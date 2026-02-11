@@ -389,6 +389,35 @@ export default definePlugin({
                 }}
             />,
             <Menu.MenuItem
+                id="blu-vc-user-actions-kick-banned"
+                label="Kick Banned Users"
+                action={() => {
+                    const channelId = SelectedChannelStore.getVoiceChannelId();
+                    if (!channelId) return;
+                    const channel = ChannelStore.getChannel(channelId);
+                    if (!channel) return;
+                    const states = VoiceStateStore.getVoiceStatesForChannel(channelId);
+                    const kickList = getKickList();
+                    let count = 0;
+                    for (const userId in states) {
+                        if (kickList.includes(userId)) {
+                            actionQueue.push({
+                                userId,
+                                channelId,
+                                guildId: channel.guild_id
+                            });
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        showToast(`Adding ${count} banned user(s) to kick queue...`);
+                        processQueue();
+                    } else {
+                        showToast("No banned users found in current channel.");
+                    }
+                }}
+            />,
+            <Menu.MenuItem
                 id="blu-vc-user-actions-settings"
                 label="Edit Settings"
                 action={() => openPluginModal(plugins["VoiceChatUserActions"])}
