@@ -1,0 +1,24 @@
+{
+    "name": "blu-vc-user-actions",
+    "version": "1.0.0",
+    "description": "Automatically takes actions against users joining your voice channel.",
+    "main": "index.tsx",
+    "author": {
+        "name": "Bluscream",
+        "url": "https://github.com/Bluscream"
+    },
+    "license": "GPL-3.0-or-later",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/bluscream-vencord-plugins/blu-vc-user-actions.git"
+    },
+    "vencord": {
+        "plugin": true,
+        "userPlugin": true
+    },
+    "files": [
+        "index.tsx",
+        "README.md",
+        "package.json"
+    ]
+}
