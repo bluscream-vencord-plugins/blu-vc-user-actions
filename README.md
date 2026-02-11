@@ -2,6 +2,13 @@
 
 Automatically takes actions against users joining your voice channel.
 
+## Screenshots
+| User Context Menu | Settings 1 |
+| :---: | :---: |
+| ![User Context Menu](https://files.catbox.moe/2rzwbx.png) | ![Settings 1](https://files.catbox.moe/w4b5lm.png) |
+| **Settings 2** | **Toolbox** |
+| ![Settings 2](https://files.catbox.moe/d4qt5u.png) | ![Toolbox](https://files.catbox.moe/4ershp.png) |
+
 ## Features
 - Auto kick users from voice channels based on a list.
 - Configurable kick messages with template variables.
