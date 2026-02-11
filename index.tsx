@@ -27,7 +27,7 @@ import {
     ChannelActions,
     ChannelRouter,
 } from "@webpack/common";
-import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import type { User } from "@vencord/discord-types";
 
 const pluginName = "VoiceChatUserActions";
@@ -130,10 +130,10 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: {
     const kickList = getKickList();
     const isKicked = kickList.includes(user.id);
 
-    children.push(
+    const item = (
         <Menu.MenuItem
             id="vc-blu-vc-user-action"
-            label={isKicked ? "Remove from Auto Kick" : "Auto Kick from VC"}
+            label={isKicked ? "Stop Auto Kick" : "Auto Kick from VC"}
             action={async () => {
                 const newList = isKicked
                     ? kickList.filter(id => id !== user.id)
@@ -164,9 +164,21 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: {
                     }
                 }
             }}
-            color={isKicked ? undefined : "danger"}
+            color={isKicked ? "success" : "danger"}
         />
     );
+
+    const group = findGroupChildrenByChildId("block", children);
+    if (group) {
+        const index = group.findIndex(c => c?.props?.id === "block");
+        if (index !== -1) {
+            group.splice(index + 1, 0, item);
+        } else {
+            group.push(item);
+        }
+    } else {
+        children.push(item);
+    }
 };
 
 // Queue handling
