@@ -1,4 +1,5 @@
-import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { registerSharedContextMenu } from "./utils/menus";
 import {
     ChannelStore,
     SelectedChannelStore,
@@ -23,8 +24,8 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
 
     const submenu = (
         <Menu.MenuItem
-            id="socialize-guild-user-submenu"
-            label={pluginName}
+            id="socialize-guild-user-actions"
+            label="Kicking"
         >
             <Menu.MenuItem
                 id="vc-blu-vc-user-action"
@@ -65,17 +66,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
         </Menu.MenuItem>
     );
 
-    const group = findGroupChildrenByChildId("block", children);
-    if (group) {
-        const index = group.findIndex(c => c?.props?.id === "block");
-        if (index !== -1) {
-            group.splice(index + 1, 0, submenu);
-        } else {
-            group.push(submenu);
-        }
-    } else {
-        children.push(submenu);
-    }
+    children.splice(-1, 0, submenu);
 };
 
 export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {

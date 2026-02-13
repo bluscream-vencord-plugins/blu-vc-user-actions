@@ -8,10 +8,12 @@ import {
     MessageStore,
     RestAPI,
     Constants,
+    showToast,
+    SelectedChannelStore,
 } from "@webpack/common";
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, ChannelOwner } from "./state";
-import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatClaimMessage, getRotateNames, formatSetChannelNameMessage } from "./utils";
+import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo } from "./state";
+import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoEmbed } from "./utils";
 
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
@@ -34,7 +36,7 @@ export async function processQueue() {
         const channel = ChannelStore.getChannel(channelId);
         const guild = guildId ? GuildStore.getGuild(guildId) : null;
 
-        let formattedMessage = settings.store.autoKickMessage
+        let formattedMessage = settings.store.kickCommand
             .replace(/{user_id}/g, userId)
             .replace(/{channel_id}/g, channelId)
             .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
@@ -66,6 +68,7 @@ export async function processQueue() {
 }
 
 export function notifyOwnership(channelId: string) {
+    if (!settings.store.enabled) return;
     const ownerInfo = getOwnerForChannel(channelId);
     if (!ownerInfo || !ownerInfo.userId) return;
 
@@ -163,7 +166,7 @@ export async function fetchAllOwners() {
     log(`Finished batch fetching owners.`);
 }
 export function claimChannel(channelId: string, formerOwnerId?: string) {
-    const formatted = formatClaimMessage(channelId, formerOwnerId);
+    const formatted = formatclaimCommand(channelId, formerOwnerId);
     log(`Automatically claiming channel ${channelId}: ${formatted}`);
     sendMessage(channelId, { content: formatted });
 }
@@ -180,7 +183,7 @@ export function rotateChannelName(channelId: string) {
     if (index >= names.length) index = 0;
 
     const nextName = names[index];
-    const formatted = formatSetChannelNameMessage(channelId, nextName);
+    const formatted = formatsetChannelNameCommand(channelId, nextName);
 
     log(`Rotating channel ${channelId} to name: ${nextName} (Index: ${index})`);
     sendMessage(channelId, { content: formatted });
@@ -189,6 +192,7 @@ export function rotateChannelName(channelId: string) {
 }
 
 export function startRotation(channelId: string) {
+    if (!settings.store.enabled) return;
     if (state.rotationIntervals.has(channelId)) return;
 
     if (!settings.store.rotateChannelNamesEnabled) {
@@ -233,9 +237,30 @@ export function stopRotation(channelId: string) {
 export function handleOwnershipChange(channelId: string, ownerId: string) {
     const me = UserStore.getCurrentUser();
     if (ownerId === me?.id) {
+        // We became the owner - start rotation and fetch channel info
         startRotation(channelId);
+        requestChannelInfo(channelId);
     } else {
         stopRotation(channelId);
+    }
+}
+
+export function handleOwnerUpdate(channelId: string, owner: ChannelOwner) {
+    if (updateOwner(channelId, owner)) {
+        notifyOwnership(channelId);
+        handleOwnershipChange(channelId, owner.userId);
+
+        const settingAny = settings.store.ownershipChangeNotificationAny;
+        const isMyChannel = state.myLastVoiceChannelId === channelId;
+        const isCurrentChat = SelectedChannelStore.getChannelId() === channelId;
+
+        if (settingAny || isMyChannel || isCurrentChat) {
+            const channel = ChannelStore.getChannel(channelId);
+            const user = UserStore.getUser(owner.userId);
+            const ownerName = user?.globalName || user?.username || owner.userId;
+            const channelName = channel?.name || channelId;
+            showToast(`Channel "${channelName}" now owned by "${ownerName}"`);
+        }
     }
 }
 
@@ -249,7 +274,7 @@ export function restartAllRotations() {
     }
 
     // If enabled, try to start rotation in the current channel if we are the owner
-    if (settings.store.rotateChannelNamesEnabled && state.myLastVoiceChannelId) {
+    if (settings.store.enabled && settings.store.rotateChannelNamesEnabled && state.myLastVoiceChannelId) {
         const ownerInfo = getOwnerForChannel(state.myLastVoiceChannelId);
         const me = UserStore.getCurrentUser();
         if (ownerInfo?.userId === me?.id) {
@@ -257,6 +282,16 @@ export function restartAllRotations() {
             startRotation(state.myLastVoiceChannelId);
         }
     }
+}
+
+export function requestChannelInfo(channelId: string) {
+    log(`Requesting channel info for ${channelId} using command: ${settings.store.infoCommand}`);
+    sendMessage(channelId, { content: settings.store.infoCommand });
+}
+
+export function handleInfoUpdate(channelId: string, info: ChannelInfo) {
+    setChannelInfo(info);
+    log(`Updated channel info`);
 }
 
 state.onRotationSettingsChange = restartAllRotations;

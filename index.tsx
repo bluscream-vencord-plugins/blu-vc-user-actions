@@ -1,4 +1,5 @@
 import definePlugin from "@utils/types";
+import { sendMessage } from "@utils/discord";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
 import {
@@ -17,7 +18,7 @@ import {
 
 import { pluginName, settings } from "./settings";
 import { state, actionQueue, processedUsers } from "./state";
-import { log, getKickList, getOwnerForChannel, updateOwner } from "./utils";
+import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -28,12 +29,17 @@ import {
     startRotation,
     stopRotation,
     handleOwnershipChange,
+    handleOwnerUpdate,
+    requestChannelInfo,
+    handleInfoUpdate,
 } from "./logic";
+import { parseBotInfoEmbed } from "./utils";
 import {
     UserContextMenuPatch,
     GuildContextMenuPatch,
     ChannelContextMenuPatch,
 } from "./menus";
+import { registerSharedContextMenu } from "./utils/menus";
 
 export default definePlugin({
     name: pluginName,
@@ -43,11 +49,6 @@ export default definePlugin({
     ],
     description: "Automatically takes actions against users joining your voice channel.",
     settings,
-    contextMenus: {
-        "user-context": UserContextMenuPatch,
-        "guild-context": GuildContextMenuPatch,
-        "channel-context": ChannelContextMenuPatch
-    },
     toolboxActions: () => {
         const currentGuildId = SelectedGuildStore.getGuildId();
         if (currentGuildId !== settings.store.guildId) return [];
@@ -83,8 +84,7 @@ export default definePlugin({
                     if (cid) {
                         const owner = await checkChannelOwner(cid, settings.store.botId);
                         if (owner.userId) {
-                            notifyOwnership(cid);
-                            handleOwnershipChange(cid, owner.userId);
+                            handleOwnerUpdate(cid, owner);
                         }
                     }
                 }}
@@ -133,6 +133,15 @@ export default definePlugin({
                 }}
             />,
             <Menu.MenuItem
+                id="blu-vc-user-actions-get-info"
+                label="Get Channel Info"
+                disabled={!channelId}
+                action={() => {
+                    const cid = SelectedChannelStore.getVoiceChannelId();
+                    if (cid) requestChannelInfo(cid);
+                }}
+            />,
+            <Menu.MenuItem
                 id="blu-vc-user-actions-settings"
                 label="Edit Settings"
                 action={() => openPluginModal(plugins[pluginName])}
@@ -153,7 +162,7 @@ export default definePlugin({
                 state.myLastVoiceChannelId = initialCid;
                 if (initialCid) {
                     checkChannelOwner(initialCid, settings.store.botId).then(owner => {
-                        if (owner.userId) notifyOwnership(initialCid);
+                        if (owner.userId) handleOwnerUpdate(initialCid, owner);
                     });
                 }
             }
@@ -171,8 +180,7 @@ export default definePlugin({
                         if (newChannelId) {
                             checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
                                 if (owner.userId) {
-                                    notifyOwnership(newChannelId);
-                                    handleOwnershipChange(newChannelId, owner.userId);
+                                    handleOwnerUpdate(newChannelId, owner);
                                 }
                             });
                         }
@@ -207,53 +215,131 @@ export default definePlugin({
             const myChannelId = state.myLastVoiceChannelId;
             if (!myChannelId) return;
 
-            for (const s of targetGuildVoiceStates) {
-                if (s.userId === me.id) continue;
+            // Auto-kick logic
+            if (settings.store.autoKickEnabled) {
+                for (const s of targetGuildVoiceStates) {
+                    if (s.userId === me.id) continue;
 
-                if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
-                    const kickList = getKickList();
-                    if (kickList.includes(s.userId)) {
-                        const now = Date.now();
-                        const lastAction = processedUsers.get(s.userId) || 0;
-                        if (now - lastAction < settings.store.queueTime) continue;
+                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
+                        const kickList = getKickList();
+                        if (kickList.includes(s.userId)) {
+                            const now = Date.now();
+                            const lastAction = processedUsers.get(s.userId) || 0;
+                            if (now - lastAction < settings.store.queueTime) continue;
 
-                        let ownerInfo = getOwnerForChannel(myChannelId);
-                        if (!ownerInfo || ownerInfo.userId === "") {
-                            ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                            let ownerInfo = getOwnerForChannel(myChannelId);
+                            if (!ownerInfo || ownerInfo.userId === "") {
+                                ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                            }
+
+                            if (ownerInfo?.userId === me.id) {
+                                log(`Adding ${s.userId} to action queue`);
+                                actionQueue.push({
+                                    userId: s.userId,
+                                    channelId: myChannelId,
+                                    guildId: s.guildId
+                                });
+                                processQueue();
+                            } else {
+                                log(`Not owner of ${myChannelId} (Owner: ${ownerInfo?.userId}), skipping kick for ${s.userId}`);
+                            }
                         }
+                    }
+                }
+            }
 
-                        if (ownerInfo?.userId === me.id) {
-                            log(`Adding ${s.userId} to action queue`);
-                            actionQueue.push({
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId
-                            });
-                            processQueue();
-                        } else {
-                            log(`Not owner of ${myChannelId} (Owner: ${ownerInfo?.userId}), skipping kick for ${s.userId}`);
+            // Ban rotation logic
+            if (settings.store.banRotateEnabled) {
+                for (const s of targetGuildVoiceStates) {
+                    if (s.userId === me.id) continue;
+
+                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
+                        const kickList = getKickList();
+                        if (kickList.includes(s.userId)) {
+                            // Check if user is already banned
+                            if (!state.channelInfo?.banned.includes(s.userId)) {
+                                let ownerInfo = getOwnerForChannel(myChannelId);
+                                if (!ownerInfo || ownerInfo.userId === "") {
+                                    ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                                }
+
+                                if (ownerInfo?.userId === me.id) {
+                                    // Get first banned user to unban
+                                    const userToUnban = state.channelInfo?.banned[0];
+
+                                    if (userToUnban) {
+                                        // Send unban command
+                                        const unbanCmd = formatUnbanCommand(myChannelId, userToUnban);
+                                        log(`Ban rotation: Unbanning ${userToUnban}`);
+                                        sendMessage(myChannelId, { content: unbanCmd });
+
+                                        // Update cache - remove from banned
+                                        if (state.channelInfo) {
+                                            state.channelInfo.banned = state.channelInfo.banned.filter(id => id !== userToUnban);
+                                        }
+                                    }
+
+                                    // Send ban command for joining user
+                                    const banCmd = formatBanCommand(myChannelId, s.userId);
+                                    log(`Ban rotation: Banning ${s.userId}`);
+                                    sendMessage(myChannelId, { content: banCmd });
+
+                                    // Update cache - add to banned
+                                    if (state.channelInfo && !state.channelInfo.banned.includes(s.userId)) {
+                                        state.channelInfo.banned.push(s.userId);
+                                    }
+                                } else {
+                                    log(`Not owner of ${myChannelId} (Owner: ${ownerInfo?.userId}), skipping ban rotation for ${s.userId}`);
+                                }
+                            } else {
+                                log(`User ${s.userId} is already banned, skipping ban rotation`);
+                            }
                         }
                     }
                 }
             }
         },
         MESSAGE_CREATE({ message }) {
-            if (!settings.store.enabled || !state.myLastVoiceChannelId) return;
+            if (!settings.store.enabled) return;
             if (message.guildId !== settings.store.guildId) return;
-            if (message.channelId !== state.myLastVoiceChannelId) return;
 
+            // Handle Ownership from Bot Messages
             const owner = getMessageOwner(message, settings.store.botId);
             if (owner) {
-                if (updateOwner(message.channelId, owner)) {
-                    notifyOwnership(message.channelId);
-                    handleOwnershipChange(message.channelId, owner.userId);
+                handleOwnerUpdate(message.channelId, owner);
+                return;
+            }
+
+            // Handle Channel Info from Bot Messages
+            if (message.author.id === settings.store.botId) {
+                const embed = message.embeds?.[0];
+                if (embed && embed.author?.name === "Channel Settings" && embed.rawDescription) {
+                    const info = parseBotInfoEmbed(embed.rawDescription);
+                    if (info) {
+                        handleInfoUpdate(message.channelId, info);
+                    }
                 }
             }
         }
     },
+    stopCleanup: null as (() => void) | null,
     onStart() {
-        if (settings.store.fetchOwnersOnStartup) {
+        if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }
+        this.stopCleanup = registerSharedContextMenu(pluginName, {
+            "user-context": (children, props) => {
+                if (props.user) UserContextMenuPatch(children, props);
+            },
+            "guild-context": (children, props) => {
+                if (props.guild) GuildContextMenuPatch(children, props);
+            },
+            "channel-context": (children, props) => {
+                if (props.channel) ChannelContextMenuPatch(children, props);
+            }
+        }, log);
+    },
+    onStop() {
+        this.stopCleanup?.();
     }
 });
