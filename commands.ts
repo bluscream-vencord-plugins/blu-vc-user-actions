@@ -2,7 +2,7 @@ import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessa
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { settings } from "./settings";
 import { state, channelOwners } from "./state";
-import { getOwnerForChannel } from "./utils";
+import { getOwnerForChannel, getKickList } from "./utils";
 import type { Embed } from "@vencord/discord-types";
 
 export const commands = [
@@ -91,11 +91,13 @@ export const commands = [
                     inline: false
                 });
 
+                const max_items = 15
+
                 if (info.permitted && info.permitted.length > 0) {
                     embed.fields.push({
                         name: `✅ Permitted Users (${info.permitted.length})`,
-                        value: info.permitted.slice(0, 10).map(id => `<@${id}>`).join(", ") +
-                            (info.permitted.length > 10 ? `\n*...and ${info.permitted.length - 10} more*` : ""),
+                        value: info.permitted.slice(0, max_items).map(id => `<@${id}>`).join(", ") +
+                            (info.permitted.length > max_items ? `\n*...and ${info.permitted.length - max_items} more*` : ""),
                         inline: false
                     });
                 }
@@ -103,8 +105,18 @@ export const commands = [
                 if (info.banned && info.banned.length > 0) {
                     embed.fields.push({
                         name: `🚫 Banned Users (${info.banned.length})`,
-                        value: info.banned.slice(0, 10).map(id => `<@${id}>`).join(", ") +
-                            (info.banned.length > 10 ? `\n*...and ${info.banned.length - 10} more*` : ""),
+                        value: info.banned.slice(0, max_items).map(id => `<@${id}>`).join(",") +
+                            (info.banned.length > max_items ? `\n*...and ${info.banned.length - max_items} more*` : ""),
+                        inline: false
+                    });
+                }
+
+                const localBanList = getKickList();
+                if (localBanList && localBanList.length > 0) {
+                    embed.fields.push({
+                        name: `🚫 Local Ban List (${localBanList.length})`,
+                        value: localBanList.slice(0, max_items).map(id => `<@${id}>`).join(",") +
+                            (localBanList.length > max_items ? `\n*...and ${localBanList.length - max_items} more*` : ""),
                         inline: false
                     });
                 }
