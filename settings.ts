@@ -59,20 +59,10 @@ export const settings = definePluginSettings({
             settings.store.ownershipChangeMessageReference = settings.def.ownershipChangeMessageReference.default;
         }
     },
-    createChannelId: {
-        type: OptionType.STRING,
-        description: "The Channel ID to join when clicking 'Create Channel'",
-        default: "763914043252801566",
-    },
-    botId: {
-        type: OptionType.STRING,
-        description: "The Bot ID that sends the welcome message",
-        default: "913852862990262282",
-    },
-    guildId: {
-        type: OptionType.STRING,
-        description: "The Guild ID for this plugin",
-        default: "505974446914535426",
+    fetchOwnersOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Fetch all owners in the category on startup",
+        default: false,
     },
     queueTime: {
         type: OptionType.SLIDER,
@@ -87,14 +77,24 @@ export const settings = definePluginSettings({
         description: "Enable automated actions",
         default: true,
     },
+    createChannelId: {
+        type: OptionType.STRING,
+        description: "The Channel ID to join when clicking 'Create Channel'",
+        default: "763914043252801566",
+    },
+    botId: {
+        type: OptionType.STRING,
+        description: "The Bot ID that sends the welcome message",
+        default: "913852862990262282",
+    },
     categoryId: {
         type: OptionType.STRING,
         description: "The Category ID to monitor for channel owners",
         default: "763914042628112455",
     },
-    fetchOwnersOnStartup: {
-        type: OptionType.BOOLEAN,
-        description: "Fetch all owners in the category on startup",
-        default: false,
+    guildId: {
+        type: OptionType.STRING,
+        description: "The Guild ID for this plugin",
+        default: "505974446914535426",
     },
 });
