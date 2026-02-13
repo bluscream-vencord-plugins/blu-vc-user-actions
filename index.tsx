@@ -5,12 +5,14 @@ import {
     ChannelStore,
     UserStore,
     SelectedChannelStore,
+    SelectedGuildStore,
     VoiceStateStore,
     Menu,
     showToast,
     ChannelActions,
     ChannelRouter,
     GuildStore,
+    React,
 } from "@webpack/common";
 
 import { pluginName, settings } from "./settings";
@@ -47,17 +49,20 @@ export default definePlugin({
         "channel-context": ChannelContextMenuPatch
     },
     toolboxActions: () => {
-        const channelId = SelectedChannelStore.getVoiceChannelId();
-        const channel = channelId ? ChannelStore.getChannel(channelId) : null;
-        if (channel?.guild_id !== settings.store.guildId) return [];
+        const currentGuildId = SelectedGuildStore.getGuildId();
+        if (currentGuildId !== settings.store.guildId) return [];
 
         const { enabled } = settings.use(["enabled"]);
+        const channelId = SelectedChannelStore.getVoiceChannelId();
+        const channel = channelId ? ChannelStore.getChannel(channelId) : null;
+
         const channelOwnerInfo = channelId ? getOwnerForChannel(channelId) : undefined;
         const owner = channelOwnerInfo?.userId ? UserStore.getUser(channelOwnerInfo.userId) : null;
         const ownerName = owner?.globalName || owner?.username || channelOwnerInfo?.userId;
-        let status = "Not Owned";
-        if (channelOwnerInfo?.userId) {
-            status = `Owned by ${ownerName} (${channelOwnerInfo.reason})`;
+
+        let status = "Not in Voice Channel";
+        if (channelId) {
+            status = channelOwnerInfo?.userId ? `Owned by ${ownerName} (${channelOwnerInfo.reason})` : "Not Owned";
         }
 
         return [
@@ -72,6 +77,7 @@ export default definePlugin({
             <Menu.MenuItem
                 id="blu-vc-user-actions-check-ownership"
                 label="Check Ownership"
+                disabled={!channelId}
                 action={async () => {
                     const cid = SelectedChannelStore.getVoiceChannelId();
                     if (cid) {
@@ -90,7 +96,7 @@ export default definePlugin({
                     const createChannelId = settings.store.createChannelId;
                     if (createChannelId) {
                         ChannelActions.selectVoiceChannel(createChannelId);
-                        ChannelRouter.transitionToChannel(createChannelId);
+                        // ChannelRouter.transitionToChannel(createChannelId);
                     } else {
                         showToast("No Create Channel ID configured in settings.");
                     }
@@ -99,6 +105,7 @@ export default definePlugin({
             <Menu.MenuItem
                 id="blu-vc-user-actions-kick-banned"
                 label="Kick Banned Users"
+                disabled={!channelId}
                 action={() => {
                     const cid = SelectedChannelStore.getVoiceChannelId();
                     if (!cid) return;
