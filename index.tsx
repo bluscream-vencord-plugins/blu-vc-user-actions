@@ -148,6 +148,11 @@ export default definePlugin({
             />
         ];
     },
+    contextMenus: {
+        "user-context": UserContextMenuPatch,
+        "guild-context": GuildContextMenuPatch,
+        "channel-context": ChannelContextMenuPatch,
+    },
     flux: {
         async VOICE_STATE_UPDATES({ voiceStates }) {
             if (!settings.store.enabled) return;

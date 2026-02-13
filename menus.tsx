@@ -20,23 +20,23 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
     if (channel?.guild_id !== settings.store.guildId) return;
     if (!user) return;
     const kickList = getKickList();
-    const isKicked = kickList.includes(user.id);
+    const isBanned = kickList.includes(user.id);
 
     const submenu = (
         <Menu.MenuItem
             id="socialize-guild-user-actions"
-            label="Kicking"
+            label={`${pluginName}`}
         >
             <Menu.MenuItem
                 id="vc-blu-vc-user-action"
-                label={isKicked ? "Stop Auto Kick" : "Auto Kick from VC"}
+                label={isBanned ? "Unban from VC" : "Ban from VC"}
                 action={async () => {
-                    const newList = isKicked
+                    const newList = isBanned
                         ? kickList.filter(id => id !== user.id)
                         : [...kickList, user.id];
                     setKickList(newList);
 
-                    if (!isKicked) {
+                    if (!isBanned) {
                         const myChannelId = SelectedChannelStore.getVoiceChannelId();
                         if (myChannelId) {
                             const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
@@ -61,7 +61,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                         }
                     }
                 }}
-                color={isKicked ? "success" : "danger"}
+                color={isBanned ? "success" : "danger"}
             />
         </Menu.MenuItem>
     );
