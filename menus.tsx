@@ -78,15 +78,13 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
     children.splice(-1, 0, submenu);
 };
 
+import { getSharedMenuItems } from "./sharedMenu";
+
 export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
     if (guild?.id !== settings.store.guildId) return;
     children.push(
         <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginName}>
-            <Menu.MenuItem
-                id="socialize-guild-claim-disbanded"
-                label="Claim Disbanded Channels"
-                action={() => claimAllDisbandedChannels(guild.id)}
-            />
+            {getSharedMenuItems()}
         </Menu.MenuItem>
     );
 };
