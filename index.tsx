@@ -30,7 +30,7 @@ import {
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import type { User } from "@vencord/discord-types";
 
-const pluginName = "VoiceChatUserActions";
+const pluginName = "SocializeGuild";
 
 function log(...args: any[]) {
     console.log(`[${pluginName}]`, ...args);
@@ -102,6 +102,11 @@ const settings = definePluginSettings({
         description: "The Bot ID that sends the welcome message",
         default: "913852862990262282",
     },
+    guildId: {
+        type: OptionType.STRING,
+        description: "The Guild ID for this plugin",
+        default: "505974446914535426",
+    },
     queueTime: {
         type: OptionType.SLIDER,
         description: "Minimum time between actions in ms",
@@ -126,59 +131,85 @@ function setKickList(list: string[]) {
 }
 
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
+    const channelId = SelectedChannelStore.getChannelId();
+    const channel = ChannelStore.getChannel(channelId);
+    if (channel?.guild_id !== settings.store.guildId) return;
     if (!user) return;
     const kickList = getKickList();
     const isKicked = kickList.includes(user.id);
 
-    const item = (
+    const submenu = (
         <Menu.MenuItem
-            id="vc-blu-vc-user-action"
-            label={isKicked ? "Stop Auto Kick" : "Auto Kick from VC"}
-            action={async () => {
-                const newList = isKicked
-                    ? kickList.filter(id => id !== user.id)
-                    : [...kickList, user.id];
-                setKickList(newList);
+            id="socialize-guild-user-submenu"
+            label={pluginName}
+        >
+            <Menu.MenuItem
+                id="vc-blu-vc-user-action"
+                label={isKicked ? "Stop Auto Kick" : "Auto Kick from VC"}
+                action={async () => {
+                    const newList = isKicked
+                        ? kickList.filter(id => id !== user.id)
+                        : [...kickList, user.id];
+                    setKickList(newList);
 
-                if (!isKicked) {
-                    const myChannelId = SelectedChannelStore.getVoiceChannelId();
-                    if (myChannelId) {
-                        const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
-                        if (voiceState) {
-                            const me = UserStore.getCurrentUser();
-                            if (channelOwner.userId === "") {
-                                channelOwner = await checkChannelOwner(myChannelId, settings.store.botId);
-                            }
-                            log(`Context menu kick: Channel ${myChannelId} Owner ${channelOwner.userId} Me ${me?.id}`);
-                            if (channelOwner.userId === me?.id) {
-                                actionQueue.push({
-                                    userId: user.id,
-                                    channelId: myChannelId,
-                                    guildId: voiceState.guildId
-                                });
-                                processQueue();
-                            } else {
-                                showToast(`Not owner of channel (Owner: ${channelOwner.userId || "None"})`);
+                    if (!isKicked) {
+                        const myChannelId = SelectedChannelStore.getVoiceChannelId();
+                        if (myChannelId) {
+                            const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                            if (voiceState) {
+                                const me = UserStore.getCurrentUser();
+                                if (channelOwner.userId === "") {
+                                    channelOwner = await checkChannelOwner(myChannelId, settings.store.botId);
+                                }
+                                log(`Context menu kick: Channel ${myChannelId} Owner ${channelOwner.userId} Me ${me?.id}`);
+                                if (channelOwner.userId === me?.id) {
+                                    actionQueue.push({
+                                        userId: user.id,
+                                        channelId: myChannelId,
+                                        guildId: voiceState.guildId
+                                    });
+                                    processQueue();
+                                } else {
+                                    showToast(`Not owner of channel (Owner: ${channelOwner.userId || "None"})`);
+                                }
                             }
                         }
                     }
-                }
-            }}
-            color={isKicked ? "success" : "danger"}
-        />
+                }}
+                color={isKicked ? "success" : "danger"}
+            />
+        </Menu.MenuItem>
     );
 
     const group = findGroupChildrenByChildId("block", children);
     if (group) {
         const index = group.findIndex(c => c?.props?.id === "block");
         if (index !== -1) {
-            group.splice(index + 1, 0, item);
+            group.splice(index + 1, 0, submenu);
         } else {
-            group.push(item);
+            group.push(submenu);
         }
     } else {
-        children.push(item);
+        children.push(submenu);
     }
+};
+
+const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
+    if (guild?.id !== settings.store.guildId) return;
+    children.push(
+        <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginName}>
+            {/* Future items here */}
+        </Menu.MenuItem>
+    );
+};
+
+const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, { channel }) => {
+    if (channel?.guild_id !== settings.store.guildId) return;
+    children.push(
+        <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginName}>
+            {/* Future items here */}
+        </Menu.MenuItem>
+    );
 };
 
 // Queue handling
@@ -355,9 +386,15 @@ export default definePlugin({
     description: "Automatically takes actions against users joining your voice channel.",
     settings,
     contextMenus: {
-        "user-context": UserContextMenuPatch
+        "user-context": UserContextMenuPatch,
+        "guild-context": GuildContextMenuPatch,
+        "channel-context": ChannelContextMenuPatch
     },
     toolboxActions: () => {
+        const channelId = SelectedChannelStore.getChannelId();
+        const channel = ChannelStore.getChannel(channelId);
+        if (channel?.guild_id !== settings.store.guildId) return [];
+
         const { enabled } = settings.use(["enabled"]);
         const owner = UserStore.getUser(channelOwner.userId);
         const ownerName = owner?.globalName || owner?.username || channelOwner.userId;
@@ -432,7 +469,7 @@ export default definePlugin({
             <Menu.MenuItem
                 id="blu-vc-user-actions-settings"
                 label="Edit Settings"
-                action={() => openPluginModal(plugins["VoiceChatUserActions"])}
+                action={() => openPluginModal(plugins[pluginName])}
             />
         ];
     },
@@ -441,6 +478,10 @@ export default definePlugin({
             if (!settings.store.enabled) return;
             const me = UserStore.getCurrentUser();
             if (!me) return;
+
+            // Filter states to only include our target guild
+            const targetGuildVoiceStates = voiceStates.filter(s => s.guildId === settings.store.guildId);
+            if (targetGuildVoiceStates.length === 0) return;
 
             // Initialize on first run
             if (myLastVoiceChannelId === undefined) {
@@ -454,7 +495,7 @@ export default definePlugin({
                 }
             }
 
-            for (const state of voiceStates) {
+            for (const state of targetGuildVoiceStates) {
                 if (state.userId === me.id) {
                     const newChannelId = state.channelId ?? null;
                     if (newChannelId !== myLastVoiceChannelId) {
@@ -477,7 +518,7 @@ export default definePlugin({
 
             // If we are still checking ownership, we might want to wait or skip.
             // But since checkChannelOwnership is called when we join, it should usually be ready.
-            for (const state of voiceStates) {
+            for (const state of targetGuildVoiceStates) {
                 if (state.userId === me.id) continue;
 
                 // User joined or moved to my channel
@@ -510,6 +551,7 @@ export default definePlugin({
         },
         MESSAGE_CREATE({ message }) {
             if (!settings.store.enabled || !myLastVoiceChannelId) return;
+            if (message.guildId !== settings.store.guildId) return;
             if (message.channelId !== myLastVoiceChannelId) return;
 
             const me = UserStore.getCurrentUser();
