@@ -235,8 +235,26 @@ export function startRotation(channelId: string) {
 
     log(`Starting channel name rotation for ${channelId} every ${intervalMinutes} minutes.`);
 
-    // Initial rotation
-    rotateChannelName(channelId);
+    // Check if current name is in rotation list to determine starting index
+    const channel = ChannelStore.getChannel(channelId);
+    let startIndex = 0;
+    if (channel) {
+        // Strip potential configured prefixes/suffixes if needed? The user didn't ask for fuzzy matching, just "current channel name".
+        // Assuming exact match for now as stored in getRotateNames().
+        // Note: getRotateNames might return names to set. Channel name might effectively update.
+        const currentName = channel.name;
+        const idx = names.indexOf(currentName);
+        if (idx !== -1) {
+            startIndex = (idx + 1) % names.length;
+            log(`Current name '${currentName}' found at index ${idx}. Next rotation will use index ${startIndex}.`);
+        } else {
+            log(`Current name '${currentName}' not found in rotation list. Starting from index 0.`);
+        }
+    }
+    state.rotationIndex.set(channelId, startIndex);
+
+    // Initial rotation Removed to wait for first interval
+    // rotateChannelName(channelId);
 
     const intervalId = setInterval(() => {
         rotateChannelName(channelId);
