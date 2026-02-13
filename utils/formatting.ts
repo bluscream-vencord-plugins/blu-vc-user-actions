@@ -112,3 +112,9 @@ export function formatWhitelistSkipMessage(channelId: string, userId: string, ac
     formatted = formatted.replace(/{action}/g, actionType);
     return formatted;
 }
+
+export function toDiscordTime(datetime: number | Date, relative = false): string {
+    const timestamp = typeof datetime === 'number' ? datetime : datetime.getTime();
+    const seconds = Math.floor(timestamp / 1000);
+    return `<t:${seconds}${relative ? ":R" : ""}>`;
+}

@@ -228,6 +228,7 @@ export function rotateChannelName(channelId: string) {
     sendMessage(channelId, { content: formatted });
 
     state.rotationIndex.set(channelId, (index + 1) % names.length);
+    state.lastRotationTime.set(channelId, Date.now());
 }
 
 export function startRotation(channelId: string) {
@@ -279,6 +280,7 @@ export function startRotation(channelId: string) {
     }, intervalMinutes * 60 * 1000);
 
     state.rotationIntervals.set(channelId, intervalId);
+    state.lastRotationTime.set(channelId, Date.now());
 }
 
 export function stopRotation(channelId: string) {
@@ -288,6 +290,7 @@ export function stopRotation(channelId: string) {
         clearInterval(intervalId);
         state.rotationIntervals.delete(channelId);
         state.rotationIndex.delete(channelId);
+        state.lastRotationTime.delete(channelId);
     }
 }
 

@@ -1,8 +1,8 @@
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { settings } from "./settings";
-import { state, channelOwners } from "./state";
-import { getOwnerForChannel, getKickList } from "./utils";
+import { state, channelOwners, actionQueue, processedUsers } from "./state";
+import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
 import type { Embed } from "@vencord/discord-types";
 
 export const commands = [
@@ -40,7 +40,7 @@ export const commands = [
             const ownerInfo = getOwnerForChannel(channelId);
             const ownerUser = ownerInfo?.userId ? UserStore.getUser(ownerInfo.userId) : null;
             const ownerName = ownerUser?.globalName || ownerUser?.username || ownerInfo?.userId || "Unknown";
-            const ownerTimestamp = ownerInfo?.timestamp ? `<t:${Math.floor(ownerInfo.timestamp / 1000)}:R>` : "Unknown";
+            const ownerTimestamp = ownerInfo?.timestamp ? toDiscordTime(ownerInfo.timestamp, true) : "Unknown";
 
             // Get channel info
             const info = state.channelInfo;
@@ -61,7 +61,7 @@ export const commands = [
                     {
                         name: "👑 Owner",
                         value: ownerInfo?.userId
-                            ? `<@${ownerInfo.userId}>\n**Reason:** ${ownerInfo.reason}\n**Since:** ${ownerTimestamp}\n**Cached:** <t:${Math.floor(ownerInfo.updated / 1000)}:R>`
+                            ? `<@${ownerInfo.userId}>\n**Reason:** ${ownerInfo.reason}\n**Since:** ${ownerTimestamp}\n**Cached:** ${toDiscordTime(ownerInfo.updated, true)}`
                             : "Unknown",
                         inline: true
                     },
@@ -85,8 +85,8 @@ export const commands = [
                         info.name ? `**Name:** ${info.name}` : null,
                         info.limit ? `**Limit:** ${info.limit}` : null,
                         info.status ? `**Status:** ${info.status}` : null,
-                        `**Since:** <t:${Math.floor(info.timestamp / 1000)}:R>`,
-                        `**Cached:** <t:${Math.floor(info.updated / 1000)}:R>`
+                        `**Since:** ${toDiscordTime(info.timestamp, true)}`,
+                        `**Cached:** ${toDiscordTime(info.updated, true)}`
                     ].filter(Boolean).join("\n") || "No data",
                     inline: false
                 });
@@ -121,6 +121,38 @@ export const commands = [
                     });
                 }
             }
+
+            // Global Info
+            if (isMyChannel && settings.store.rotateChannelNamesEnabled) {
+                const names = getRotateNames();
+                const interval = settings.store.rotateChannelNamesTime;
+                const nextIndex = state.rotationIndex.get(channelId) ?? 0;
+                const lastTime = state.lastRotationTime.get(channelId);
+                let nextTimeStr = "Not active";
+
+                if (lastTime) {
+                    const nextTime = lastTime + (interval * 60 * 1000);
+                    nextTimeStr = toDiscordTime(nextTime, true);
+                }
+
+                if (names.length > 0) {
+                    const nextName = names[nextIndex];
+                    embed.fields.push({
+                        name: `🔄 Rotation Info`,
+                        value: `**Interval:** ${interval}m\n**Next Name:** ${nextName}\n**Next Rotation:** ${nextTimeStr}\n**Names (${names.length}):**\n${names.map((n, i) => i === nextIndex ? `> **${n}**` : `  ${n}`).join("\n")}`,
+                        inline: false
+                    });
+                }
+            }
+
+            const queueSize = actionQueue.length;
+            const processedCount = processedUsers.size;
+
+            embed.fields.push({
+                name: "💾 Plugin Stats",
+                value: `**Cached Owners:** ${channelOwners.size}\n**Queue Size:** ${queueSize}\n**Processed Users:** ${processedCount}\n**Enabled:** ${settings.store.enabled ? "✅" : "❌"}`,
+                inline: true
+            });
 
             sendBotMessage(ctx.channel.id, {
                 embeds: [embed]
