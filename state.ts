@@ -1,6 +1,8 @@
 export interface ChannelOwner {
     userId: string;
     reason: string;
+    timestamp: number;
+    updated: number;
 }
 
 export interface ChannelInfo {
@@ -9,7 +11,8 @@ export interface ChannelInfo {
     status?: string;
     permitted: string[];
     banned: string[];
-    lastUpdated: number;
+    timestamp: number;
+    updated: number;
 }
 
 export const channelOwners = new Map<string, ChannelOwner>();

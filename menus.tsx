@@ -25,7 +25,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
     const submenu = (
         <Menu.MenuItem
             id="socialize-guild-user-actions"
-            label={`${pluginName}`}
+            label={pluginName}
         >
             <Menu.MenuItem
                 id="vc-blu-vc-user-action"

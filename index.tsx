@@ -2,6 +2,7 @@ import definePlugin from "@utils/types";
 import { sendMessage } from "@utils/discord";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
+import type { Message } from "@vencord/discord-types";
 import {
     ChannelStore,
     UserStore,
@@ -33,13 +34,21 @@ import {
     requestChannelInfo,
     handleInfoUpdate,
 } from "./logic";
-import { parseBotInfoEmbed } from "./utils";
+import { parseBotInfoMessage } from "./utils";
 import {
     UserContextMenuPatch,
     GuildContextMenuPatch,
     ChannelContextMenuPatch,
 } from "./menus";
 import { registerSharedContextMenu } from "./utils/menus";
+import { commands } from "./commands";
+
+interface MessageCreatePayload {
+    channelId: string;
+    guildId: string;
+    message: Message;
+    optimistic?: boolean;
+}
 
 export default definePlugin({
     name: pluginName,
@@ -49,6 +58,7 @@ export default definePlugin({
     ],
     description: "Automatically takes actions against users joining your voice channel.",
     settings,
+    commands,
     toolboxActions: () => {
         const currentGuildId = SelectedGuildStore.getGuildId();
         if (currentGuildId !== settings.store.guildId) return [];
@@ -182,12 +192,17 @@ export default definePlugin({
                         actionQueue.length = 0;
                         state.myLastVoiceChannelId = newChannelId;
 
+
                         if (newChannelId) {
-                            checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
-                                if (owner.userId) {
-                                    handleOwnerUpdate(newChannelId, owner);
-                                }
-                            });
+                            // Wait 1 second before checking ownership to give the bot time to send welcome message
+                            setTimeout(() => {
+                                checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
+                                    if (owner.userId) {
+                                        log(`Detailed ownership check: userId=${owner.userId}`);
+                                        handleOwnerUpdate(newChannelId, owner);
+                                    }
+                                });
+                            }, 1000);
                         }
                     }
                 }
@@ -304,24 +319,31 @@ export default definePlugin({
                 }
             }
         },
-        MESSAGE_CREATE({ message }) {
+        MESSAGE_CREATE({ message, channelId, guildId }: MessageCreatePayload) {
             if (!settings.store.enabled) return;
-            if (message.guildId !== settings.store.guildId) return;
+            if (guildId !== settings.store.guildId) return;
 
             // Handle Ownership from Bot Messages
             const owner = getMessageOwner(message, settings.store.botId);
             if (owner) {
-                handleOwnerUpdate(message.channelId, owner);
+                handleOwnerUpdate(channelId, owner);
                 return;
             }
 
             // Handle Channel Info from Bot Messages
             if (message.author.id === settings.store.botId) {
                 const embed = message.embeds?.[0];
-                if (embed && embed.author?.name === "Channel Settings" && embed.rawDescription) {
-                    const info = parseBotInfoEmbed(embed.rawDescription);
+
+                // Check if it's the specific channel info embed
+                // We use rawDescription via casting as it's an internal property, but fallback to standard description
+                const rawDesc = (embed as any)?.rawDescription || (embed as any)?.description;
+                if (embed && embed.author?.name === "Channel Settings" && rawDesc) {
+                    const info = parseBotInfoMessage(message);
                     if (info) {
-                        handleInfoUpdate(message.channelId, info);
+                        log(`Successfully parsed channel info for ${channelId}`);
+                        handleInfoUpdate(channelId, info);
+                    } else {
+                        log(`Failed to parse channel info`);
                     }
                 }
             }
@@ -329,6 +351,7 @@ export default definePlugin({
     },
     stopCleanup: null as (() => void) | null,
     onStart() {
+        log(`Plugin starting... enabled=${settings.store.enabled}, fetchOwnersOnStartup=${settings.store.fetchOwnersOnStartup}`);
         if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }

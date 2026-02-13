@@ -13,7 +13,7 @@ import {
 } from "@webpack/common";
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo } from "./state";
-import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoEmbed } from "./utils";
+import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage } from "./utils";
 
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
@@ -101,19 +101,21 @@ export function getMessageOwner(msg: any, botId: string): ChannelOwner | null {
     const authorName = embed.author?.name;
     if (authorName === "Channel Created") {
         const userId = msg.mentions?.[0]?.id || msg.mentions?.[0] || msg.content?.match(/<@!?(\d+)>/)?.[1];
-        if (userId) return { userId, reason: "Created" };
+        const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+        if (userId) return { userId, reason: "Created", timestamp, updated: Date.now() };
     } else if (authorName === "Channel Claimed") {
         const iconURL = embed.author?.iconURL;
         if (iconURL) {
             const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
-            if (userIdFromUrl) return { userId: userIdFromUrl, reason: "Claimed" };
+            const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+            if (userIdFromUrl) return { userId: userIdFromUrl, reason: "Claimed", timestamp, updated: Date.now() };
         }
     }
     return null;
 }
 
 export async function checkChannelOwner(channelId: string, botId: string): Promise<ChannelOwner> {
-    const fallback: ChannelOwner = { userId: "", reason: "Unknown" };
+    const fallback: ChannelOwner = { userId: "", reason: "Unknown", timestamp: Date.now(), updated: Date.now() };
     const cached = MessageStore.getMessages(channelId);
     let owner: ChannelOwner | null = null;
 
@@ -200,9 +202,9 @@ export function startRotation(channelId: string) {
         return;
     }
 
-    const intervalSeconds = settings.store.rotateChannelNamesTime;
-    if (intervalSeconds < 9) {
-        log(`Rotation interval for ${channelId} is less than 9 seconds, skipping.`);
+    const intervalMinutes = settings.store.rotateChannelNamesTime;
+    if (intervalMinutes < 10) {
+        log(`Rotation interval for ${channelId} is less than 10 minutes, skipping to prevent rate limits.`);
         return;
     }
 
@@ -212,14 +214,14 @@ export function startRotation(channelId: string) {
         return;
     }
 
-    log(`Starting channel name rotation for ${channelId} every ${intervalSeconds} seconds.`);
+    log(`Starting channel name rotation for ${channelId} every ${intervalMinutes} minutes.`);
 
     // Initial rotation
     rotateChannelName(channelId);
 
     const intervalId = setInterval(() => {
         rotateChannelName(channelId);
-    }, intervalSeconds * 1000);
+    }, intervalMinutes * 60 * 1000);
 
     state.rotationIntervals.set(channelId, intervalId);
 }
@@ -236,11 +238,14 @@ export function stopRotation(channelId: string) {
 
 export function handleOwnershipChange(channelId: string, ownerId: string) {
     const me = UserStore.getCurrentUser();
+    log(`Ownership change for ${channelId}: owner is ${ownerId}, me is ${me?.id}`);
     if (ownerId === me?.id) {
         // We became the owner - start rotation and fetch channel info
+        log(`We are the owner! Starting rotation and requesting channel info`);
         startRotation(channelId);
         requestChannelInfo(channelId);
     } else {
+        log(`We are not the owner, stopping rotation`);
         stopRotation(channelId);
     }
 }

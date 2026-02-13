@@ -1,13 +1,32 @@
 import { ChannelInfo } from "../state";
 import { log } from "./logging";
+import type { Message } from "@vencord/discord-types";
 
-export function parseBotInfoEmbed(rawDescription: string): ChannelInfo | null {
-    if (!rawDescription) return null;
+function getTimestamp(msg: any): number {
+    const ts = msg.timestamp;
+    if (!ts) return Date.now();
+    if (typeof ts === 'string') return new Date(ts).getTime();
+    // Assume Moment object if not string
+    if (typeof ts.valueOf === 'function') return ts.valueOf();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    return Date.now();
+}
 
+export function parseBotInfoMessage(msg: Message): ChannelInfo | null {
+    const embed = msg.embeds?.[0];
+    const rawDescription = (embed as any)?.rawDescription || (embed as any)?.description;
+
+    if (!rawDescription) {
+        log("parseBotInfoMessage: No description found in embed");
+        return null;
+    }
+
+    const timestamp = getTimestamp(msg);
     const info: ChannelInfo = {
         permitted: [],
         banned: [],
-        lastUpdated: Date.now()
+        timestamp,
+        updated: Date.now()
     };
 
     try {
@@ -54,7 +73,7 @@ export function parseBotInfoEmbed(rawDescription: string): ChannelInfo | null {
             }
         }
 
-        log("Successfully parsed channel info:", info);
+
         return info;
     } catch (e) {
         log("Error parsing channel info embed:", e);

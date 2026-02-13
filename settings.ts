@@ -36,10 +36,10 @@ export const settings = definePluginSettings({
     },
     rotateChannelNamesTime: {
         type: OptionType.SLIDER,
-        description: "Time before the next channel name is set in seconds",
+        description: "Time before the next channel name is set in minutes",
         default: 15,
         min: 10,
-        markers: [10, 15, 30, 60, 120, 300, 600],
+        markers: [10, 15, 30, 60, 120, 300],
         onChange: () => state.onRotationSettingsChange(),
     },
     ownershipChangeNotificationAny: {
