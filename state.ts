@@ -12,4 +12,5 @@ export const state = {
     myLastVoiceChannelId: undefined as string | null | undefined,
     rotationIndex: new Map<string, number>(),
     rotationIntervals: new Map<string, any>(),
+    onRotationSettingsChange: () => { },
 };

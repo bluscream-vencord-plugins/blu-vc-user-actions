@@ -191,9 +191,14 @@ export function rotateChannelName(channelId: string) {
 export function startRotation(channelId: string) {
     if (state.rotationIntervals.has(channelId)) return;
 
+    if (!settings.store.rotateChannelNamesEnabled) {
+        log(`Channel name rotation is disabled in settings, skipping ${channelId}.`);
+        return;
+    }
+
     const intervalSeconds = settings.store.rotateChannelNamesTime;
-    if (intervalSeconds < 1) {
-        log(`Rotation interval for ${channelId} is less than 1 second, skipping.`);
+    if (intervalSeconds < 9) {
+        log(`Rotation interval for ${channelId} is less than 9 seconds, skipping.`);
         return;
     }
 
@@ -233,3 +238,25 @@ export function handleOwnershipChange(channelId: string, ownerId: string) {
         stopRotation(channelId);
     }
 }
+
+export function restartAllRotations() {
+    log("Settings changed, updating rotations...");
+
+    // Stop everything first
+    const activeChannels = Array.from(state.rotationIntervals.keys());
+    for (const channelId of activeChannels) {
+        stopRotation(channelId);
+    }
+
+    // If enabled, try to start rotation in the current channel if we are the owner
+    if (settings.store.rotateChannelNamesEnabled && state.myLastVoiceChannelId) {
+        const ownerInfo = getOwnerForChannel(state.myLastVoiceChannelId);
+        const me = UserStore.getCurrentUser();
+        if (ownerInfo?.userId === me?.id) {
+            log(`Restarting rotation for current channel ${state.myLastVoiceChannelId}`);
+            startRotation(state.myLastVoiceChannelId);
+        }
+    }
+}
+
+state.onRotationSettingsChange = restartAllRotations;

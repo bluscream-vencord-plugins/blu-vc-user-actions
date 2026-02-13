@@ -1,22 +1,30 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
+import { state } from "./state";
 
 export const pluginName = "SocializeGuild";
 
 export const settings = definePluginSettings({
+    rotateChannelNamesEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable channel name rotation",
+        default: false,
+        onChange: () => state.onRotationSettingsChange(),
+    },
     rotateChannelNamesTime: {
         type: OptionType.SLIDER,
         description: "Time before the next channel name is set in seconds",
-        default: 600,
-        min: 0,
-        max: 10000,
-        markers: [0, 30, 60, 120, 300, 600, 1000],
+        default: 15,
+        min: 10,
+        markers: [10, 15, 30, 60, 120, 300, 600],
+        onChange: () => state.onRotationSettingsChange(),
     },
     rotateChannelNames: {
         type: OptionType.STRING,
         description: "Will rotate through these channel names every rotateChannelNamesTime seconds",
         default: "",
         multiline: true,
+        onChange: () => state.onRotationSettingsChange(),
     },
     autoKickList: {
         type: OptionType.STRING,
