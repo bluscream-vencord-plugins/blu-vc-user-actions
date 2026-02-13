@@ -18,7 +18,8 @@ export interface ChannelInfo {
 export enum ActionType {
     KICK = 'KICK',
     BAN = 'BAN',
-    UNBAN = 'UNBAN'
+    UNBAN = 'UNBAN',
+    CLAIM = 'CLAIM'
 }
 
 export interface ActionItem {

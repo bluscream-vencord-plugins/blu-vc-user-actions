@@ -18,7 +18,7 @@ import {
     formatBanCommand,
     formatUnbanCommand
 } from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban } from "./logic";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels } from "./logic";
 import { actionQueue, ActionType } from "./state";
 import { sendMessage } from "@utils/discord";
 
@@ -82,7 +82,11 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
     if (guild?.id !== settings.store.guildId) return;
     children.push(
         <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginName}>
-            {/* Future items here */}
+            <Menu.MenuItem
+                id="socialize-guild-claim-disbanded"
+                label="Claim Disbanded Channels"
+                action={() => claimAllDisbandedChannels(guild.id)}
+            />
         </Menu.MenuItem>
     );
 };

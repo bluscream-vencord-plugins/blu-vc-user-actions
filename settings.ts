@@ -11,6 +11,12 @@ export const settings = definePluginSettings({
         default: "",
         multiline: true,
     },
+    userWhitelist: {
+        type: OptionType.STRING,
+        description: "List of user IDs ignored by automated actions [newline separated]",
+        default: "",
+        multiline: true,
+    },
     autoKickEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable auto kicking of banned users",
@@ -57,6 +63,11 @@ export const settings = definePluginSettings({
         description: "Automatically claim any channel when their owner left",
         default: false,
     },
+    autoNavigateToOwnedChannel: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically navigate to the channel you own",
+        default: true,
+    },
     fetchOwnersOnStartup: {
         type: OptionType.BOOLEAN,
         description: "Fetch all owners in the category on startup",
@@ -66,6 +77,11 @@ export const settings = definePluginSettings({
         type: OptionType.STRING,
         description: "Message to show when ownership is detected",
         default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
+    },
+    whitelistSkipMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when an action is skipped for a whitelisted user.",
+        default: "🛡️ Skipped {action} action for whitelisted user <@{user_id}>",
     },
     banRotationMessage: {
         type: OptionType.STRING,
@@ -147,8 +163,11 @@ export const settings = definePluginSettings({
 {guild_name} = Current Guild Name
 {channel_id} = Current Channel ID
 {channel_name} = Current Channel Name
-{user_id} = User ID [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand]
-{user_name} = User Name [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand]
+{user_id} = User ID [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
+{user_name} = User Name [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
+{user_id_old} = Old User ID [banRotationMessage]
+{user_name_old} = Old User Name [banRotationMessage]
+{action} = Action Type [whitelistSkipMessage]
 {reason} = Reason for ownership (Unknown/Created/Claimed) [ownershipChangeMessage, setChannelNameCommand]
 {channel_name_new} = New channel name [setChannelNameCommand]`,
         readonly: true,

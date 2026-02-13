@@ -20,7 +20,7 @@ import {
 
 import { pluginName, settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
-import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage } from "./utils";
+import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage, navigateToChannel } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -42,6 +42,7 @@ import {
     ChannelContextMenuPatch,
 } from "./menus";
 import { registerSharedContextMenu } from "./utils/menus";
+import { getToolboxActions } from "./toolbox";
 import { commands } from "./commands";
 
 interface MessageCreatePayload {
@@ -60,106 +61,7 @@ export default definePlugin({
     description: "Automatically takes actions against users joining your voice channel.",
     settings,
     commands,
-    toolboxActions: () => {
-        // const currentGuildId = SelectedGuildStore.getGuildId();
-        // if (currentGuildId !== settings.store.guildId) return [];
-
-        const { enabled } = settings.use(["enabled"]);
-        const channelId = SelectedChannelStore.getVoiceChannelId();
-        const channel = channelId ? ChannelStore.getChannel(channelId) : null;
-
-        const channelOwnerInfo = channelId ? getOwnerForChannel(channelId) : undefined;
-        const owner = channelOwnerInfo?.userId ? UserStore.getUser(channelOwnerInfo.userId) : null;
-        const ownerName = owner?.globalName || owner?.username || channelOwnerInfo?.userId;
-
-        let status = "Not in Voice Channel";
-        if (channelId) {
-            status = channelOwnerInfo?.userId ? `Owned by ${ownerName} (${channelOwnerInfo.reason})` : "Not Owned";
-        }
-
-        return [
-            <Menu.MenuCheckboxItem
-                id="blu-vc-user-actions-status"
-                label={`${status}`}
-                checked={enabled}
-                action={() => {
-                    settings.store.enabled = !enabled;
-                }}
-            />,
-            <Menu.MenuItem
-                id="blu-vc-user-actions-check-ownership"
-                label="Check Ownership"
-                disabled={!channelId}
-                action={async () => {
-                    const cid = SelectedChannelStore.getVoiceChannelId();
-                    if (cid) {
-                        const owner = await checkChannelOwner(cid, settings.store.botId);
-                        if (owner.userId) {
-                            handleOwnerUpdate(cid, owner);
-                        }
-                    }
-                }}
-            />,
-            <Menu.MenuItem
-                id="blu-vc-user-actions-create-channel"
-                label="Create Channel"
-                action={() => {
-                    const createChannelId = settings.store.createChannelId;
-                    if (createChannelId) {
-                        ChannelActions.selectVoiceChannel(createChannelId);
-                        // ChannelRouter.transitionToChannel(createChannelId);
-                    } else {
-                        showToast("No Create Channel ID configured in settings.");
-                    }
-                }}
-            />,
-            <Menu.MenuItem
-                id="blu-vc-user-actions-kick-banned"
-                label="Kick Banned Users"
-                disabled={!channelId}
-                action={() => {
-                    const cid = SelectedChannelStore.getVoiceChannelId();
-                    if (!cid) return;
-                    const chan = ChannelStore.getChannel(cid);
-                    if (!chan) return;
-                    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(cid);
-                    const kickList = getKickList();
-                    let count = 0;
-                    for (const uid in voiceStates) {
-                        if (kickList.includes(uid)) {
-                            actionQueue.push({
-                                type: ActionType.KICK,
-                                userId: uid,
-                                channelId: cid,
-                                guildId: chan.guild_id
-                            });
-                            count++;
-                        }
-                    }
-                    if (count > 0) {
-                        showToast(`Adding ${count} banned user(s) to kick queue...`);
-                        processQueue();
-                    } else {
-                        showToast("No banned users found in current channel.");
-                    }
-                }}
-            />,
-            <Menu.MenuItem
-                id="blu-vc-user-actions-get-info"
-                label="Get Channel Info"
-                disabled={!channelId}
-                action={() => {
-                    const cid = SelectedChannelStore.getVoiceChannelId();
-                    if (cid) requestChannelInfo(cid);
-                }}
-            />,
-            <Menu.MenuItem
-                id="blu-vc-user-actions-settings"
-                label="Edit Settings"
-                action={() => openPluginModal(plugins[pluginName])}
-            />
-        ];
-    },
+    toolboxActions: getToolboxActions,
     contextMenus: {
         "user-context": UserContextMenuPatch,
         "guild-context": GuildContextMenuPatch,
@@ -202,6 +104,14 @@ export default definePlugin({
                                     if (owner.userId) {
                                         log(`Detailed ownership check: userId=${owner.userId}`);
                                         handleOwnerUpdate(newChannelId, owner);
+
+                                        if (settings.store.autoClaimDisbanded && owner.userId !== me.id) {
+                                            const voiceStates = VoiceStateStore.getVoiceStatesForChannel(newChannelId);
+                                            if (!voiceStates[owner.userId]) {
+                                                log(`Owner ${owner.userId} not in channel, claiming disbanded channel.`);
+                                                claimChannel(newChannelId, owner.userId);
+                                            }
+                                        }
                                     }
                                 });
                             }, 1000);

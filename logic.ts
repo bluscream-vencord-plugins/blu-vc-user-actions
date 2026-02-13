@@ -11,12 +11,13 @@ import {
     showToast,
     SelectedChannelStore,
     VoiceStateStore,
+    ChannelActions,
 } from "@webpack/common";
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo, ActionType } from "./state";
-import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage } from "./utils";
+import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage, navigateToChannel, formatWhitelistSkipMessage } from "./utils";
 
-import { getKickList, setKickList } from "./utils/kicklist";
+import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
@@ -27,6 +28,15 @@ export async function processQueue() {
         if (!item) continue;
 
         const { userId, channelId, guildId, type } = item;
+
+        if ((type === ActionType.KICK || type === ActionType.BAN) && isWhitelisted(userId)) {
+            log(`Skipping ${type} for whitelisted user ${userId}`);
+            const skipMsg = formatWhitelistSkipMessage(channelId, userId, type);
+            sendBotMessage(channelId, { content: skipMsg });
+            processedUsers.set(userId, Date.now());
+            continue;
+        }
+
         const now = Date.now();
         const lastAction = processedUsers.get(userId) || 0;
 
@@ -50,6 +60,9 @@ export async function processQueue() {
             case ActionType.UNBAN:
                 template = settings.store.unbanCommand;
                 break;
+            case ActionType.CLAIM:
+                template = settings.store.claimCommand;
+                break;
             default:
                 console.error(`Unknown action type: ${type}`);
                 continue;
@@ -70,8 +83,13 @@ export async function processQueue() {
             formattedMessage = formattedMessage.replace(/{user_name}/g, userId);
         }
 
+        if (type === ActionType.CLAIM) {
+            ChannelActions.selectVoiceChannel(channelId);
+            await new Promise(r => setTimeout(r, 500));
+        }
+
         try {
-            log(`Sending kick message: ${formattedMessage}`);
+            log(`Sending ${type} message: ${formattedMessage}`);
             sendMessage(channelId, { content: formattedMessage });
             processedUsers.set(userId, now);
         } catch (e) {
@@ -281,6 +299,11 @@ export function handleOwnershipChange(channelId: string, ownerId: string) {
         log(`We are the owner! Starting rotation and requesting channel info`);
         startRotation(channelId);
         requestChannelInfo(channelId);
+
+        if (settings.store.autoNavigateToOwnedChannel) {
+            const channel = ChannelStore.getChannel(channelId);
+            navigateToChannel(channelId, channel?.guild_id);
+        }
     } else {
         log(`We are not the owner, stopping rotation`);
         stopRotation(channelId);
@@ -379,4 +402,55 @@ export function bulkUnban(userIds: string[]): number {
         return currentList.length - newList.length;
     }
     return 0;
+}
+
+export function claimAllDisbandedChannels(guildId: string) {
+    if (!settings.store.enabled) return;
+    const channels = GuildChannelStore.getChannels(guildId).VOCAL;
+    if (!channels || channels.length === 0) {
+        showToast("No voice channels found to check.");
+        return;
+    }
+
+    let count = 0;
+    const me = UserStore.getCurrentUser();
+    if (!me) return;
+
+    for (const item of channels) {
+        const channel = item.channel;
+        if (channel.parent_id !== settings.store.categoryId) continue;
+
+        const ownerInfo = getOwnerForChannel(channel.id);
+        const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+
+        let shouldClaim = false;
+
+        if (ownerInfo?.userId) {
+            if (ownerInfo.userId === me.id) continue;
+            // If owner is not in channel, consider it disbanded
+            if (!voiceStates || !voiceStates[ownerInfo.userId]) {
+                shouldClaim = true;
+            }
+        } else {
+            // No known owner, consider it disbanded/claimable
+            shouldClaim = true;
+        }
+
+        if (shouldClaim) {
+            actionQueue.push({
+                type: ActionType.CLAIM,
+                userId: me.id,
+                channelId: channel.id,
+                guildId: guildId
+            });
+            count++;
+        }
+    }
+
+    if (count > 0) {
+        showToast(`Queued claims for ${count} disbanded channels...`);
+        processQueue();
+    } else {
+        showToast("No disbanded channels found to claim.");
+    }
 }
