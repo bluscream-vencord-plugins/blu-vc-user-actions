@@ -92,3 +92,17 @@ export function formatBanCommand(channelId: string, userId: string): string {
 export function formatUnbanCommand(channelId: string, userId: string): string {
     return formatCommand(settings.store.unbanCommand, channelId, { userId });
 }
+
+export function formatBanRotationMessage(channelId: string, oldUserId: string, newUserId: string): string {
+    const oldUser = UserStore.getUser(oldUserId);
+
+    // Use formatCommand to handle channel, guild, and the new user (as primary user)
+    let formatted = formatCommand(settings.store.banRotationMessage, channelId, { userId: newUserId });
+
+    // Handle the specific old user placeholders
+    formatted = formatted
+        .replace(/{user_id_old}/g, oldUserId)
+        .replace(/{user_name_old}/g, oldUser?.username || oldUserId);
+
+    return formatted;
+}

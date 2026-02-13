@@ -67,6 +67,11 @@ export const settings = definePluginSettings({
         description: "Message to show when ownership is detected",
         default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
     },
+    banRotationMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when a ban rotates.",
+        default: "♾️ Banned user <@{user_id_old}> has been replaced with <@{user_id}>",
+    },
     kickCommand: {
         type: OptionType.STRING,
         description: "Message to send when a user in the auto kick list joins",
@@ -84,13 +89,13 @@ export const settings = definePluginSettings({
     },
     setChannelNameCommand: {
         type: OptionType.STRING,
-        description: "Message to send to set a channel name (uses setChannelNameCommandReference)",
+        description: "Message to send to set a channel name",
         default: "!v name {channel_name_new}",
         group: ""
     },
     claimCommand: {
         type: OptionType.STRING,
-        description: "Message to send to claim a channel (uses ownershipChangeMessageReference)",
+        description: "Message to send to claim a channel",
         default: "!v claim",
     },
     infoCommand: {

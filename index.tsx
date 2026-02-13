@@ -1,4 +1,5 @@
 import definePlugin from "@utils/types";
+import { sendBotMessage } from "@api/Commands";
 import { sendMessage } from "@utils/discord";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
@@ -19,7 +20,7 @@ import {
 
 import { pluginName, settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
-import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand } from "./utils";
+import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -298,6 +299,12 @@ export default definePlugin({
                                         // Update cache - remove from banned
                                         if (state.channelInfo) {
                                             state.channelInfo.banned = state.channelInfo.banned.filter(id => id !== userToUnban);
+                                        }
+
+                                        // Send ephemeral message
+                                        if (settings.store.banRotationMessage) {
+                                            const msg = formatBanRotationMessage(myChannelId, userToUnban, s.userId);
+                                            sendBotMessage(myChannelId, { content: msg });
                                         }
                                     }
 
