@@ -10,10 +10,13 @@ import {
     Constants,
     showToast,
     SelectedChannelStore,
+    VoiceStateStore,
 } from "@webpack/common";
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo } from "./state";
+import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo, ActionType } from "./state";
 import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage } from "./utils";
+
+import { getKickList, setKickList } from "./utils/kicklist";
 
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
@@ -23,7 +26,7 @@ export async function processQueue() {
         const item = actionQueue.shift();
         if (!item) continue;
 
-        const { userId, channelId, guildId } = item;
+        const { userId, channelId, guildId, type } = item;
         const now = Date.now();
         const lastAction = processedUsers.get(userId) || 0;
 
@@ -31,12 +34,28 @@ export async function processQueue() {
             continue;
         }
 
-        log(`Processing kick for ${userId} in ${channelId}`);
+        log(`Processing ${type} for ${userId} in ${channelId}`);
         const user = UserStore.getUser(userId);
         const channel = ChannelStore.getChannel(channelId);
         const guild = guildId ? GuildStore.getGuild(guildId) : null;
 
-        let formattedMessage = settings.store.kickCommand
+        let template: string;
+        switch (type) {
+            case ActionType.KICK:
+                template = settings.store.kickCommand;
+                break;
+            case ActionType.BAN:
+                template = settings.store.banCommand;
+                break;
+            case ActionType.UNBAN:
+                template = settings.store.unbanCommand;
+                break;
+            default:
+                console.error(`Unknown action type: ${type}`);
+                continue;
+        }
+
+        let formattedMessage = template
             .replace(/{user_id}/g, userId)
             .replace(/{channel_id}/g, channelId)
             .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
@@ -300,3 +319,46 @@ export function handleInfoUpdate(channelId: string, info: ChannelInfo) {
 }
 
 state.onRotationSettingsChange = restartAllRotations;
+
+export function bulkBanAndKick(userIds: string[], channelId: string, guildId: string): number {
+    const currentList = getKickList();
+    const uniqueNewUsers = userIds.filter(id => !currentList.includes(id));
+
+    if (uniqueNewUsers.length > 0) {
+        setKickList([...currentList, ...uniqueNewUsers]);
+    }
+
+    // Queue kick commands for users currently in the channel
+    let count = 0;
+    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId);
+
+    for (const userId of userIds) {
+        // Ensure user is still in the channel
+        if (voiceStates && voiceStates[userId]) {
+            actionQueue.push({
+                type: ActionType.KICK,
+                userId: userId,
+                channelId: channelId,
+                guildId: guildId
+            });
+            count++;
+        }
+    }
+
+    if (count > 0) {
+        processQueue();
+    }
+
+    return count;
+}
+
+export function bulkUnban(userIds: string[]): number {
+    const currentList = getKickList();
+    const newList = currentList.filter(id => !userIds.includes(id));
+
+    if (currentList.length !== newList.length) {
+        setKickList(newList);
+        return currentList.length - newList.length;
+    }
+    return 0;
+}

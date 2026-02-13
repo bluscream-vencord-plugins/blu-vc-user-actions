@@ -15,8 +15,21 @@ export interface ChannelInfo {
     updated: number;
 }
 
+export enum ActionType {
+    KICK = 'KICK',
+    BAN = 'BAN',
+    UNBAN = 'UNBAN'
+}
+
+export interface ActionItem {
+    type: ActionType;
+    userId: string;
+    channelId: string;
+    guildId?: string;
+}
+
 export const channelOwners = new Map<string, ChannelOwner>();
-export const actionQueue: Array<{ userId: string; channelId: string; guildId?: string }> = [];
+export const actionQueue: Array<ActionItem> = [];
 export const processedUsers = new Map<string, number>();
 
 export const state = {

@@ -10,9 +10,17 @@ import {
 } from "@webpack/common";
 import { type User } from "@vencord/discord-types";
 import { pluginName, settings } from "./settings";
-import { getKickList, setKickList, getOwnerForChannel, log } from "./utils";
-import { checkChannelOwner, processQueue } from "./logic";
-import { actionQueue } from "./state";
+import {
+    getKickList,
+    setKickList,
+    getOwnerForChannel,
+    log,
+    formatBanCommand,
+    formatUnbanCommand
+} from "./utils";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban } from "./logic";
+import { actionQueue, ActionType } from "./state";
+import { sendMessage } from "@utils/discord";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
     const channelId = SelectedChannelStore.getChannelId();
@@ -49,6 +57,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                                 log(`Context menu kick: Channel ${myChannelId} Owner ${ownerInfo.userId} Me ${me?.id}`);
                                 if (ownerInfo.userId === me?.id) {
                                     actionQueue.push({
+                                        type: ActionType.KICK,
                                         userId: user.id,
                                         channelId: myChannelId,
                                         guildId: voiceState.guildId
@@ -80,9 +89,57 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
 
 export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, { channel }) => {
     if (channel?.guild_id !== settings.store.guildId) return;
+
+    // Only show for voice channels
+    if (!channel || ![2, 13].includes(channel.type)) return;
+
     children.push(
         <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginName}>
-            {/* Future items here */}
+            <Menu.MenuItem
+                id="socialize-guild-ban-all-vc"
+                label="Ban All Users in VC"
+                color="danger"
+                action={async () => {
+                    const me = UserStore.getCurrentUser();
+                    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+                    const userIds: string[] = [];
+
+                    for (const userId in voiceStates) {
+                        if (userId === me?.id) continue;
+                        userIds.push(userId);
+                    }
+
+                    if (userIds.length > 0) {
+                        showToast(`Adding ${userIds.length} users to local ban list and queuing kicks...`);
+                        const count = bulkBanAndKick(userIds, channel.id, channel.guild_id);
+                        showToast(`Queued kicks for ${count} users.`);
+                    } else {
+                        showToast("No other users found in voice channel.");
+                    }
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-unban-all-vc"
+                label="Unban All Users in VC"
+                color="success"
+                action={async () => {
+                    const me = UserStore.getCurrentUser();
+                    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+                    const userIds: string[] = [];
+
+                    for (const userId in voiceStates) {
+                        if (userId === me?.id) continue;
+                        userIds.push(userId);
+                    }
+
+                    if (userIds.length > 0) {
+                        const count = bulkUnban(userIds);
+                        showToast(`Removed ${count} users from local ban list.`);
+                    } else {
+                        showToast("No other users found in voice channel.");
+                    }
+                }}
+            />
         </Menu.MenuItem>
     );
 };

@@ -18,7 +18,7 @@ import {
 } from "@webpack/common";
 
 import { pluginName, settings } from "./settings";
-import { state, actionQueue, processedUsers } from "./state";
+import { ActionType, state, actionQueue, processedUsers } from "./state";
 import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand } from "./utils";
 import {
     processQueue,
@@ -60,8 +60,8 @@ export default definePlugin({
     settings,
     commands,
     toolboxActions: () => {
-        const currentGuildId = SelectedGuildStore.getGuildId();
-        if (currentGuildId !== settings.store.guildId) return [];
+        // const currentGuildId = SelectedGuildStore.getGuildId();
+        // if (currentGuildId !== settings.store.guildId) return [];
 
         const { enabled } = settings.use(["enabled"]);
         const channelId = SelectedChannelStore.getVoiceChannelId();
@@ -127,6 +127,7 @@ export default definePlugin({
                     for (const uid in voiceStates) {
                         if (kickList.includes(uid)) {
                             actionQueue.push({
+                                type: ActionType.KICK,
                                 userId: uid,
                                 channelId: cid,
                                 guildId: chan.guild_id
@@ -255,6 +256,7 @@ export default definePlugin({
                             if (ownerInfo?.userId === me.id) {
                                 log(`Adding ${s.userId} to action queue`);
                                 actionQueue.push({
+                                    type: ActionType.KICK,
                                     userId: s.userId,
                                     channelId: myChannelId,
                                     guildId: s.guildId

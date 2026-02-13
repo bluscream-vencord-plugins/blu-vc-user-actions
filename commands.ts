@@ -7,7 +7,7 @@ import type { Embed } from "@vencord/discord-types";
 
 export const commands = [
     {
-        name: "channelinfo",
+        name: "socialize",
         description: "Display detailed information about the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
@@ -91,7 +91,7 @@ export const commands = [
                     inline: false
                 });
 
-                const max_items = 15
+                const max_items = 20
 
                 if (info.permitted && info.permitted.length > 0) {
                     embed.fields.push({
