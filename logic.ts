@@ -11,7 +11,7 @@ import {
 } from "@webpack/common";
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, ChannelOwner } from "./state";
-import { log, formatMessageCommon, updateOwner, getOwnerForChannel } from "./utils";
+import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatClaimMessage, getRotateNames, formatSetChannelNameMessage } from "./utils";
 
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
@@ -161,4 +161,75 @@ export async function fetchAllOwners() {
         await new Promise(r => setTimeout(r, 200));
     }
     log(`Finished batch fetching owners.`);
+}
+export function claimChannel(channelId: string, formerOwnerId?: string) {
+    const formatted = formatClaimMessage(channelId, formerOwnerId);
+    log(`Automatically claiming channel ${channelId}: ${formatted}`);
+    sendMessage(channelId, { content: formatted });
+}
+
+export function rotateChannelName(channelId: string) {
+    const names = getRotateNames();
+    if (names.length === 0) {
+        log(`No names to rotate for channel ${channelId}, stopping rotation.`);
+        stopRotation(channelId);
+        return;
+    }
+
+    let index = state.rotationIndex.get(channelId) ?? 0;
+    if (index >= names.length) index = 0;
+
+    const nextName = names[index];
+    const formatted = formatSetChannelNameMessage(channelId, nextName);
+
+    log(`Rotating channel ${channelId} to name: ${nextName} (Index: ${index})`);
+    sendMessage(channelId, { content: formatted });
+
+    state.rotationIndex.set(channelId, (index + 1) % names.length);
+}
+
+export function startRotation(channelId: string) {
+    if (state.rotationIntervals.has(channelId)) return;
+
+    const intervalSeconds = settings.store.rotateChannelNamesTime;
+    if (intervalSeconds < 1) {
+        log(`Rotation interval for ${channelId} is less than 1 second, skipping.`);
+        return;
+    }
+
+    const names = getRotateNames();
+    if (names.length === 0) {
+        log(`No names configured for rotation, skipping ${channelId}.`);
+        return;
+    }
+
+    log(`Starting channel name rotation for ${channelId} every ${intervalSeconds} seconds.`);
+
+    // Initial rotation
+    rotateChannelName(channelId);
+
+    const intervalId = setInterval(() => {
+        rotateChannelName(channelId);
+    }, intervalSeconds * 1000);
+
+    state.rotationIntervals.set(channelId, intervalId);
+}
+
+export function stopRotation(channelId: string) {
+    const intervalId = state.rotationIntervals.get(channelId);
+    if (intervalId) {
+        log(`Stopping channel name rotation for ${channelId}.`);
+        clearInterval(intervalId);
+        state.rotationIntervals.delete(channelId);
+        state.rotationIndex.delete(channelId);
+    }
+}
+
+export function handleOwnershipChange(channelId: string, ownerId: string) {
+    const me = UserStore.getCurrentUser();
+    if (ownerId === me?.id) {
+        startRotation(channelId);
+    } else {
+        stopRotation(channelId);
+    }
 }

@@ -10,6 +10,7 @@ import {
     showToast,
     ChannelActions,
     ChannelRouter,
+    GuildStore,
 } from "@webpack/common";
 
 import { pluginName, settings } from "./settings";
@@ -21,6 +22,10 @@ import {
     fetchAllOwners,
     notifyOwnership,
     getMessageOwner,
+    claimChannel,
+    startRotation,
+    stopRotation,
+    handleOwnershipChange,
 } from "./logic";
 import {
     UserContextMenuPatch,
@@ -71,7 +76,10 @@ export default definePlugin({
                     const cid = SelectedChannelStore.getVoiceChannelId();
                     if (cid) {
                         const owner = await checkChannelOwner(cid, settings.store.botId);
-                        if (owner.userId) notifyOwnership(cid);
+                        if (owner.userId) {
+                            notifyOwnership(cid);
+                            handleOwnershipChange(cid, owner.userId);
+                        }
                     }
                 }}
             />,
@@ -147,13 +155,43 @@ export default definePlugin({
                 if (s.userId === me.id) {
                     const newChannelId = s.channelId ?? null;
                     if (newChannelId !== state.myLastVoiceChannelId) {
+                        const oldChannelId = state.myLastVoiceChannelId;
+                        if (oldChannelId) stopRotation(oldChannelId);
+
                         actionQueue.length = 0;
                         state.myLastVoiceChannelId = newChannelId;
 
                         if (newChannelId) {
                             checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
-                                if (owner.userId) notifyOwnership(newChannelId);
+                                if (owner.userId) {
+                                    notifyOwnership(newChannelId);
+                                    handleOwnershipChange(newChannelId, owner.userId);
+                                }
                             });
+                        }
+                    }
+                }
+            }
+
+            // Handle owner departures for auto-claim
+            for (const s of targetGuildVoiceStates) {
+                // If someone left a channel (or moved)
+                if (s.oldChannelId && s.oldChannelId !== s.channelId) {
+                    const oldChannel = ChannelStore.getChannel(s.oldChannelId);
+                    if (oldChannel?.parent_id !== settings.store.categoryId) continue;
+
+                    const ownerInfo = getOwnerForChannel(s.oldChannelId);
+                    // If the person who left was the cached owner
+                    if (ownerInfo && ownerInfo.userId === s.userId) {
+                        log(`Owner ${s.userId} left channel ${s.oldChannelId}`);
+
+                        const isMyChannel = state.myLastVoiceChannelId === s.oldChannelId;
+                        const shouldClaim = (settings.store.autoClaimDisbanded && isMyChannel) || settings.store.autoClaimDisbandedAny;
+
+                        if (shouldClaim) {
+                            claimChannel(s.oldChannelId, ownerInfo.userId);
+                        } else {
+                            log(`Auto-claim disabled for ${isMyChannel ? "current" : "other"} channel, skipping.`);
                         }
                     }
                 }
@@ -201,6 +239,7 @@ export default definePlugin({
             if (owner) {
                 if (updateOwner(message.channelId, owner)) {
                     notifyOwnership(message.channelId);
+                    handleOwnershipChange(message.channelId, owner.userId);
                 }
             }
         }

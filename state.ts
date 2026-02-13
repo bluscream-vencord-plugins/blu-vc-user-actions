@@ -10,4 +10,6 @@ export const processedUsers = new Map<string, number>();
 export const state = {
     isProcessing: false,
     myLastVoiceChannelId: undefined as string | null | undefined,
+    rotationIndex: new Map<string, number>(),
+    rotationIntervals: new Map<string, any>(),
 };

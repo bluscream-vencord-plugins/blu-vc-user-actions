@@ -4,6 +4,20 @@ import { OptionType } from "@utils/types";
 export const pluginName = "SocializeGuild";
 
 export const settings = definePluginSettings({
+    rotateChannelNamesTime: {
+        type: OptionType.SLIDER,
+        description: "Time before the next channel name is set in seconds",
+        default: 600,
+        min: 0,
+        max: 10000,
+        markers: [0, 30, 60, 120, 300, 600, 1000],
+    },
+    rotateChannelNames: {
+        type: OptionType.STRING,
+        description: "Will rotate through these channel names every rotateChannelNamesTime seconds",
+        default: "",
+        multiline: true,
+    },
     autoKickList: {
         type: OptionType.STRING,
         description: "List of user IDs to auto kick (newline separated)",
@@ -34,6 +48,37 @@ export const settings = definePluginSettings({
             settings.store.autoKickMessageReference = settings.def.autoKickMessageReference.default;
         }
     },
+    setChannelNameMessage: {
+        type: OptionType.STRING,
+        description: "Message to send to set a channel name (uses setChannelNameMessageReference)",
+        default: "!v name {channel_name_new}",
+    },
+    setChannelNameMessageReference: {
+        type: OptionType.STRING,
+        description: "Template Reference - Variables: ",
+        default: `{now} = Datetime of message being sent
+{now:DD.MM.YY HH:mm:ss} = Datetime with custom format
+{my_id} = Your own User ID
+{my_name} = Your own User Name
+{guild_id} = Current Guild ID
+{guild_name} = Current Guild Name
+{channel_id} = Current Channel ID
+{channel_name} = Current Channel Name
+{user_id} = Owner User ID
+{user_name} = Owner User Name
+{reason} = Reason for ownership (Created/Claimed)
+{channel_name_new} = New Channel Name`,
+        readonly: true,
+        multiline: true,
+        onChange(_) {
+            settings.store.setChannelNameMessageReference = settings.def.setChannelNameMessageReference.default;
+        }
+    },
+    claimMessage: {
+        type: OptionType.STRING,
+        description: "Message to send to claim a channel (uses ownershipChangeMessageReference)",
+        default: "!v claim",
+    },
     ownershipChangeMessage: {
         type: OptionType.STRING,
         description: "Message to show when ownership is detected",
@@ -59,11 +104,6 @@ export const settings = definePluginSettings({
             settings.store.ownershipChangeMessageReference = settings.def.ownershipChangeMessageReference.default;
         }
     },
-    fetchOwnersOnStartup: {
-        type: OptionType.BOOLEAN,
-        description: "Fetch all owners in the category on startup",
-        default: false,
-    },
     queueTime: {
         type: OptionType.SLIDER,
         description: "Minimum time between actions in ms",
@@ -71,6 +111,21 @@ export const settings = definePluginSettings({
         min: 0,
         max: 10000,
         markers: [0, 250, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000],
+    },
+    autoClaimDisbanded: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically claim the channel you're in when its owner leaves",
+        default: false,
+    },
+    autoClaimDisbandedAny: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically claim any channel when their owner left",
+        default: false,
+    },
+    fetchOwnersOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Fetch all owners in the category on startup",
+        default: false,
     },
     enabled: {
         type: OptionType.BOOLEAN,
