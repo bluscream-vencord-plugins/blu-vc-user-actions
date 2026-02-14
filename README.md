@@ -52,3 +52,48 @@ call pnpm build
 call pnpm buildWeb
 call pnpm inject -install-openasar -branch stable
 ```
+
+```bat
+@echo off
+REM Install dependencies
+winget install -e --id Git.Git
+winget install -e --id OpenJS.NodeJS
+call npm install -g pnpm
+REM Clone Vencord
+git clone https://github.com/Vencord/Vencord Vencord
+REM Setup User Plugin
+mkdir Vencord\src\userplugins
+git clone https://github.com/bluscream-vencord-plugins/blu-vc-user-actions Vencord\src\userplugins\blu-vc-user-actions
+REM Build and Inject
+cd Vencord
+call pnpm install --frozen-lockfile
+call pnpm build
+call pnpm buildWeb
+call pnpm inject -install-openasar -branch stable
+```
+
+```bat
+@echo off
+REM Install dependencies
+winget install -e --id OpenJS.NodeJS
+call npm install -g pnpm
+REM Download and Extract Equicord
+powershell -Command "Invoke-WebRequest https://github.com/Equicord/Equicord/archive/refs/heads/main.zip -OutFile Equicord.zip"
+powershell -Command "Expand-Archive -Path Equicord.zip -DestinationPath ."
+ren Equicord-main Equicord
+del Equicord.zip
+REM Setup User Plugin
+mkdir Equicord\src\userplugins
+cd Equicord\src\userplugins
+powershell -Command "Invoke-WebRequest https://github.com/bluscream-vencord-plugins/blu-vc-user-actions/archive/refs/heads/main.zip -OutFile Plugin.zip"
+powershell -Command "Expand-Archive -Path Plugin.zip -DestinationPath ."
+ren blu-vc-user-actions-main blu-vc-user-actions
+del Plugin.zip
+cd ..\..\..
+REM Build and Inject
+cd Equicord
+call pnpm install --frozen-lockfile
+call pnpm build
+call pnpm buildWeb
+call pnpm inject -install-openasar -branch stable
+```
