@@ -98,6 +98,24 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
     children.push(
         <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginName}>
             <Menu.MenuItem
+                id="socialize-guild-claim-channel"
+                label="Claim Channel"
+                action={async () => {
+                    const me = UserStore.getCurrentUser();
+                    if (me) {
+                        actionQueue.push({
+                            type: ActionType.CLAIM,
+                            userId: me.id,
+                            channelId: channel.id,
+                            guildId: channel.guild_id
+                        });
+                        processQueue();
+                    } else {
+                        showToast("Could not identify current user.");
+                    }
+                }}
+            />
+            <Menu.MenuItem
                 id="socialize-guild-ban-all-vc"
                 label="Ban All Users in VC"
                 color="danger"

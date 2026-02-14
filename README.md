@@ -31,3 +31,24 @@ Common variables available in messages:
 - `{user_id}`: Target/Owner user ID.
 - `{user_name}`: Target/Owner username.
 - `{reason}`: Reason for ownership (for ownership messages).
+
+## Installation
+
+```bat
+@echo off
+REM Install dependencies
+winget install -e --id Git.Git
+winget install -e --id OpenJS.NodeJS
+call npm install -g pnpm
+REM Clone Equicord
+git clone https://github.com/Equicord/Equicord Equicord
+REM Setup User Plugin
+mkdir Equicord\src\userplugins
+git clone https://github.com/bluscream-vencord-plugins/blu-vc-user-actions Equicord\src\userplugins\blu-vc-user-actions
+REM Build and Inject
+cd Equicord
+call pnpm install --frozen-lockfile
+call pnpm build
+call pnpm buildWeb
+call pnpm inject -install-openasar -branch stable
+```
