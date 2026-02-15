@@ -20,7 +20,7 @@ import {
 
 import { pluginName, settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
-import { log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage, navigateToChannel } from "./utils";
+import { logger, log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage, navigateToChannel } from "./utils";
 import {
     processQueue,
     checkChannelOwner,

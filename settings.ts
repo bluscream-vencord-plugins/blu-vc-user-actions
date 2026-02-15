@@ -2,7 +2,7 @@ import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 import { state } from "./state";
 
-export const pluginName = "SocializeGuild";
+export const pluginName = "Socialize Guild";
 
 export const settings = definePluginSettings({
     autoKickList: {

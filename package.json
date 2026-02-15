@@ -1,7 +1,7 @@
 {
-    "name":  "blu-vc-user-actions",
+    "name": "socializeGuild",
     "version":  "1.0.0",
-    "description":  "Automatically takes actions against users joining your voice channel.",
+    "description": "Socialize Guild",
     "main":  "index.tsx",
     "author":  {
                    "name":  "Bluscream",

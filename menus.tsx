@@ -16,7 +16,8 @@ import {
     getOwnerForChannel,
     log,
     formatBanCommand,
-    formatUnbanCommand
+    formatUnbanCommand,
+    isVoiceChannel
 } from "./utils";
 import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels } from "./logic";
 import { actionQueue, ActionType } from "./state";
@@ -73,7 +74,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
             <Menu.MenuItem
                 id="socialize-guild-kick-vc"
                 label="Kick from VC"
-                color="danger"
+                color="brand"
                 action={async () => {
                     const me = UserStore.getCurrentUser();
                     let ownerInfo = getOwnerForChannel(myChannelId);
@@ -124,7 +125,7 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
     if (channel?.guild_id !== settings.store.guildId) return;
 
     // Only show for voice channels
-    if (!channel || ![2, 13].includes(channel.type)) return;
+    if (!isVoiceChannel(channel)) return;
 
     children.push(
         <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginName}>
