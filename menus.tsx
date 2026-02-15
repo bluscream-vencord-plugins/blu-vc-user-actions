@@ -23,55 +23,86 @@ import { actionQueue, ActionType } from "./state";
 import { sendMessage } from "@utils/discord";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
-    const channelId = SelectedChannelStore.getChannelId();
-    const channel = ChannelStore.getChannel(channelId);
-    if (channel?.guild_id !== settings.store.guildId) return;
+    const chatChannelId = SelectedChannelStore.getChannelId();
+    const chatChannel = ChannelStore.getChannel(chatChannelId);
+    if (chatChannel?.guild_id !== settings.store.guildId) return;
     if (!user) return;
+
+    const myChannelId = SelectedChannelStore.getVoiceChannelId();
+    const isTargetInMyChannel = myChannelId && VoiceStateStore.getVoiceStatesForChannel(myChannelId)?.[user.id];
+
     const kickList = getKickList();
     const isBanned = kickList.includes(user.id);
+
+    const submenuItems = [
+        <Menu.MenuItem
+            id="vc-blu-vc-user-action"
+            label={isBanned ? "Unban from VC" : "Ban from VC"}
+            action={async () => {
+                const newList = isBanned
+                    ? kickList.filter(id => id !== user.id)
+                    : [...kickList, user.id];
+                setKickList(newList);
+
+                if (!isBanned && isTargetInMyChannel) {
+                    const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                    const me = UserStore.getCurrentUser();
+                    let ownerInfo = getOwnerForChannel(myChannelId);
+                    if (!ownerInfo || ownerInfo.userId === "") {
+                        ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                    }
+                    if (ownerInfo.userId === me?.id) {
+                        actionQueue.push({
+                            type: ActionType.KICK,
+                            userId: user.id,
+                            channelId: myChannelId,
+                            guildId: voiceState?.guildId
+                        });
+                        processQueue();
+                    } else {
+                        showToast(`Not owner of channel (Owner: ${ownerInfo.userId || "None"})`);
+                    }
+                }
+            }}
+            color={isBanned ? "success" : "danger"}
+        />
+    ];
+
+    if (isTargetInMyChannel) {
+        submenuItems.push(
+            <Menu.MenuItem
+                id="socialize-guild-kick-vc"
+                label="Kick from VC"
+                color="danger"
+                action={async () => {
+                    const me = UserStore.getCurrentUser();
+                    let ownerInfo = getOwnerForChannel(myChannelId);
+                    if (!ownerInfo || ownerInfo.userId === "") {
+                        ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                    }
+                    if (ownerInfo.userId === me?.id) {
+                        const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                        actionQueue.push({
+                            type: ActionType.KICK,
+                            userId: user.id,
+                            channelId: myChannelId,
+                            guildId: voiceState?.guildId
+                        });
+                        processQueue();
+                    } else {
+                        showToast(`Not owner of channel (Owner: ${ownerInfo.userId || "None"})`);
+                    }
+                }}
+            />
+        );
+    }
 
     const submenu = (
         <Menu.MenuItem
             id="socialize-guild-user-actions"
             label={pluginName}
         >
-            <Menu.MenuItem
-                id="vc-blu-vc-user-action"
-                label={isBanned ? "Unban from VC" : "Ban from VC"}
-                action={async () => {
-                    const newList = isBanned
-                        ? kickList.filter(id => id !== user.id)
-                        : [...kickList, user.id];
-                    setKickList(newList);
-
-                    if (!isBanned) {
-                        const myChannelId = SelectedChannelStore.getVoiceChannelId();
-                        if (myChannelId) {
-                            const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
-                            if (voiceState) {
-                                const me = UserStore.getCurrentUser();
-                                let ownerInfo = getOwnerForChannel(myChannelId);
-                                if (!ownerInfo || ownerInfo.userId === "") {
-                                    ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
-                                }
-                                log(`Context menu kick: Channel ${myChannelId} Owner ${ownerInfo.userId} Me ${me?.id}`);
-                                if (ownerInfo.userId === me?.id) {
-                                    actionQueue.push({
-                                        type: ActionType.KICK,
-                                        userId: user.id,
-                                        channelId: myChannelId,
-                                        guildId: voiceState.guildId
-                                    });
-                                    processQueue();
-                                } else {
-                                    showToast(`Not owner of channel (Owner: ${ownerInfo.userId || "None"})`);
-                                }
-                            }
-                        }
-                    }
-                }}
-                color={isBanned ? "success" : "danger"}
-            />
+            {submenuItems}
         </Menu.MenuItem>
     );
 
