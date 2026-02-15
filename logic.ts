@@ -84,8 +84,8 @@ export async function processQueue() {
         }
 
         if (type === ActionType.CLAIM) {
-            ChannelActions.selectVoiceChannel(channelId);
-            await new Promise(r => setTimeout(r, 500));
+            navigateToChannel(channelId, guildId);
+            await new Promise(r => setTimeout(r, 1000));
         }
 
         try {
@@ -241,8 +241,8 @@ export function startRotation(channelId: string) {
     }
 
     const intervalMinutes = settings.store.rotateChannelNamesTime;
-    if (intervalMinutes < 10) {
-        log(`Rotation interval for ${channelId} is less than 10 minutes, skipping to prevent rate limits.`);
+    if (intervalMinutes < 11) {
+        log(`Rotation interval for ${channelId} is less than 11 minutes, skipping to prevent rate limits.`);
         return;
     }
 
@@ -272,7 +272,7 @@ export function startRotation(channelId: string) {
     }
     state.rotationIndex.set(channelId, startIndex);
 
-    // Initial rotation Removed to wait for first interval
+    // Waiting for first interval...
     // rotateChannelName(channelId);
 
     const intervalId = setInterval(() => {

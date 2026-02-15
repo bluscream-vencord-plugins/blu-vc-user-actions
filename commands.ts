@@ -3,6 +3,7 @@ import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { settings } from "./settings";
 import { state, channelOwners, actionQueue, processedUsers } from "./state";
 import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
+import { rotateChannelName, startRotation } from "./logic";
 import type { Embed } from "@vencord/discord-types";
 
 export const commands = [
@@ -157,6 +158,23 @@ export const commands = [
             sendBotMessage(ctx.channel.id, {
                 embeds: [embed]
             });
+        }
+    },
+    {
+        name: "rotate",
+        description: "Force the next channel name rotation and ensure rotation is enabled",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (args, ctx) => {
+            const channelId = SelectedChannelStore.getVoiceChannelId();
+            if (!channelId) {
+                sendBotMessage(ctx.channel.id, { content: "❌ You are not in a voice channel." });
+                return;
+            }
+
+            // Manually trigger the next rotation
+            rotateChannelName(channelId);
+
+            sendBotMessage(ctx.channel.id, { content: "🔄 Rotation triggered (next name selected)." });
         }
     }
 ];

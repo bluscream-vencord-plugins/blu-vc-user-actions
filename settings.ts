@@ -29,7 +29,7 @@ export const settings = definePluginSettings({
     },
     rotateChannelNames: {
         type: OptionType.STRING,
-        description: "Will rotate through these channel names every rotateChannelNamesTime seconds",
+        description: "Will rotate through these channel names every rotateChannelNamesTime minutes",
         default: "",
         multiline: true,
         onChange: () => state.onRotationSettingsChange(),
