@@ -1,7 +1,8 @@
 import { ActionType, actionQueue } from "./state";
 import { getKickList, getOwnerForChannel, navigateToChannel } from "./utils";
 import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, claimAllDisbandedChannels, fetchAllOwners } from "./logic";
-import { settings, pluginName } from "./settings";
+import { settings } from "./settings";
+import { pluginInfo } from "./index";
 import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React } from "@webpack/common";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
@@ -109,7 +110,7 @@ export const getSharedMenuItems = () => {
         <Menu.MenuItem
             id="blu-vc-user-actions-settings"
             label="Edit Settings"
-            action={() => openPluginModal(plugins[pluginName])}
+            action={() => openPluginModal(plugins[pluginInfo.id])}
         />
     ];
 };

@@ -9,7 +9,8 @@ import {
     showToast,
 } from "@webpack/common";
 import { type User } from "@vencord/discord-types";
-import { pluginName, settings } from "./settings";
+import { settings } from "./settings";
+import { pluginInfo } from "./index";
 import {
     getKickList,
     setKickList,
@@ -101,7 +102,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
     const submenu = (
         <Menu.MenuItem
             id="socialize-guild-user-actions"
-            label={pluginName}
+            label={pluginInfo.name}
         >
             {submenuItems}
         </Menu.MenuItem>
@@ -115,7 +116,7 @@ import { getSharedMenuItems } from "./sharedMenu";
 export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
     if (guild?.id !== settings.store.guildId) return;
     children.push(
-        <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginName}>
+        <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginInfo.name}>
             {getSharedMenuItems()}
         </Menu.MenuItem>
     );
@@ -128,7 +129,7 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
     if (!isVoiceChannel(channel)) return;
 
     children.push(
-        <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginName}>
+        <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginInfo.name}>
             <Menu.MenuItem
                 id="socialize-guild-claim-channel"
                 label="Claim Channel"

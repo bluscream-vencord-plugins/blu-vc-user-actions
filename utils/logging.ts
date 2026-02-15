@@ -1,7 +1,7 @@
 import { Logger } from "@utils/Logger";
-import { pluginName } from "../settings";
+import { pluginInfo } from "../index";
 
-export const logger = new Logger(pluginName, "#7289da");
+export const logger = new Logger(pluginInfo.name, pluginInfo.color);
 
 export function log(...args: any[]) {
     logger.log(...args);

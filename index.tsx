@@ -1,3 +1,10 @@
+export const pluginInfo = {
+    id: "socializeGuild",
+    name: "Socialize Guild",
+    description: "Automatically takes actions against users joining your voice channel.",
+    color: "#7289da"
+};
+
 import definePlugin from "@utils/types";
 import { sendBotMessage } from "@api/Commands";
 import { sendMessage } from "@utils/discord";
@@ -18,7 +25,7 @@ import {
     React,
 } from "@webpack/common";
 
-import { pluginName, settings } from "./settings";
+import { settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
 import { logger, log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage, navigateToChannel } from "./utils";
 import {
@@ -53,7 +60,7 @@ interface MessageCreatePayload {
 }
 
 export default definePlugin({
-    name: pluginName,
+    name: "Socialize Guild",
     authors: [
         { name: "Bluscream", id: 1205616252488519723n },
         { name: "Antigravity", id: 0n }
@@ -274,7 +281,7 @@ export default definePlugin({
         if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }
-        this.stopCleanup = registerSharedContextMenu(pluginName, {
+        this.stopCleanup = registerSharedContextMenu(pluginInfo.name, {
             "user-context": (children, props) => {
                 if (props.user) UserContextMenuPatch(children, props);
             },
