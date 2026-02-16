@@ -1,50 +1,10 @@
-import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
-import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
+import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption } from "@api/Commands";
+import { UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
 import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState, MemberChannelInfo } from "./state";
-import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
-import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, claimChannel, bulkUnban, requestChannelInfo, getMemberInfoForChannel } from "./logic";
-import type { Embed } from "@vencord/discord-types";
-
-const SUBCOMMANDS = {
-    INFO: "info",
-    STATS: "stats",
-    CHECK: "check",
-    NAMES: "names",
-    RESET: "reset",
-    BANS: "bans"
-};
-
-const BANS_SUBCOMMANDS = {
-    LIST: "list",
-    SHARE: "share"
-};
-
-const NAMES_SUBCOMMANDS = {
-    START: "start",
-    ROTATE: "rotate",
-    CLEAR: "clear",
-    CHECK: "check",
-    ADD: "add",
-    REMOVE: "remove",
-    SHARE: "share"
-};
-
-const STATS_SUBCOMMANDS = {
-    VIEW: "view",
-    SHARE: "share"
-};
-
-const INFO_SUBCOMMANDS = {
-    VIEW: "view",
-    SHARE: "share"
-};
-
-const RESET_SUBCOMMANDS = {
-    STATE: "state",
-    SETTINGS: "settings"
-};
+import { getOwnerForChannel, getKickList, getRotateNames } from "./utils";
+import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, requestChannelInfo, getMemberInfoForChannel } from "./logic";
 
 export const commands = [
     {
@@ -53,29 +13,61 @@ export const commands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "action",
-                description: "Main action",
-                type: ApplicationCommandOptionType.STRING,
-                required: true,
-                choices: Object.values(SUBCOMMANDS).map(v => ({ name: v, label: v, value: v }))
+                name: "info",
+                description: "View channel/user info",
+                type: ApplicationCommandOptionType.SUB_COMMAND,
+                options: [
+                    { name: "user", description: "Target user (optional)", type: ApplicationCommandOptionType.USER, required: false },
+                    { name: "share", description: "Share results in chat", type: ApplicationCommandOptionType.BOOLEAN, required: false }
+                ]
             },
             {
-                name: "subaction",
-                description: "Sub-action (for name/reset/share)",
-                type: ApplicationCommandOptionType.STRING,
-                required: false
+                name: "stats",
+                description: "View plugin stats",
+                type: ApplicationCommandOptionType.SUB_COMMAND,
+                options: [
+                    { name: "share", description: "Share results in chat", type: ApplicationCommandOptionType.BOOLEAN, required: false }
+                ]
             },
             {
-                name: "argument",
-                description: "Argument (user, name, etc.)",
-                type: ApplicationCommandOptionType.STRING,
-                required: false
+                name: "check",
+                description: "Sync ownership and info",
+                type: ApplicationCommandOptionType.SUB_COMMAND
+            },
+            {
+                name: "name",
+                description: "Channel name rotation management",
+                type: ApplicationCommandOptionType.SUB_COMMAND_GROUP,
+                options: [
+                    { name: "start", description: "Start name rotation", type: ApplicationCommandOptionType.SUB_COMMAND },
+                    { name: "rotate", description: "Immediately rotate name", type: ApplicationCommandOptionType.SUB_COMMAND },
+                    { name: "clear", description: "Stop rotation and clear state", type: ApplicationCommandOptionType.SUB_COMMAND },
+                    { name: "check", description: "Check names for duplicates/invalid length", type: ApplicationCommandOptionType.SUB_COMMAND },
+                    { name: "add", description: "Add a name to the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to add", type: ApplicationCommandOptionType.STRING, required: true }] },
+                    { name: "remove", description: "Remove a name from the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to remove", type: ApplicationCommandOptionType.STRING, required: true }] },
+                    { name: "share", description: "Share the name list in chat", type: ApplicationCommandOptionType.SUB_COMMAND }
+                ]
+            },
+            {
+                name: "bans",
+                description: "Ban and sync management",
+                type: ApplicationCommandOptionType.SUB_COMMAND_GROUP,
+                options: [
+                    { name: "list", description: "Show merged ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "Specific user to check", type: ApplicationCommandOptionType.USER, required: false }] },
+                    { name: "share", description: "Share the sync list in chat", type: ApplicationCommandOptionType.SUB_COMMAND }
+                ]
+            },
+            {
+                name: "reset",
+                description: "Reset plugin state or settings",
+                type: ApplicationCommandOptionType.SUB_COMMAND_GROUP,
+                options: [
+                    { name: "state", description: "Reset internal state (channel owners, etc.)", type: ApplicationCommandOptionType.SUB_COMMAND },
+                    { name: "settings", description: "Reset all settings to defaults", type: ApplicationCommandOptionType.SUB_COMMAND }
+                ]
             }
         ],
         execute: async (args, ctx) => {
-            const action = args[0]?.value;
-            const subaction = args[1]?.value;
-            const argument = args[2]?.value;
             const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
             const { sendBotMessage } = require("@api/Commands");
 
@@ -84,13 +76,24 @@ export const commands = [
                 return;
             }
 
+            // Command resolver
+            const mainOption = args[0];
+            const action = mainOption.name;
+            let subaction = "";
+            let finalOptions = mainOption.options || [];
+
+            if (mainOption.type === ApplicationCommandOptionType.SUB_COMMAND_GROUP) {
+                const subCommandOption = mainOption.options[0];
+                subaction = subCommandOption.name;
+                finalOptions = subCommandOption.options || [];
+            }
+
             switch (action) {
-                case SUBCOMMANDS.INFO: {
-                    const isShare = subaction === INFO_SUBCOMMANDS.SHARE;
-                    let targetUserId = argument;
-                    if (targetUserId) {
-                        targetUserId = targetUserId.match(/<@!?(\d+)>/)?.[1] || targetUserId;
-                    } else {
+                case "info": {
+                    const isShare = findOption(finalOptions, "share", false) as boolean;
+                    let targetUserId = findOption(finalOptions, "user", "") as string;
+
+                    if (!targetUserId) {
                         const me = UserStore.getCurrentUser();
                         targetUserId = me?.id;
                     }
@@ -99,7 +102,6 @@ export const commands = [
                     let info = targetUserId ? memberInfos.get(targetUserId) : undefined;
 
                     if (info && targetUserId) {
-                        // Find any channel associated with this owner to show in the embed
                         for (const [cid, ownership] of channelOwners.entries()) {
                             if (ownership.claimant?.userId === targetUserId || ownership.creator?.userId === targetUserId) {
                                 targetChannelId = cid;
@@ -107,7 +109,6 @@ export const commands = [
                             }
                         }
                     } else if (!info) {
-                        // Fallback to current channel
                         info = getMemberInfoForChannel(channelId);
                     }
 
@@ -126,7 +127,7 @@ export const commands = [
                             {
                                 name: "👑 Owner",
                                 value: ownership
-                                    ? `Creator: <@${ownership.creator?.userId || "None"}>\nClaimant: <@${ownership.claimant?.userId || "None"}>`
+                                    ? `Creator: ${ownership.creator?.userId ? `<@${ownership.creator.userId}>` : "None"}\nClaimant: ${ownership.claimant?.userId ? `<@${ownership.claimant.userId}>` : "None"}`
                                     : "Unknown",
                                 inline: true
                             }
@@ -165,11 +166,11 @@ export const commands = [
                     break;
                 }
 
-                case SUBCOMMANDS.STATS: {
+                case "stats": {
                     const queueSize = actionQueue.length;
                     const processedCount = processedUsers.size;
                     const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${memberInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`;
-                    if (subaction === STATS_SUBCOMMANDS.SHARE) {
+                    if (findOption(finalOptions, "share", false) as boolean) {
                         sendMessage(ctx.channel.id, { content });
                     } else {
                         sendBotMessage(ctx.channel.id, { content });
@@ -177,30 +178,26 @@ export const commands = [
                     break;
                 }
 
-                case SUBCOMMANDS.CHECK: {
+                case "check": {
                     sendBotMessage(ctx.channel.id, { content: "🔄 Checking ownership and channel info..." });
                     await checkChannelOwner(channelId, settings.store.botId);
                     requestChannelInfo(channelId);
+                    sendBotMessage(ctx.channel.id, { content: "✅ Ownership check and sync complete." });
                     break;
                 }
 
-                case SUBCOMMANDS.NAMES: {
-                    if (!subaction) {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Missing subaction for names (start, rotate, clear, check, add, remove, share)" });
-                        return;
-                    }
-                    if (subaction === NAMES_SUBCOMMANDS.START) {
+                case "name": {
+                    if (subaction === "start") {
                         startRotation(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Started rotation." });
-                    } else if (subaction === NAMES_SUBCOMMANDS.ROTATE) {
+                    } else if (subaction === "rotate") {
                         rotateChannelName(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Rotated name." });
-                    } else if (subaction === NAMES_SUBCOMMANDS.CLEAR) {
+                    } else if (subaction === "clear") {
                         stopRotation(channelId);
                         state.rotationIndex.delete(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Stopped rotation and cleared index." });
-                    }
-                    else if (subaction === NAMES_SUBCOMMANDS.CHECK) {
+                    } else if (subaction === "check") {
                         const names = getRotateNames();
                         const invalid = names.filter(n => n.length === 0 || n.length > 15 || n.trim() === "");
                         const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
@@ -216,57 +213,30 @@ export const commands = [
                         } else {
                             sendBotMessage(ctx.channel.id, { content: "✅ All names are valid and unique." });
                         }
-                    } else if (subaction === NAMES_SUBCOMMANDS.ADD) {
-                        if (!argument) { sendBotMessage(ctx.channel.id, { content: "❌ Missing name to add." }); return; }
+                    } else if (subaction === "add") {
+                        const newName = findOption(finalOptions, "name", "") as string;
                         const names = getRotateNames();
-                        if (names.includes(argument)) { sendBotMessage(ctx.channel.id, { content: "❌ Name already exists." }); return; }
-                        if (argument.length > 15) { sendBotMessage(ctx.channel.id, { content: "❌ Name too long (max 15)." }); return; }
-                        settings.store.rotateChannelNames += `\n${argument}`;
-                        sendBotMessage(ctx.channel.id, { content: `✅ Added ${argument}.` });
-                    } else if (subaction === NAMES_SUBCOMMANDS.REMOVE) {
-                        if (!argument) { sendBotMessage(ctx.channel.id, { content: "❌ Missing name to remove." }); return; }
+                        if (names.includes(newName)) { sendBotMessage(ctx.channel.id, { content: "❌ Name already exists." }); return; }
+                        if (newName.length > 15) { sendBotMessage(ctx.channel.id, { content: "❌ Name too long (max 15)." }); return; }
+                        settings.store.rotateChannelNames += `\n${newName}`;
+                        sendBotMessage(ctx.channel.id, { content: `✅ Added ${newName}.` });
+                    } else if (subaction === "remove") {
+                        const toRemove = findOption(finalOptions, "name", "") as string;
                         const names = getRotateNames();
-                        const newList = names.filter(n => n !== argument);
+                        const newList = names.filter(n => n !== toRemove);
                         settings.store.rotateChannelNames = newList.join("\n");
-                        sendBotMessage(ctx.channel.id, { content: `✅ Removed ${argument}.` });
-                    } else if (subaction === NAMES_SUBCOMMANDS.SHARE) {
+                        sendBotMessage(ctx.channel.id, { content: `✅ Removed ${toRemove}.` });
+                    } else if (subaction === "share") {
                         const names = getRotateNames();
-                        sendMessage(ctx.channel.id, {
-                            content: `\`\`\`\n${names.join("\n")}\n\`\`\``
-                        });
-                    }
-                    else {
-                        sendBotMessage(ctx.channel.id, { content: `❌ Subaction ${subaction} not fully implemented yet.` });
+                        sendMessage(ctx.channel.id, { content: `\`\`\`\n${names.join("\n")}\n\`\`\`` });
                     }
                     break;
                 }
 
-                case SUBCOMMANDS.RESET: {
-                    if (subaction === RESET_SUBCOMMANDS.STATE) {
-                        resetState();
-                        sendBotMessage(ctx.channel.id, { content: "✅ Plugin state reset." });
-                    } else if (subaction === RESET_SUBCOMMANDS.SETTINGS) {
-                        // Reset settings
-                        for (const key in settings.def) {
-                            if (key === "enabled" || (settings.def as any)[key].readonly) continue;
-                            try {
-                                (settings.store as any)[key] = (settings.def as any)[key].default;
-                            } catch (e) { }
-                        }
-                        sendBotMessage(ctx.channel.id, { content: "✅ Settings reset to defaults (excluding 'enabled')." });
-                    } else {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown reset target (state, settings)." });
-                    }
-                    break;
-                }
-
-                case SUBCOMMANDS.BANS: {
-                    if (subaction === BANS_SUBCOMMANDS.LIST) {
+                case "bans": {
+                    if (subaction === "list") {
                         const me = UserStore.getCurrentUser();
-                        let targetUserId = argument;
-                        if (targetUserId) {
-                            targetUserId = targetUserId.match(/<@!?(\d+)>/)?.[1] || targetUserId;
-                        }
+                        let targetUserId = findOption(finalOptions, "user", "") as string;
 
                         let info: MemberChannelInfo | undefined;
                         let contextName = "";
@@ -291,17 +261,12 @@ export const commands = [
 
                         const autoKickList = getKickList();
                         const bannedIds = info?.banned || [];
-
-                        // Create a merged list of unique IDs
                         const allIds = Array.from(new Set([...bannedIds, ...autoKickList]));
-
-                        // ID that would be replaced next
                         const nextToReplace = (bannedIds.length >= settings.store.banLimit) ? bannedIds[0] : null;
 
                         const lines = allIds.map(id => {
                             const user = UserStore.getUser(id);
                             const name = user ? `<@${id}>` : `Unknown (\`${id}\`)`;
-
                             const isAuto = autoKickList.includes(id);
                             const isChannel = bannedIds.includes(id);
 
@@ -332,19 +297,27 @@ export const commands = [
                                     inline: false
                                 }
                             ],
-                            footer: {
-                                text: `⭐=Both | ⚙️=Sync Only | 📍=MemberOnly | ♻️=Next to replace`
-                            }
+                            footer: { text: `⭐=Both | ⚙️=Sync Only | 📍=MemberOnly | ♻️=Next to replace` }
                         };
 
                         sendBotMessage(ctx.channel.id, { embeds: [embed] });
-                    } else if (subaction === BANS_SUBCOMMANDS.SHARE) {
+                    } else if (subaction === "share") {
                         const list = getKickList();
-                        sendMessage(ctx.channel.id, {
-                            content: `\`\`\`\n${list.join("\n")}\n\`\`\``
-                        });
-                    } else {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown bans subcommand (list, share)." });
+                        sendMessage(ctx.channel.id, { content: `\`\`\`\n${list.join("\n")}\n\`\`\`` });
+                    }
+                    break;
+                }
+
+                case "reset": {
+                    if (subaction === "state") {
+                        resetState();
+                        sendBotMessage(ctx.channel.id, { content: "✅ Plugin state reset." });
+                    } else if (subaction === "settings") {
+                        for (const key in settings.def) {
+                            if (key === "enabled" || (settings.def as any)[key].readonly) continue;
+                            try { (settings.store as any)[key] = (settings.def as any)[key].default; } catch (e) { }
+                        }
+                        sendBotMessage(ctx.channel.id, { content: "✅ Settings reset to defaults (excluding 'enabled')." });
                     }
                     break;
                 }

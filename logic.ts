@@ -14,7 +14,7 @@ import {
 import { findStoreLazy } from "@webpack";
 const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
+import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
 import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
@@ -176,31 +176,32 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
 
     const { BotResponse } = require("./utils/BotResponse");
 
-    if (cached) {
-        const msgsArray = cached.toArray ? cached.toArray() : cached;
+    const msgsArray = cached ? (cached.toArray ? cached.toArray() : cached) : [];
 
-        for (let i = msgsArray.length - 1; i >= 0; i--) {
-            const msg = msgsArray[i];
-            const response = new BotResponse(msg, botId);
-            if (response.initiatorId) {
-                owner = {
-                    userId: response.initiatorId,
-                    reason: response.type,
-                    timestamp: response.timestamp
-                };
-                break;
-            }
+    for (let i = 0; i < msgsArray.length; i++) {
+        const msg = msgsArray[i];
+        const response = new BotResponse(msg, botId);
+        if (response.initiatorId) {
+            owner = {
+                userId: response.initiatorId,
+                reason: response.type,
+                timestamp: response.timestamp
+            };
+            updateOwner(channelId, owner);
         }
     }
 
-    if (!owner) {
+    // If we haven't found a creator yet, try fetching more from API
+    const currentOwnership = channelOwners.get(channelId);
+    if (!currentOwnership?.creator) {
         try {
             const res = await RestAPI.get({
                 url: Constants.Endpoints.MESSAGES(channelId),
                 query: { limit: 50 }
             });
             if (res.body && Array.isArray(res.body)) {
-                for (let i = 0; i < res.body.length; i++) {
+                // Process API messages oldest to newest (Discord returns newest first)
+                for (let i = res.body.length - 1; i >= 0; i--) {
                     const response = new BotResponse(res.body[i], botId);
                     if (response.initiatorId) {
                         owner = {
@@ -208,18 +209,13 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
                             reason: response.type,
                             timestamp: response.timestamp
                         };
-                        break;
+                        updateOwner(channelId, owner);
                     }
                 }
             }
         } catch (e) {
             log("[SocializeGuild] Failed to fetch messages for ownership check:", e);
         }
-    }
-
-    if (owner) {
-        updateOwner(channelId, owner);
-        return owner;
     }
 
     return fallback;

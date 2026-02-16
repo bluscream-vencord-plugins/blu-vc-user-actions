@@ -30,9 +30,13 @@ export class BotResponse {
 
     private parseType() {
         const authorName = this.embed.author?.name;
-        if (authorName === "Channel Created") this.type = BotResponseType.CREATED;
-        else if (authorName === "Channel Claimed") this.type = BotResponseType.CLAIMED;
-        else if (authorName === "Channel Settings") this.type = BotResponseType.INFO;
+        const title = this.embed.title;
+
+        const check = (str: string) => authorName === str || title === str;
+
+        if (check("Channel Created")) this.type = BotResponseType.CREATED;
+        else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
+        else if (check("Channel Settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
     }
 
     private findInitiatorId(): string | undefined {
