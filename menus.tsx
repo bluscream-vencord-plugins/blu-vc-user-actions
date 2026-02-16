@@ -18,7 +18,9 @@ import {
     log,
     formatBanCommand,
     formatUnbanCommand,
-    isVoiceChannel
+    isVoiceChannel,
+    getWhitelist,
+    setWhitelist
 } from "./utils";
 import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels, getMemberInfoForChannel } from "./logic";
 import { actionQueue, ActionType } from "./state";
@@ -88,6 +90,20 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                 }
             }}
             color={isBanned ? "success" : "danger"}
+        />,
+        <Menu.MenuItem
+            id="vc-blu-vc-user-whitelist"
+            label={getWhitelist().includes(user.id) ? "Unwhitelist User" : "Whitelist User"}
+            action={() => {
+                const whitelist = getWhitelist();
+                const isWhitelisted = whitelist.includes(user.id);
+                const newList = isWhitelisted
+                    ? whitelist.filter(id => id !== user.id)
+                    : [...whitelist, user.id];
+
+                setWhitelist(newList);
+                showToast(isWhitelisted ? `Removed ${user.username} from whitelist.` : `Added ${user.username} to whitelist.`, { type: "success" } as any);
+            }}
         />
     ];
 
