@@ -1,4 +1,4 @@
-import { sendMessage } from "@utils/discord";
+import { sendMessage as _sendMessage } from "@utils/discord";
 import {
     ChannelStore,
     GuildStore,
@@ -18,6 +18,14 @@ import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionT
 import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
+
+const sendMessage = (channelId: string, options: any) => {
+    if (channelId === settings.store.createChannelId) {
+        log(`Blocked message to createChannelId: ${channelId}`);
+        return;
+    }
+    _sendMessage(channelId, options);
+};
 
 export async function processQueue() {
     const { sendBotMessage } = require("@api/Commands");

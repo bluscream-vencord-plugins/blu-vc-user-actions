@@ -30,12 +30,6 @@ export const settings = definePluginSettings({
         default: "",
         restartNeeded: false,
     },
-    kickNotInRoleMessage: {
-        type: OptionType.STRING,
-        description: "Ephemeral message to show when a user is kicked for missing the required role",
-        default: "🚫 Kicking <@{user_id}> because they are missing the required role",
-        restartNeeded: false,
-    },
     banRotateEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable rotating banlist",
@@ -115,16 +109,22 @@ export const settings = definePluginSettings({
         default: false,
         restartNeeded: false,
     },
+    showChannelInfoChangeMessage: {
+        type: OptionType.BOOLEAN,
+        description: "Causes a message to be sent to the channel when the channel info changes",
+        default: false,
+        restartNeeded: false,
+    },
     ownershipChangeMessage: {
         type: OptionType.STRING,
         description: "Message to show when ownership is detected",
         default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
         restartNeeded: false,
     },
-    showChannelInfoChangeMessage: {
-        type: OptionType.BOOLEAN,
-        description: "Causes a message to be sent to the channel when the channel info changes",
-        default: false,
+    kickNotInRoleMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when a user is kicked for missing the required role",
+        default: "🚫 Kicking <@{user_id}> because they are missing the required role",
         restartNeeded: false,
     },
     whitelistSkipMessage: {
@@ -139,10 +139,16 @@ export const settings = definePluginSettings({
         default: "♾️ Banned user <@{user_id_old}> has been replaced with <@{user_id}>",
         restartNeeded: false,
     },
+    voteSubmittedMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when a vote is submitted",
+        default: "<@{user_id}> votes to ban <@{target_user_id}> (Expires {discordtime})",
+        restartNeeded: false,
+    },
     voteBanCommand: {
         type: OptionType.STRING,
         description: "Message to parse for vote ban system",
-        default: "!vote ban {user name/mention/id}",
+        default: "!vote ban {target}",
         restartNeeded: false,
     },
     kickCommand: {

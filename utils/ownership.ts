@@ -22,13 +22,13 @@ export function updateOwner(channelId: string, owner: OwnerEntry): boolean {
 
     let changed = false;
 
-    if (owner.reason === "Created") {
+    if (owner.reason === "Channel Created" || owner.reason === "Created") {
         // This is the creator
         if (!ownership.first || ownership.first.userId !== owner.userId) {
             ownership.first = owner;
             changed = true;
         }
-    } else if (owner.reason === "Claimed") {
+    } else if (owner.reason === "Channel Claimed" || owner.reason === "Claimed") {
         // This is a claimant
         if (ownership.first && ownership.first.userId === owner.userId) {
             // Creator claimed it back! Clear claimant (last)

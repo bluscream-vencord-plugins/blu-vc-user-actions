@@ -5,6 +5,7 @@ import { getOwnerForChannel } from "./ownership";
 import { isWhitelisted } from "./kicklist";
 import { processQueue } from "../logic";
 import { VoiceStateStore } from "@webpack/common";
+import { toDiscordTime } from "./formatting";
 
 const activeVotes = new Map<string, { voters: Set<string>, expires: number }>();
 
@@ -12,7 +13,7 @@ export function handleVoteBan(message: any, channelId: string) {
     if (!settings.store.voteBanEnabled) return;
 
     const content = message.content;
-    const voteCommand = settings.store.voteBanCommand.replace("{user name/mention/id}", "(\\d+| <@!?(\\d+)>|.*?)");
+    const voteCommand = settings.store.voteBanCommand.replace("{target}", "(\\d+| <@!?(\\d+)>|.*?)");
     const regex = new RegExp(voteCommand, "i");
     const match = content.match(regex);
 
@@ -53,6 +54,15 @@ export function handleVoteBan(message: any, channelId: string) {
     }
 
     vote.voters.add(voterId);
+
+    // Send ephemeral confirmation
+    const { sendBotMessage } = require("@api/Commands");
+    const uniqueVoteMsg = settings.store.voteSubmittedMessage
+        .replace(/{user_id}/g, voterId)
+        .replace(/{target_user_id}/g, targetUserId)
+        .replace(/{discordtime}/g, toDiscordTime(vote.expires, true));
+
+    sendBotMessage(channelId, { content: uniqueVoteMsg });
 
     // Check if enough votes
     const totalUsersInVC = Object.keys(voiceStates).length;
