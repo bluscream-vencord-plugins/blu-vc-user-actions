@@ -38,6 +38,7 @@ export const state = {
     rotationIndex: new Map<string, number>(),
     rotationIntervals: new Map<string, any>(),
     lastRotationTime: new Map<string, number>(),
+    roleKickedUsers: new Set<string>(),
     onRotationSettingsChange: () => {
         const { restartAllRotations } = require("./utils/rotation");
         restartAllRotations();
@@ -62,6 +63,7 @@ export function resetState() {
     channelOwners.clear();
     memberInfos.clear();
     state.rotationIndex.clear();
+    state.roleKickedUsers.clear();
     processedUsers.clear();
     saveState();
 }

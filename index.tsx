@@ -180,31 +180,6 @@ export default definePlugin({
             }
             const isOwner = ownerInfo?.userId === me.id;
 
-            // Auto-kick logic
-            if (settings.store.autoKickEnabled && isOwner) {
-                const kickList = getKickList();
-                for (const s of targetGuildVoiceStates) {
-                    if (s.userId === me.id) continue;
-
-                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
-                        if (kickList.includes(s.userId)) {
-                            const now = Date.now();
-                            const lastAction = processedUsers.get(s.userId) || 0;
-                            if (now - lastAction < settings.store.queueTime) continue;
-
-                            log(`Adding ${s.userId} to auto-kick queue`);
-                            actionQueue.push({
-                                type: ActionType.KICK,
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId
-                            });
-                            processQueue();
-                        }
-                    }
-                }
-            }
-
             // Kick Not In Role Logic
             if (settings.store.kickNotInRole && isOwner) {
                 for (const s of targetGuildVoiceStates) {
@@ -212,14 +187,30 @@ export default definePlugin({
 
                     const member = GuildMemberStore.getMember(s.guildId, s.userId);
                     if (member && !member.roles.includes(settings.store.kickNotInRole)) {
-                        log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
-                        actionQueue.push({
-                            type: ActionType.KICK,
-                            userId: s.userId,
-                            channelId: myChannelId,
-                            guildId: s.guildId,
-                            ephemeralMessage: settings.store.kickNotInRoleMessage
-                        });
+                        // Avoid duplicate queue items for the same user
+                        if (actionQueue.some(item => item.userId === s.userId)) continue;
+
+                        const hasBeenKicked = state.roleKickedUsers.has(s.userId);
+
+                        if (hasBeenKicked) {
+                            log(`User ${s.userId} rejoined without role ${settings.store.kickNotInRole}, upgrading to BAN`);
+                            actionQueue.push({
+                                type: ActionType.BAN,
+                                userId: s.userId,
+                                channelId: myChannelId,
+                                guildId: s.guildId
+                            });
+                        } else {
+                            log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
+                            state.roleKickedUsers.add(s.userId);
+                            actionQueue.push({
+                                type: ActionType.KICK,
+                                userId: s.userId,
+                                channelId: myChannelId,
+                                guildId: s.guildId,
+                                ephemeralMessage: settings.store.kickNotInRoleMessage
+                            });
+                        }
                         processQueue();
                     }
                 }

@@ -79,7 +79,17 @@ export async function processQueue() {
         }
 
         let template: string;
-        switch (type) {
+        let activeType = type;
+
+        if (activeType === ActionType.BAN) {
+            const ownerInfo = getOwnerForChannel(channelId);
+            if (ownerInfo?.reason?.toLowerCase().includes("claim")) {
+                log(`Downgrading BAN to KICK for ${userId} in ${channelId} (Ownership Reason: ${ownerInfo.reason})`);
+                activeType = ActionType.KICK;
+            }
+        }
+
+        switch (activeType) {
             case ActionType.KICK:
                 template = settings.store.kickCommand;
                 break;
@@ -93,7 +103,7 @@ export async function processQueue() {
                 template = settings.store.claimCommand;
                 break;
             default:
-                console.error(`Unknown action type: ${type}`);
+                console.error(`Unknown action type: ${activeType}`);
                 continue;
         }
 
@@ -118,7 +128,7 @@ export async function processQueue() {
         }
 
         try {
-            log(`Sending ${type} message: ${formattedMessage}`);
+            log(`Sending ${activeType} message: ${formattedMessage}`);
             sendMessage(channelId, { content: formattedMessage });
             processedUsers.set(userId, now);
         } catch (e) {
@@ -368,6 +378,7 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
             channelId: channelId,
             guildId: guildId
         });
+        state.roleKickedUsers.delete(userId);
         count++;
     }
 

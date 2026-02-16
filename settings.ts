@@ -17,13 +17,6 @@ export const settings = definePluginSettings({
         multiline: true,
         restartNeeded: false,
     },
-    autoKickEnabled: {
-        type: OptionType.BOOLEAN,
-        description: "Enable auto kicking of banned users",
-        default: false,
-        restartNeeded: false,
-        hidden: true
-    },
     kickNotInRole: {
         type: OptionType.STRING,
         description: "Role ID required to stay in the channel (Auto-Kick if missing)",
