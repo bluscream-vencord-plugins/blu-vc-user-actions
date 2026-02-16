@@ -25,17 +25,12 @@ export function updateOwner(channelId: string, owner: OwnerEntry): boolean {
         }
     } else if (owner.reason === "Channel Claimed" || owner.reason === "Claimed") {
         // This is a claimant
-        if (ownership.creator && ownership.creator.userId === owner.userId) {
-            // Creator claimed it back! Clear claimant
-            if (ownership.claimant) {
-                ownership.claimant = undefined;
-                changed = true;
-            }
-        } else if (!ownership.claimant || ownership.claimant.userId !== owner.userId) {
+        if (ownership.claimant?.userId !== owner.userId) {
             ownership.claimant = new ChannelClaimant(owner.userId, owner.reason, owner.timestamp);
             changed = true;
         }
     }
+
 
     if (changed) {
         saveState();

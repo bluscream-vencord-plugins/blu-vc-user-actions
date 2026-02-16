@@ -12,7 +12,6 @@ export function getWhitelist(): string[] {
     return settings.store.userWhitelist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
 }
 
-
 export function setWhitelist(list: string[]) {
     settings.store.userWhitelist = list.join("\n");
 }

@@ -1,4 +1,4 @@
-import { ActionType, actionQueue } from "./state";
+import { ActionType, actionQueue, channelOwners } from "./state";
 import { getKickList, getOwnerForChannel, navigateTo, jumpToFirstMessage } from "./utils";
 import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, claimAllDisbandedChannels, fetchAllOwners } from "./logic";
 import { settings } from "./settings";
@@ -11,19 +11,37 @@ export const getSharedMenuItems = () => {
     const { enabled } = settings.use(["enabled"]);
     const channelId = SelectedChannelStore.getVoiceChannelId();
 
-    const channelOwnerInfo = channelId ? getOwnerForChannel(channelId) : undefined;
-    const owner = channelOwnerInfo?.userId ? UserStore.getUser(channelOwnerInfo.userId) : null;
-    const ownerName = owner?.globalName || owner?.username || channelOwnerInfo?.userId;
+    let creatorStatus = "Creator: None";
+    let claimantStatus = "Claimant: None";
 
-    let status = "Not in Voice Channel";
     if (channelId) {
-        status = channelOwnerInfo?.userId ? `Owned by ${ownerName} (${channelOwnerInfo.reason})` : "Not Owned";
+        const ownership = channelOwners.get(channelId);
+
+        if (ownership?.creator) {
+            const creatorUser = UserStore.getUser(ownership.creator.userId);
+            const creatorName = creatorUser?.globalName || creatorUser?.username || ownership.creator.userId;
+            creatorStatus = `Creator: ${creatorName} (${ownership.creator.reason})`;
+        }
+
+        if (ownership?.claimant) {
+            const claimantUser = UserStore.getUser(ownership.claimant.userId);
+            const claimantName = claimantUser?.globalName || claimantUser?.username || ownership.claimant.userId;
+            claimantStatus = `Claimant: ${claimantName} (${ownership.claimant.reason})`;
+        }
     }
 
     return [
         <Menu.MenuCheckboxItem
-            id="blu-vc-user-actions-status"
-            label={`${status}`}
+            id="blu-vc-user-actions-creator"
+            label={creatorStatus}
+            checked={enabled}
+            action={() => {
+                settings.store.enabled = !enabled;
+            }}
+        />,
+        <Menu.MenuCheckboxItem
+            id="blu-vc-user-actions-claimant"
+            label={claimantStatus}
             checked={enabled}
             action={() => {
                 settings.store.enabled = !enabled;

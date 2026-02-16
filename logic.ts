@@ -368,6 +368,7 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
     }
 
     if (targetOwnerId) {
+        if (!info.ownerId) info.ownerId = targetOwnerId;
         setMemberInfo(targetOwnerId, info);
         log(`Updated member info for ${targetOwnerId} (via channel ${channelId})`);
     } else {

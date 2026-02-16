@@ -108,7 +108,7 @@ export const commands = [
                     if (info) {
                         embed.fields.push({
                             name: "🔧 Channel Settings",
-                            value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${info.ownerId ? `<@${info.ownerId}>` : "N/A"}`,
+                            value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}`,
                             inline: false
                         });
                         if (info.permitted.length > 0) embed.fields.push({ name: `Permitted (${info.permitted.length})`, value: info.permitted.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
@@ -126,7 +126,7 @@ export const commands = [
                             content += `**🔧 Settings:**\n`;
                             content += `- Name: \`${info.name || "N/A"}\`\n`;
                             content += `- Limit: \`${info.limit || "N/A"}\`\n`;
-                            content += `- Owner ID: ${info.ownerId ? `<@${info.ownerId}>` : "None"}\n`;
+                            content += `- Owner ID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}\n`;
                             if (info.permitted.length > 0) content += `- Permitted: ${info.permitted.length} users\n`;
                             if (info.banned.length > 0) content += `- Banned: ${info.banned.length} users\n`;
                         }
