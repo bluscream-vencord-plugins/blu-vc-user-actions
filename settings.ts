@@ -142,13 +142,13 @@ export const settings = definePluginSettings({
     voteSubmittedMessage: {
         type: OptionType.STRING,
         description: "Ephemeral message to show when a vote is submitted",
-        default: "<@{user_id}> votes to ban <@{target_user_id}> (Expires {discordtime})",
+        default: "⚠️ <@{user_id}> votes to ban <@{target_user_id}> (Expires in <t:{expires}:R>)",
         restartNeeded: false,
     },
     voteBanCommand: {
         type: OptionType.STRING,
-        description: "Message to parse for vote ban system",
-        default: "!vote ban {target}",
+        description: "Regex Pattern to parse for vote ban system",
+        default: "^!vote ban (.*)$",
         restartNeeded: false,
     },
     kickCommand: {

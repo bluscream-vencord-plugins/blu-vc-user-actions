@@ -1,6 +1,6 @@
 import { MemberChannelInfo } from "../state";
 import { log } from "./logging";
-import { BotResponse } from "./BotResponse";
+import { BotResponse, BotResponseType } from "./BotResponse";
 
 export function parseBotInfoMessage(response: BotResponse): { info: MemberChannelInfo, channelId: string } | null {
     if (!response.embed) return null;
@@ -11,7 +11,8 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
         banned: [],
         timestamp: response.timestamp,
         updated: Date.now(),
-        ownerId: response.initiatorId
+        // ownerId should NOT come from initiatorId for INFO responses
+        ownerId: (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED) ? response.initiatorId : undefined
     };
 
     let targetChannelId = response.channelId;

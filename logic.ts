@@ -239,18 +239,27 @@ export function claimChannel(channelId: string, formerOwnerId?: string) {
 
 export function handleOwnershipChange(channelId: string, ownerId: string) {
     const me = UserStore.getCurrentUser();
+    const currentVoiceChannelId = SelectedChannelStore.getVoiceChannelId();
+
+    // Only handle ownership changes for the current channel, or if we are not in a channel, or if we were already rotating this channel
+    if (currentVoiceChannelId && channelId !== currentVoiceChannelId && !state.rotationIntervals.has(channelId)) {
+        return;
+    }
+
     log(`Ownership change for ${channelId}: owner is ${ownerId}, me is ${me?.id}`);
     if (ownerId === me?.id) {
         log(`We are the owner! Starting rotation and requesting channel info`);
         startRotation(channelId);
         requestChannelInfo(channelId);
 
-        if (settings.store.autoNavigateToOwnedChannel) {
+        if (settings.store.autoNavigateToOwnedChannel && channelId === currentVoiceChannelId) {
             const channel = ChannelStore.getChannel(channelId);
             jumpToFirstMessage(channelId, channel?.guild_id);
         }
     } else {
-        log(`We are not the owner, stopping rotation`);
+        if (state.rotationIntervals.has(channelId)) {
+            log(`We are no longer the owner of ${channelId}, stopping rotation.`);
+        }
         stopRotation(channelId);
     }
 }

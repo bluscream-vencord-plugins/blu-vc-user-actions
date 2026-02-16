@@ -1,37 +1,33 @@
+import * as DataStore from "@api/DataStore";
 import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry } from "./types";
 export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry };
 
-// Persistence - Try to load from localStorage
+// Persistence Keys
 const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v1";
-const STORAGE_KEY_INFO = "SocializeGuild_Info_v1";
-
-let loadedOwners = new Map<string, ChannelOwnership>();
-try {
-    const raw = localStorage.getItem(STORAGE_KEY_OWNERS);
-    if (raw) {
-        const parsed = JSON.parse(raw);
-        loadedOwners = new Map(Object.entries(parsed));
-    }
-} catch (e) {
-    console.error("[SocializeGuild] Failed to load owners:", e);
-}
-
 const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v1";
 
-let loadedMembers = new Map<string, MemberChannelInfo>();
-try {
-    const raw = localStorage.getItem(STORAGE_KEY_MEMBERS);
-    if (raw) {
-        const parsed = JSON.parse(raw);
-        loadedMembers = new Map(Object.entries(parsed));
+export const channelOwners = new Map<string, ChannelOwnership>();
+export const memberInfos = new Map<string, MemberChannelInfo>(); // Map<ownerId, MemberChannelInfo>
+
+export async function loadState() {
+    try {
+        const owners = await DataStore.get(STORAGE_KEY_OWNERS);
+        if (owners) {
+            for (const [k, v] of Object.entries(owners)) {
+                channelOwners.set(k, v as ChannelOwnership);
+            }
+        }
+        const members = await DataStore.get(STORAGE_KEY_MEMBERS);
+        if (members) {
+            for (const [k, v] of Object.entries(members)) {
+                memberInfos.set(k, v as MemberChannelInfo);
+            }
+        }
+        console.log(`[SocializeGuild] State loaded: ${channelOwners.size} owners, ${memberInfos.size} members`);
+    } catch (e) {
+        console.error("[SocializeGuild] Failed to load state from DataStore:", e);
     }
-} catch (e) {
-    console.error("[SocializeGuild] Failed to load member info:", e);
 }
-
-
-export const channelOwners = loadedOwners;
-export const memberInfos = loadedMembers; // Map<ownerId, MemberChannelInfo>
 
 export const actionQueue: Array<ActionItem> = [];
 export const processedUsers = new Map<string, number>();
@@ -48,12 +44,12 @@ export const state = {
     },
 };
 
-export function saveState() {
+export async function saveState() {
     try {
-        localStorage.setItem(STORAGE_KEY_OWNERS, JSON.stringify(Object.fromEntries(channelOwners)));
-        localStorage.setItem(STORAGE_KEY_MEMBERS, JSON.stringify(Object.fromEntries(memberInfos)));
+        await DataStore.set(STORAGE_KEY_OWNERS, Object.fromEntries(channelOwners));
+        await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
     } catch (e) {
-        console.error("[SocializeGuild] Failed to save state:", e);
+        console.error("[SocializeGuild] Failed to save state to DataStore:", e);
     }
 }
 

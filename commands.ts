@@ -2,7 +2,7 @@ import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
-import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState } from "./state";
+import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState, MemberChannelInfo } from "./state";
 import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
 import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, claimChannel, bulkUnban, requestChannelInfo, getMemberInfoForChannel } from "./logic";
 import type { Embed } from "@vencord/discord-types";
@@ -262,15 +262,82 @@ export const commands = [
 
                 case SUBCOMMANDS.BANS: {
                     if (subaction === BANS_SUBCOMMANDS.LIST) {
-                        const list = getKickList();
-                        const lines = list.map(id => {
+                        const me = UserStore.getCurrentUser();
+                        let targetUserId = argument;
+                        if (targetUserId) {
+                            targetUserId = targetUserId.match(/<@!?(\d+)>/)?.[1] || targetUserId;
+                        }
+
+                        let info: MemberChannelInfo | undefined;
+                        let contextName = "";
+
+                        if (targetUserId) {
+                            info = memberInfos.get(targetUserId);
+                            const user = UserStore.getUser(targetUserId);
+                            contextName = user?.globalName || user?.username || targetUserId;
+                        } else {
+                            const owner = getOwnerForChannel(channelId);
+                            if (owner) {
+                                targetUserId = owner.userId;
+                                info = memberInfos.get(targetUserId);
+                                const user = UserStore.getUser(targetUserId);
+                                contextName = user?.globalName || user?.username || targetUserId;
+                            } else if (me) {
+                                targetUserId = me.id;
+                                info = memberInfos.get(targetUserId);
+                                contextName = "Your Settings";
+                            }
+                        }
+
+                        const autoKickList = getKickList();
+                        const bannedIds = info?.banned || [];
+
+                        // Create a merged list of unique IDs
+                        const allIds = Array.from(new Set([...bannedIds, ...autoKickList]));
+
+                        // ID that would be replaced next
+                        const nextToReplace = (bannedIds.length >= settings.store.banLimit) ? bannedIds[0] : null;
+
+                        const lines = allIds.map(id => {
                             const user = UserStore.getUser(id);
-                            const name = user?.globalName || user?.username || "Unknown User";
-                            return `- ${name} (\`${id}\`)`;
+                            const name = user ? `<@${id}>` : `Unknown (\`${id}\`)`;
+
+                            const isAuto = autoKickList.includes(id);
+                            const isChannel = bannedIds.includes(id);
+
+                            let marker = "";
+                            if (isAuto && isChannel) marker = " ⭐";
+                            else if (isAuto) marker = " ⚙️";
+                            else marker = " 📍";
+
+                            if (id === nextToReplace) marker += " ♻️";
+
+                            let source = "";
+                            if (isAuto && isChannel) source = "(Both)";
+                            else if (isAuto) source = "(Sync)";
+                            else source = "(MemberInfo)";
+
+                            return `- ${name} ${source}${marker}`;
                         });
-                        sendBotMessage(ctx.channel.id, {
-                            content: `**${list.length} Banned Users (Ephemeral):**\n${lines.join("\n")}`
-                        });
+
+                        const embed: any = {
+                            type: "rich",
+                            title: `🚫 Ban Configuration: ${contextName}`,
+                            description: lines.length > 0 ? lines.join("\n") : "No users are currently banned in this configuration.",
+                            color: 0xED4245,
+                            fields: [
+                                {
+                                    name: "📊 Stats",
+                                    value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nGlobal Sync: ${autoKickList.length}`,
+                                    inline: false
+                                }
+                            ],
+                            footer: {
+                                text: `⭐=Both | ⚙️=Sync Only | 📍=MemberOnly | ♻️=Next to replace`
+                            }
+                        };
+
+                        sendBotMessage(ctx.channel.id, { embeds: [embed] });
                     } else if (subaction === BANS_SUBCOMMANDS.SHARE) {
                         const list = getKickList();
                         sendMessage(ctx.channel.id, {

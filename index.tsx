@@ -14,7 +14,7 @@ import {
     ChannelActions
 } from "@webpack/common";
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners } from "./state";
+import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners, loadState } from "./state";
 import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
 import {
     processQueue,
@@ -24,10 +24,10 @@ import {
     stopRotation,
     handleOwnerUpdate,
     handleInfoUpdate,
-    handleVoteBan,
     requestChannelInfo,
     getMemberInfoForChannel,
 } from "./logic";
+import { handleVoteBan } from "./utils/voteban";
 import { parseBotInfoMessage, BotResponse, BotResponseType } from "./utils";
 import {
     UserContextMenuPatch,
@@ -277,7 +277,7 @@ export default definePlugin({
 
             // Handle Bot Responses (Ownership & Info)
             const response = new BotResponse(message, settings.store.botId);
-            if (response.initiatorId) {
+            if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
                 handleOwnerUpdate(channelId, {
                     userId: response.initiatorId,
                     reason: response.type,
@@ -300,7 +300,8 @@ export default definePlugin({
         }
     },
     stopCleanup: null as (() => void) | null,
-    onStart() {
+    async onStart() {
+        await loadState();
         log(`Plugin starting... enabled=${settings.store.enabled}, fetchOwnersOnStartup=${settings.store.fetchOwnersOnStartup}`);
         if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
