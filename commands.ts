@@ -9,36 +9,41 @@ import type { Embed } from "@vencord/discord-types";
 
 const SUBCOMMANDS = {
     INFO: "info",
-    PLUGIN: "plugin",
+    STATS: "stats",
     CHECK: "check",
-    NAME: "name",
+    NAMES: "names",
     RESET: "reset",
-    SHARE: "share",
     BANS: "bans"
 };
 
 const BANS_SUBCOMMANDS = {
-    LIST: "list"
+    LIST: "list",
+    SHARE: "share"
 };
 
-const NAME_SUBCOMMANDS = {
+const NAMES_SUBCOMMANDS = {
     START: "start",
     ROTATE: "rotate",
     CLEAR: "clear",
     CHECK: "check",
     ADD: "add",
-    REMOVE: "remove"
+    REMOVE: "remove",
+    SHARE: "share"
+};
+
+const STATS_SUBCOMMANDS = {
+    VIEW: "view",
+    SHARE: "share"
+};
+
+const INFO_SUBCOMMANDS = {
+    VIEW: "view",
+    SHARE: "share"
 };
 
 const RESET_SUBCOMMANDS = {
     STATE: "state",
     SETTINGS: "settings"
-};
-
-const SHARE_SUBCOMMANDS = {
-    BANS: "bans",
-    NAMES: "names",
-    STATE: "state"
 };
 
 export const commands = [
@@ -81,7 +86,7 @@ export const commands = [
 
             switch (action) {
                 case SUBCOMMANDS.INFO: {
-                    // /channel info {user or self}
+                    const isShare = subaction === INFO_SUBCOMMANDS.SHARE;
                     let targetUserId = argument;
                     if (targetUserId) {
                         targetUserId = targetUserId.match(/<@!?(\d+)>/)?.[1] || targetUserId;
@@ -90,7 +95,6 @@ export const commands = [
                         targetUserId = me?.id;
                     }
 
-                    // Try to find channel by owner ID
                     let targetChannelId = channelId;
                     if (targetUserId) {
                         for (const [cid, info] of channelInfos.entries()) {
@@ -127,23 +131,44 @@ export const commands = [
                     if (info) {
                         embed.fields.push({
                             name: "🔧 Channel Settings",
-                            value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID (Parsed): ${info.ownerId ? `<@${info.ownerId}>` : "N/A"}`,
+                            value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${info.ownerId ? `<@${info.ownerId}>` : "N/A"}`,
                             inline: false
                         });
                         if (info.permitted.length > 0) embed.fields.push({ name: `Permitted (${info.permitted.length})`, value: info.permitted.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
                         if (info.banned.length > 0) embed.fields.push({ name: `Banned (${info.banned.length})`, value: info.banned.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
                     }
 
-                    sendBotMessage(ctx.channel.id, { embeds: [embed] });
+                    if (isShare) {
+                        let content = `### 📊 Channel Information for <#${targetChannelId}>\n`;
+                        content += `- **Channel ID:** \`${targetChannelId}\`\n`;
+                        if (ownership) {
+                            content += `- **Creator:** <@${ownership.first?.userId || "None"}>\n`;
+                            content += `- **Claimant:** <@${ownership.last?.userId || "None"}>\n`;
+                        }
+                        if (info) {
+                            content += `**🔧 Settings:**\n`;
+                            content += `- Name: \`${info.name || "N/A"}\`\n`;
+                            content += `- Limit: \`${info.limit || "N/A"}\`\n`;
+                            content += `- Owner ID: <@${info.ownerId || "None"}>\n`;
+                            if (info.permitted.length > 0) content += `- Permitted: ${info.permitted.length} users\n`;
+                            if (info.banned.length > 0) content += `- Banned: ${info.banned.length} users\n`;
+                        }
+                        sendMessage(ctx.channel.id, { content });
+                    } else {
+                        sendBotMessage(ctx.channel.id, { embeds: [embed] });
+                    }
                     break;
                 }
 
-                case SUBCOMMANDS.PLUGIN: {
+                case SUBCOMMANDS.STATS: {
                     const queueSize = actionQueue.length;
                     const processedCount = processedUsers.size;
-                    sendBotMessage(ctx.channel.id, {
-                        content: `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${channelInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`
-                    });
+                    const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${channelInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`;
+                    if (subaction === STATS_SUBCOMMANDS.SHARE) {
+                        sendMessage(ctx.channel.id, { content });
+                    } else {
+                        sendBotMessage(ctx.channel.id, { content });
+                    }
                     break;
                 }
 
@@ -154,23 +179,23 @@ export const commands = [
                     break;
                 }
 
-                case SUBCOMMANDS.NAME: {
+                case SUBCOMMANDS.NAMES: {
                     if (!subaction) {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Missing subaction for name (start, rotate, clear, check, add, remove)" });
+                        sendBotMessage(ctx.channel.id, { content: "❌ Missing subaction for names (start, rotate, clear, check, add, remove, share)" });
                         return;
                     }
-                    if (subaction === NAME_SUBCOMMANDS.START) {
+                    if (subaction === NAMES_SUBCOMMANDS.START) {
                         startRotation(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Started rotation." });
-                    } else if (subaction === NAME_SUBCOMMANDS.ROTATE) {
+                    } else if (subaction === NAMES_SUBCOMMANDS.ROTATE) {
                         rotateChannelName(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Rotated name." });
-                    } else if (subaction === NAME_SUBCOMMANDS.CLEAR) {
+                    } else if (subaction === NAMES_SUBCOMMANDS.CLEAR) {
                         stopRotation(channelId);
                         state.rotationIndex.delete(channelId);
                         sendBotMessage(ctx.channel.id, { content: "✅ Stopped rotation and cleared index." });
                     }
-                    else if (subaction === NAME_SUBCOMMANDS.CHECK) {
+                    else if (subaction === NAMES_SUBCOMMANDS.CHECK) {
                         const names = getRotateNames();
                         const invalid = names.filter(n => n.length === 0 || n.length > 15 || n.trim() === "");
                         const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
@@ -186,19 +211,24 @@ export const commands = [
                         } else {
                             sendBotMessage(ctx.channel.id, { content: "✅ All names are valid and unique." });
                         }
-                    } else if (subaction === NAME_SUBCOMMANDS.ADD) {
+                    } else if (subaction === NAMES_SUBCOMMANDS.ADD) {
                         if (!argument) { sendBotMessage(ctx.channel.id, { content: "❌ Missing name to add." }); return; }
                         const names = getRotateNames();
                         if (names.includes(argument)) { sendBotMessage(ctx.channel.id, { content: "❌ Name already exists." }); return; }
                         if (argument.length > 15) { sendBotMessage(ctx.channel.id, { content: "❌ Name too long (max 15)." }); return; }
                         settings.store.rotateChannelNames += `\n${argument}`;
                         sendBotMessage(ctx.channel.id, { content: `✅ Added ${argument}.` });
-                    } else if (subaction === NAME_SUBCOMMANDS.REMOVE) {
+                    } else if (subaction === NAMES_SUBCOMMANDS.REMOVE) {
                         if (!argument) { sendBotMessage(ctx.channel.id, { content: "❌ Missing name to remove." }); return; }
                         const names = getRotateNames();
                         const newList = names.filter(n => n !== argument);
                         settings.store.rotateChannelNames = newList.join("\n");
                         sendBotMessage(ctx.channel.id, { content: `✅ Removed ${argument}.` });
+                    } else if (subaction === NAMES_SUBCOMMANDS.SHARE) {
+                        const names = getRotateNames();
+                        sendMessage(ctx.channel.id, {
+                            content: `\`\`\`\n${names.join("\n")}\n\`\`\``
+                        });
                     }
                     else {
                         sendBotMessage(ctx.channel.id, { content: `❌ Subaction ${subaction} not fully implemented yet.` });
@@ -225,28 +255,6 @@ export const commands = [
                     break;
                 }
 
-                case SUBCOMMANDS.SHARE: {
-                    if (subaction === SHARE_SUBCOMMANDS.NAMES) {
-                        const names = getRotateNames();
-                        sendMessage(ctx.channel.id, {
-                            content: `**${names.length} Channel Names:**\n${names.map(n => `- \`${n}\``).join("\n")}`
-                        });
-                    } else if (subaction === SHARE_SUBCOMMANDS.BANS) {
-                        const list = getKickList();
-                        sendMessage(ctx.channel.id, {
-                            content: `\`\`\`\n${list.join("\n")}\n\`\`\``
-                        });
-                    } else if (subaction === SHARE_SUBCOMMANDS.STATE) {
-                        const time = new Date().toLocaleString();
-                        sendBotMessage(ctx.channel.id, {
-                            content: `**Plugin State:**\nTime: ${time}\nGuild: ${settings.store.guildId}\nCategory: ${settings.store.categoryId}\nBot: ${settings.store.botId}\nQueue: ${actionQueue.length}`
-                        });
-                    } else {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown share target." });
-                    }
-                    break;
-                }
-
                 case SUBCOMMANDS.BANS: {
                     if (subaction === BANS_SUBCOMMANDS.LIST) {
                         const list = getKickList();
@@ -258,8 +266,13 @@ export const commands = [
                         sendBotMessage(ctx.channel.id, {
                             content: `**${list.length} Banned Users (Ephemeral):**\n${lines.join("\n")}`
                         });
+                    } else if (subaction === BANS_SUBCOMMANDS.SHARE) {
+                        const list = getKickList();
+                        sendMessage(ctx.channel.id, {
+                            content: `\`\`\`\n${list.join("\n")}\n\`\`\``
+                        });
                     } else {
-                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown bans subcommand (list)." });
+                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown bans subcommand (list, share)." });
                     }
                     break;
                 }
