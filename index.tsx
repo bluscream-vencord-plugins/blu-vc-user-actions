@@ -9,13 +9,11 @@ import {
     UserStore,
     SelectedChannelStore,
     VoiceStateStore,
-    showToast,
-    GuildStore,
 } from "@webpack/common";
 
 import { settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
-import { logger as utilLogger, log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage } from "./utils";
+import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
