@@ -13,7 +13,7 @@ import {
 } from "@webpack/common";
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setChannelInfo, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
-import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, formatWhitelistSkipMessage } from "./utils";
+import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
 
@@ -83,7 +83,7 @@ export async function processQueue() {
         }
 
         if (type === ActionType.CLAIM) {
-            navigateTo(guildId, channelId);
+            jumpToFirstMessage(channelId, guildId);
             await new Promise(r => setTimeout(r, 1000));
         }
 
@@ -221,7 +221,7 @@ export function handleOwnershipChange(channelId: string, ownerId: string) {
 
         if (settings.store.autoNavigateToOwnedChannel) {
             const channel = ChannelStore.getChannel(channelId);
-            navigateTo(channel?.guild_id, channelId);
+            jumpToFirstMessage(channelId, channel?.guild_id);
         }
     } else {
         log(`We are not the owner, stopping rotation`);

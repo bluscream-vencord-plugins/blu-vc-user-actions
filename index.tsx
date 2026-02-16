@@ -10,11 +10,12 @@ import {
     SelectedChannelStore,
     VoiceStateStore,
     GuildMemberStore,
+    MessageActions,
+    ChannelActions
 } from "@webpack/common";
-
 import { settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers, channelInfos, channelOwners } from "./state";
-import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo } from "./utils";
+import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -101,9 +102,9 @@ export default definePlugin({
                                     requestChannelInfo(newChannelId);
                                 }
                                 log(`Scrolling to start of ${newChannelId}`);
-                                navigateTo(channel.guild_id, newChannelId, "0");
+                                ChannelActions.selectChannel(newChannelId);
+                                jumpToFirstMessage(newChannelId, channel.guild_id);
                                 // Request first message to ensure we have the context
-                                const { MessageActions } = require("@webpack/common");
                                 if (MessageActions?.fetchMessages) {
                                     MessageActions.fetchMessages({
                                         channelId: newChannelId,
