@@ -1,5 +1,9 @@
 import { NavigationRouter } from "@webpack/common";
 
-export function navigateToChannel(channelId: string, guildId?: string) {
-    NavigationRouter.transitionTo(`/channels/${guildId ?? "@me"}/${channelId}`);
+export function navigateTo(guildId: string = "@me", channelId: string = "", messageId: string = "") {
+    let path = "/channels";
+    if (guildId) path += `/${guildId}`;
+    if (channelId) path += `/${channelId}`;
+    if (messageId) path += `/${messageId}`;
+    NavigationRouter.transitionTo(path);
 }

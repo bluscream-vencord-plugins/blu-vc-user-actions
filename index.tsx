@@ -14,7 +14,7 @@ import {
 
 import { settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers, channelInfos, channelOwners } from "./state";
-import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage } from "./utils";
+import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -25,6 +25,7 @@ import {
     handleInfoUpdate,
     getMessageOwner,
     handleVoteBan,
+    requestChannelInfo,
 } from "./logic";
 import { parseBotInfoMessage } from "./utils";
 import {
@@ -93,6 +94,24 @@ export default definePlugin({
 
 
                         if (newChannelId) {
+                            const channel = ChannelStore.getChannel(newChannelId);
+                            if (channel?.guild_id === settings.store.guildId && channel.parent_id === settings.store.categoryId) {
+                                if (!channelInfos.has(newChannelId)) {
+                                    log(`Joined unrecognized channel ${newChannelId}, requesting info.`);
+                                    requestChannelInfo(newChannelId);
+                                }
+                                log(`Scrolling to start of ${newChannelId}`);
+                                navigateTo(channel.guild_id, newChannelId, "0");
+                                // Request first message to ensure we have the context
+                                const { MessageActions } = require("@webpack/common");
+                                if (MessageActions?.fetchMessages) {
+                                    MessageActions.fetchMessages({
+                                        channelId: newChannelId,
+                                        limit: 50,
+                                    });
+                                }
+                            }
+
                             // Wait 1 second before checking ownership to give the bot time to send welcome message
                             setTimeout(() => {
                                 checkChannelOwner(newChannelId, settings.store.botId).then(owner => {

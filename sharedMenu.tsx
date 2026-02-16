@@ -1,5 +1,5 @@
 import { ActionType, actionQueue } from "./state";
-import { getKickList, getOwnerForChannel, navigateToChannel } from "./utils";
+import { getKickList, getOwnerForChannel, navigateTo } from "./utils";
 import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, claimAllDisbandedChannels, fetchAllOwners } from "./logic";
 import { settings } from "./settings";
 import { pluginInfo } from "./index";
@@ -51,7 +51,7 @@ export const getSharedMenuItems = () => {
                 if (createChannelId) {
                     ChannelActions.selectVoiceChannel(createChannelId);
                     const channel = ChannelStore.getChannel(createChannelId);
-                    navigateToChannel(createChannelId, channel?.guild_id);
+                    navigateTo(channel?.guild_id, createChannelId);
                 } else {
                     showToast("No Create Channel ID configured in settings.");
                 }
