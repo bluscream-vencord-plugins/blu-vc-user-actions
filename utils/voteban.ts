@@ -1,9 +1,8 @@
 import { settings } from "../settings";
-import { actionQueue, ActionType } from "../state";
+import { actionQueue, ActionType, channelOwners } from "../state";
 import { log } from "./logging";
-import { getOwnerForChannel } from "./ownership";
 import { isWhitelisted } from "./kicklist";
-import { VoiceStateStore } from "@webpack/common";
+import { VoiceStateStore, UserStore } from "@webpack/common";
 
 const activeVotes = new Map<string, { voters: Set<string>, expires: number }>();
 
@@ -25,6 +24,15 @@ export function handleVoteBan(message: any, channelId: string) {
 
     if (!targetUserId) return;
 
+    // Check if we are the owner (Voting only works if WE are the owner)
+    const me = UserStore.getCurrentUser();
+    const ownership = channelOwners.get(channelId);
+
+    if (!me || !ownership) return;
+
+    const isOwner = (ownership.creator?.userId === me.id) || (ownership.claimant?.userId === me.id);
+    if (!isOwner) return;
+
     // Check if target is in our channel
     const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId);
     if (!voiceStates || !voiceStates[targetUserId]) return;
@@ -35,9 +43,8 @@ export function handleVoteBan(message: any, channelId: string) {
     const voterId = message.author.id;
     if (voterId === targetUserId) return;
 
-    // Check if owner is excluded
-    const ownerInfo = getOwnerForChannel(channelId);
-    if (voterId === ownerInfo?.userId) return;
+    // Check if owner is excluded (Owner cannot vote, they should just ban)
+    if (voterId === ownership.creator?.userId || voterId === ownership.claimant?.userId) return;
 
     const voteKey = `${channelId}:${targetUserId}`;
     let vote = activeVotes.get(voteKey);
@@ -64,7 +71,8 @@ export function handleVoteBan(message: any, channelId: string) {
 
     // Check if enough votes
     const totalUsersInVC = Object.keys(voiceStates).length;
-    const votersRequiredPool = totalUsersInVC - (ownerInfo?.userId ? 1 : 0) - 1;
+    const ownerCount = (ownership.creator?.userId ? 1 : 0) + (ownership.claimant?.userId && ownership.claimant.userId !== ownership.creator?.userId ? 1 : 0);
+    const votersRequiredPool = totalUsersInVC - ownerCount - 1;
     const requiredVotes = Math.ceil((settings.store.voteRequiredPercent / 100) * votersRequiredPool);
 
     if (vote.voters.size >= requiredVotes) {

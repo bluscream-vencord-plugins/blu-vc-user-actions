@@ -1,8 +1,7 @@
 import { settings } from "../settings";
-import { state } from "../state";
+import { state, channelOwners } from "../state";
 import { log } from "./logging";
 import { getRotateNames, formatsetChannelNameCommand } from "./formatting";
-import { getOwnerForChannel } from "./ownership";
 import { sendMessage } from "@utils/discord";
 import { ChannelStore, SelectedChannelStore, UserStore } from "@webpack/common";
 
@@ -96,9 +95,9 @@ export function restartAllRotations() {
     // If enabled, try to start rotation in the current channel if we are the owner
     const myChannelId = SelectedChannelStore.getVoiceChannelId();
     if (settings.store.enabled && settings.store.rotateChannelNamesEnabled && myChannelId) {
-        const ownerInfo = getOwnerForChannel(myChannelId);
+        const ownership = channelOwners.get(myChannelId);
         const me = UserStore.getCurrentUser();
-        if (ownerInfo?.userId === me?.id) {
+        if (ownership && (ownership.creator?.userId === me?.id || ownership.claimant?.userId === me?.id)) {
             log(`Restarting rotation for current channel ${myChannelId}`);
             startRotation(myChannelId);
         }

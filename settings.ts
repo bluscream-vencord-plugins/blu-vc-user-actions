@@ -135,7 +135,7 @@ export const settings = definePluginSettings({
     voteSubmittedMessage: {
         type: OptionType.STRING,
         description: "Ephemeral message to show when a vote is submitted",
-        default: "⚠️ <@{user_id}> votes to ban <@{target_user_id}> (Expires in <t:{expires}:R>)",
+        default: "⚠️ <@{user_id}> votes to ban <@{target_user_id}> (Expires <t:{expires}:R>)",
         restartNeeded: false,
     },
     voteBanCommand: {

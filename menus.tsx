@@ -14,7 +14,6 @@ import { pluginInfo } from "./info";
 import {
     getKickList,
     setKickList,
-    getOwnerForChannel,
     log,
     formatBanCommand,
     formatUnbanCommand,
@@ -23,7 +22,7 @@ import {
     setWhitelist
 } from "./utils";
 import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels, getMemberInfoForChannel } from "./logic";
-import { actionQueue, ActionType } from "./state";
+import { actionQueue, ActionType, channelOwners } from "./state";
 import { sendMessage } from "@utils/discord";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
@@ -51,12 +50,18 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                 const me = UserStore.getCurrentUser();
                 if (!me || !myChannelId) return;
 
-                let ownerInfo = getOwnerForChannel(myChannelId);
-                if (!ownerInfo || ownerInfo.userId === "") {
-                    ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                let ownership = channelOwners.get(myChannelId);
+                const isCached = ownership && (ownership.creator || ownership.claimant);
+
+                if (!isCached) {
+                    await checkChannelOwner(myChannelId, settings.store.botId);
+                    ownership = channelOwners.get(myChannelId);
                 }
 
-                if (ownerInfo.userId !== me.id) return;
+                const isCreator = ownership?.creator?.userId === me.id;
+                const isClaimant = ownership?.claimant?.userId === me.id;
+
+                if (!isCreator && !isClaimant) return;
 
                 const info = getMemberInfoForChannel(myChannelId);
 
@@ -101,11 +106,18 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                 color="brand"
                 action={async () => {
                     const me = UserStore.getCurrentUser();
-                    let ownerInfo = getOwnerForChannel(myChannelId);
-                    if (!ownerInfo || ownerInfo.userId === "") {
-                        ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                    let ownership = channelOwners.get(myChannelId);
+                    const isCached = ownership && (ownership.creator || ownership.claimant);
+
+                    if (!isCached) {
+                        await checkChannelOwner(myChannelId, settings.store.botId);
+                        ownership = channelOwners.get(myChannelId);
                     }
-                    if (ownerInfo.userId === me?.id) {
+
+                    const isCreator = ownership?.creator?.userId === me.id;
+                    const isClaimant = ownership?.claimant?.userId === me.id;
+
+                    if (isCreator || isClaimant) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
                         actionQueue.push({
                             type: ActionType.KICK,
@@ -115,7 +127,8 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                         });
                         processQueue();
                     } else {
-                        showToast(`Not owner of channel (Owner: ${ownerInfo.userId || "None"})`);
+                        const ownerText = `Creator: ${ownership?.creator?.userId || "None"}, Claimant: ${ownership?.claimant?.userId || "None"}`;
+                        showToast(`Not owner of channel (${ownerText})`);
                     }
                 }}
             />
