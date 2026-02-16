@@ -20,13 +20,13 @@ export const getSharedMenuItems = () => {
         if (ownership?.creator) {
             const creatorUser = UserStore.getUser(ownership.creator.userId);
             const creatorName = creatorUser?.globalName || creatorUser?.username || ownership.creator.userId;
-            creatorStatus = `Creator: ${creatorName} (${ownership.creator.reason})`;
+            creatorStatus = `Creator: ${creatorName}`;
         }
 
         if (ownership?.claimant) {
             const claimantUser = UserStore.getUser(ownership.claimant.userId);
             const claimantName = claimantUser?.globalName || claimantUser?.username || ownership.claimant.userId;
-            claimantStatus = `Claimant: ${claimantName} (${ownership.claimant.reason})`;
+            claimantStatus = `Claimant: ${claimantName}`;
         }
     }
 
