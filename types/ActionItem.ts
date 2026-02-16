@@ -5,4 +5,5 @@ export interface ActionItem {
     userId: string;
     channelId: string;
     guildId?: string;
+    ephemeralMessage?: string;
 }

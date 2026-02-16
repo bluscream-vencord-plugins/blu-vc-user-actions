@@ -30,6 +30,12 @@ export const settings = definePluginSettings({
         default: "",
         restartNeeded: false,
     },
+    kickNotInRoleMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when a user is kicked for missing the required role",
+        default: "🚫 Kicking <@{user_id}> because they are missing the required role",
+        restartNeeded: false,
+    },
     banRotateEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable rotating banlist",

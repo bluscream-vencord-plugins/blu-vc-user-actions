@@ -7,3 +7,4 @@ export * from "./navigation";
 export * from "./channels";
 export * from "./rotation";
 export * from "./voteban";
+export * from "./BotResponse";

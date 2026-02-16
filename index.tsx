@@ -24,12 +24,11 @@ import {
     stopRotation,
     handleOwnerUpdate,
     handleInfoUpdate,
-    getMessageOwner,
     handleVoteBan,
     requestChannelInfo,
     getMemberInfoForChannel,
 } from "./logic";
-import { parseBotInfoMessage } from "./utils";
+import { parseBotInfoMessage, BotResponse, BotResponseType } from "./utils";
 import {
     UserContextMenuPatch,
     GuildContextMenuPatch,
@@ -218,7 +217,8 @@ export default definePlugin({
                             type: ActionType.KICK,
                             userId: s.userId,
                             channelId: myChannelId,
-                            guildId: s.guildId
+                            guildId: s.guildId,
+                            ephemeralMessage: settings.store.kickNotInRoleMessage
                         });
                         processQueue();
                     }
@@ -275,27 +275,21 @@ export default definePlugin({
             if (!settings.store.enabled) return;
             if (guildId !== settings.store.guildId) return;
 
-            // Handle Ownership from Bot Messages
-            const owner = getMessageOwner(message, settings.store.botId);
-            if (owner) {
-                handleOwnerUpdate(channelId, owner);
-                return;
+            // Handle Bot Responses (Ownership & Info)
+            const response = new BotResponse(message, settings.store.botId);
+            if (response.initiatorId) {
+                handleOwnerUpdate(channelId, {
+                    userId: response.initiatorId,
+                    reason: response.type,
+                    timestamp: response.timestamp
+                });
             }
 
-            // Handle Channel Info from Bot Messages
-            if (message.author.id === settings.store.botId) {
-                const embed = message.embeds?.[0];
-
-                // Check if it's the specific channel info embed
-                const rawDesc = (embed as any)?.rawDescription || (embed as any)?.description;
-                if (embed && embed.author?.name === "Channel Settings" && rawDesc) {
-                    const result = parseBotInfoMessage(message);
-                    if (result) {
-                        log(`Successfully parsed channel info for ${result.channelId}`);
-                        handleInfoUpdate(result.channelId, result.info);
-                    } else {
-                        log(`Failed to parse channel info`);
-                    }
+            if (response.type === BotResponseType.INFO) {
+                const result = parseBotInfoMessage(response);
+                if (result) {
+                    log(`Successfully parsed channel info for ${result.channelId}`);
+                    handleInfoUpdate(result.channelId, result.info);
                 }
             }
 

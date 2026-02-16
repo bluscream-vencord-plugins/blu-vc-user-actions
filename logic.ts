@@ -50,6 +50,26 @@ export async function processQueue() {
         const channel = ChannelStore.getChannel(channelId);
         const guild = guildId ? GuildStore.getGuild(guildId) : null;
 
+        if (item.ephemeralMessage) {
+            let ephemeralMsg = item.ephemeralMessage
+                .replace(/{user_id}/g, userId)
+                .replace(/{channel_id}/g, channelId)
+                .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
+                .replace(/{guild_id}/g, guildId || "")
+                .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
+
+            if (user) {
+                ephemeralMsg = ephemeralMsg.replace(/{user_name}/g, user.username);
+            } else {
+                ephemeralMsg = ephemeralMsg.replace(/{user_name}/g, userId);
+            }
+
+            log(`Sending ephemeral message: ${ephemeralMsg}`);
+            sendBotMessage(channelId, { content: ephemeralMsg });
+            // Small delay to ensure the ephemeral message appears before the kick action
+            await new Promise(r => setTimeout(r, 500));
+        }
+
         let template: string;
         switch (type) {
             case ActionType.KICK:
@@ -131,70 +151,27 @@ export function notifyOwnership(channelId: string) {
     });
 }
 
-export function getMessageOwner(msg: any, botId: string): OwnerEntry | null {
-    if (msg.author.id !== botId) return null;
-
-    const embed = msg.embeds?.[0];
-    if (!embed) return null;
-
-    const authorName = embed.author?.name;
-    const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-
-    if (authorName === "Channel Created") {
-        const userId = msg.mentions?.[0]?.id || msg.mentions?.[0] || msg.content?.match(/<@!?(\d+)>/)?.[1];
-        if (userId) return { userId, reason: "Created", timestamp };
-    } else if (authorName === "Channel Claimed" || authorName === "Channel Settings") {
-        let userId: string | undefined;
-
-        // Try parsing from Icon URL
-        const iconURL = embed.author?.iconURL || embed.author?.icon_url;
-        if (iconURL) {
-            userId = iconURL.split("/avatars/")[1]?.split("/")[0];
-        }
-
-        // Fallback: Check the message being replied to (Best practice based on ValidReply & NoBlockedMessages)
-        if (!userId) {
-            if (msg.referenced_message) {
-                userId = msg.referenced_message.author?.id;
-            } else {
-                const ref = msg.message_reference || msg.messageReference;
-                if (ref && ref.message_id) {
-                    // Try getting from ReferencedMessageStore first (best for replies)
-                    const refData = ReferencedMessageStore?.getMessageByReference?.(ref);
-                    if (refData?.message) {
-                        userId = refData.message.author?.id;
-                    } else {
-                        // Fallback to general MessageStore
-                        const cachedRef = MessageStore.getMessage(ref.channel_id || msg.channel_id, ref.message_id);
-                        if (cachedRef) {
-                            userId = cachedRef.author?.id;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (userId) {
-            return {
-                userId,
-                reason: authorName === "Channel Claimed" ? "Claimed" : "Info",
-                timestamp
-            };
-        }
-    }
-    return null;
-}
-
 export async function checkChannelOwner(channelId: string, botId: string): Promise<OwnerEntry> {
     const fallback: OwnerEntry = { userId: "", reason: "Unknown", timestamp: Date.now() };
     const cached = MessageStore.getMessages(channelId);
     let owner: OwnerEntry | null = null;
 
+    const { BotResponse } = require("./utils/BotResponse");
+
     if (cached) {
         const msgsArray = cached.toArray ? cached.toArray() : cached;
+
         for (let i = msgsArray.length - 1; i >= 0; i--) {
-            owner = getMessageOwner(msgsArray[i], botId);
-            if (owner) break;
+            const msg = msgsArray[i];
+            const response = new BotResponse(msg, botId);
+            if (response.initiatorId) {
+                owner = {
+                    userId: response.initiatorId,
+                    reason: response.type,
+                    timestamp: response.timestamp
+                };
+                break;
+            }
         }
     }
 
@@ -206,8 +183,15 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
             });
             if (res.body && Array.isArray(res.body)) {
                 for (let i = 0; i < res.body.length; i++) {
-                    owner = getMessageOwner(res.body[i], botId);
-                    if (owner) break;
+                    const response = new BotResponse(res.body[i], botId);
+                    if (response.initiatorId) {
+                        owner = {
+                            userId: response.initiatorId,
+                            reason: response.type,
+                            timestamp: response.timestamp
+                        };
+                        break;
+                    }
                 }
             }
         } catch (e) {
@@ -270,7 +254,17 @@ export function handleOwnerUpdate(channelId: string, owner: OwnerEntry) {
     }
 }
 
+const requestedInfo = new Map<string, number>();
+
 export function requestChannelInfo(channelId: string) {
+    const now = Date.now();
+    const lastRequest = requestedInfo.get(channelId) || 0;
+    if (now - lastRequest < 5000) { // 5 second cooldown
+        log(`Skipping channel info request for ${channelId} (cooldown)`);
+        return;
+    }
+    requestedInfo.set(channelId, now);
+
     log(`Requesting channel info for ${channelId} using command: ${settings.store.infoCommand}`);
     sendMessage(channelId, { content: settings.store.infoCommand });
 }
