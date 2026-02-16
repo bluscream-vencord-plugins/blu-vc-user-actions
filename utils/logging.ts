@@ -1,5 +1,5 @@
 import { Logger } from "@utils/Logger";
-import { pluginInfo } from "../index";
+import { pluginInfo } from "../info";
 
 export const logger = new Logger(pluginInfo.name, pluginInfo.color);
 

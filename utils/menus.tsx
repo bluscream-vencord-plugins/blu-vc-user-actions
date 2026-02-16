@@ -1,4 +1,4 @@
-import { addGlobalContextMenuPatch, GlobalContextMenuPatchCallback, removeGlobalContextMenuPatch } from "@api/ContextMenu";
+import type { GlobalContextMenuPatchCallback } from "@api/ContextMenu";
 import { React, Menu } from "@webpack/common";
 
 export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[], log?: (...args: any[]) => void) {
@@ -65,6 +65,8 @@ export function addToSubmenu(children: any[], menuId: string, menuLabel: string,
 }
 
 export function registerSharedContextMenu(pluginName: string, handlers: Record<string, (children: any[], props: any) => void>, log?: (...args: any[]) => void) {
+    const { addGlobalContextMenuPatch, removeGlobalContextMenuPatch } = require("@api/ContextMenu");
+
     const patch: GlobalContextMenuPatchCallback = (navId, children, ...args) => {
         const handler = handlers[navId];
         if (handler) {

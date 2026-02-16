@@ -10,7 +10,7 @@ import {
 } from "@webpack/common";
 import { type User } from "@vencord/discord-types";
 import { settings } from "./settings";
-import { pluginInfo } from "./index";
+import { pluginInfo } from "./info";
 import {
     getKickList,
     setKickList,

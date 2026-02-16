@@ -1,4 +1,3 @@
-import { sendBotMessage } from "@api/Commands";
 import { sendMessage } from "@utils/discord";
 import {
     ChannelStore,
@@ -20,6 +19,7 @@ import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimC
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 
 export async function processQueue() {
+    const { sendBotMessage } = require("@api/Commands");
     if (state.isProcessing || actionQueue.length === 0) return;
     state.isProcessing = true;
 
@@ -105,6 +105,7 @@ export async function processQueue() {
 }
 
 export function notifyOwnership(channelId: string) {
+    const { sendBotMessage } = require("@api/Commands");
     if (!settings.store.enabled) return;
     const ownerInfo = getOwnerForChannel(channelId);
     if (!ownerInfo || !ownerInfo.userId) return;

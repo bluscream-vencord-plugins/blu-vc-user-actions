@@ -1,4 +1,4 @@
-import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { settings } from "./settings";
 import { state, channelOwners, actionQueue, processedUsers } from "./state";
@@ -23,6 +23,7 @@ export const commands = [
             const channelId = args[0]?.value || SelectedChannelStore.getVoiceChannelId();
 
             if (!channelId) {
+                const { sendBotMessage } = require("@api/Commands");
                 sendBotMessage(ctx.channel.id, {
                     content: "❌ You are not in a voice channel and no channel ID was provided."
                 });
@@ -31,6 +32,7 @@ export const commands = [
 
             const channel = ChannelStore.getChannel(channelId);
             if (!channel) {
+                const { sendBotMessage } = require("@api/Commands");
                 sendBotMessage(ctx.channel.id, {
                     content: `❌ Channel not found: ${channelId}`
                 });
@@ -155,6 +157,7 @@ export const commands = [
                 inline: true
             });
 
+            const { sendBotMessage } = require("@api/Commands");
             sendBotMessage(ctx.channel.id, {
                 embeds: [embed]
             });
@@ -167,6 +170,7 @@ export const commands = [
         execute: (args, ctx) => {
             const channelId = SelectedChannelStore.getVoiceChannelId();
             if (!channelId) {
+                const { sendBotMessage } = require("@api/Commands");
                 sendBotMessage(ctx.channel.id, { content: "❌ You are not in a voice channel." });
                 return;
             }
@@ -174,6 +178,7 @@ export const commands = [
             // Manually trigger the next rotation
             rotateChannelName(channelId);
 
+            const { sendBotMessage } = require("@api/Commands");
             sendBotMessage(ctx.channel.id, { content: "🔄 Rotation triggered (next name selected)." });
         }
     }

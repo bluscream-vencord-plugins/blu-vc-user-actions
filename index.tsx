@@ -1,7 +1,7 @@
 //// Plugin originally written for Equicord at 2026-02-16 by https://github.com/Bluscream, https://antigravity.google
 // region Imports
 import definePlugin from "@utils/types";
-import { sendBotMessage } from "@api/Commands";
+
 import { sendMessage } from "@utils/discord";
 import type { Message } from "@vencord/discord-types";
 import {
@@ -36,16 +36,8 @@ import { Logger } from "@utils/Logger";
 // endregion Imports
 
 // region PluginInfo
-export const pluginInfo = {
-    id: "socializeGuild",
-    name: "SocializeGuild",
-    description: "Automatically takes actions against users joining your voice channel",
-    color: "#7289da",
-    authors: [
-        { name: "Bluscream", id: 467777925790564352n },
-        { name: "Assistant", id: 0n }
-    ],
-};
+import { pluginInfo } from "./info";
+export { pluginInfo };
 // endregion PluginInfo
 
 // region Variables
@@ -221,7 +213,8 @@ export default definePlugin({
                                         // Send ephemeral message
                                         if (settings.store.banRotationMessage) {
                                             const msg = formatBanRotationMessage(myChannelId, userToUnban, s.userId);
-                                            sendBotMessage(myChannelId, { content: msg });
+                                        const { sendBotMessage } = require("@api/Commands");
+                                        sendBotMessage(myChannelId, { content: msg });
                                         }
                                     }
 
@@ -310,7 +303,9 @@ function getMessageOwner(message: Message, botId: string) {
         return {
             userId: match[1],
             channelId: match[2],
-            reason: match[3]
+            reason: match[3],
+            timestamp: Date.now(),
+            updated: Date.now()
         };
     }
     return null;
