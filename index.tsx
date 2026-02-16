@@ -13,7 +13,7 @@ import {
 } from "@webpack/common";
 
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, processedUsers, channelInfos } from "./state";
+import { ActionType, state, actionQueue, processedUsers, channelInfos, channelOwners } from "./state";
 import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage } from "./utils";
 import {
     processQueue,
@@ -24,6 +24,7 @@ import {
     handleOwnerUpdate,
     handleInfoUpdate,
     getMessageOwner,
+    handleVoteBan,
 } from "./logic";
 import { parseBotInfoMessage } from "./utils";
 import {
@@ -46,14 +47,7 @@ export { pluginInfo };
 const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
-// region Types
-interface MessageCreatePayload {
-    channelId: string;
-    guildId: string;
-    message: Message;
-    optimistic?: boolean;
-}
-// endregion Types
+import { MessageCreatePayload } from "./types";
 
 // region Definition
 export default definePlugin({
@@ -128,18 +122,30 @@ export default definePlugin({
                     const oldChannel = ChannelStore.getChannel(s.oldChannelId);
                     if (oldChannel?.parent_id !== settings.store.categoryId) continue;
 
-                    const ownerInfo = getOwnerForChannel(s.oldChannelId);
-                    // If the person who left was the cached owner
-                    if (ownerInfo && ownerInfo.userId === s.userId) {
-                        log(`Owner ${s.userId} left channel ${s.oldChannelId}`);
+                    const ownership = channelOwners.get(s.oldChannelId);
+                    if (!ownership) continue;
+
+                    // Check if the person who left was either the creator or the claimant
+                    const isCreator = ownership.first?.userId === s.userId;
+                    const isClaimant = ownership.last?.userId === s.userId;
+
+                    if (isCreator || isClaimant) {
+                        log(`Owner (${isCreator ? "Creator" : "Claimant"}) ${s.userId} left channel ${s.oldChannelId}`);
 
                         const isMyChannel = state.myLastVoiceChannelId === s.oldChannelId;
-                        const shouldClaim = (settings.store.autoClaimDisbanded && isMyChannel) || settings.store.autoClaimDisbandedAny;
+                        if (settings.store.autoClaimDisbanded && isMyChannel) {
+                        // If it was the claimant who left, but the creator is still there, do we claim?
+                        // User requirement: "when creator joins back the claimant will still have owner perms until the creator claims the channel again"
+                        // So if claimant leaves, we should probably try to claim if we want it.
 
-                        if (shouldClaim) {
-                            claimChannel(s.oldChannelId, ownerInfo.userId);
-                        } else {
-                            log(`Auto-claim disabled for ${isMyChannel ? "current" : "other"} channel, skipping.`);
+                            // Check if there is still an owner present
+                            const voiceStates = VoiceStateStore.getVoiceStatesForChannel(s.oldChannelId);
+                            const currentOwner = getOwnerForChannel(s.oldChannelId);
+
+                            if (currentOwner && !voiceStates[currentOwner.userId]) {
+                                log(`Channel ${s.oldChannelId} is disbanded (Owner ${currentOwner.userId} left), auto-claiming...`);
+                                claimChannel(s.oldChannelId, currentOwner.userId);
+                            }
                         }
                     }
                 }
@@ -148,139 +154,94 @@ export default definePlugin({
             const myChannelId = state.myLastVoiceChannelId;
             if (!myChannelId) return;
 
+            // Cache ownership once for the handler
+            let ownerInfo = getOwnerForChannel(myChannelId);
+            if (!ownerInfo || ownerInfo.userId === "") {
+                ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+            }
+            const isOwner = ownerInfo?.userId === me.id;
+
             // Auto-kick logic
-            if (settings.store.autoKickEnabled) {
+            if (settings.store.autoKickEnabled && isOwner) {
+                const kickList = getKickList();
                 for (const s of targetGuildVoiceStates) {
                     if (s.userId === me.id) continue;
 
                     if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
-                        const kickList = getKickList();
                         if (kickList.includes(s.userId)) {
                             const now = Date.now();
                             const lastAction = processedUsers.get(s.userId) || 0;
                             if (now - lastAction < settings.store.queueTime) continue;
 
-                            let ownerInfo = getOwnerForChannel(myChannelId);
-                            if (!ownerInfo || ownerInfo.userId === "") {
-                                ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
-                            }
-
-                            if (ownerInfo?.userId === me.id) {
-                                log(`Adding ${s.userId} to action queue`);
-                                actionQueue.push({
-                                    type: ActionType.KICK,
-                                    userId: s.userId,
-                                    channelId: myChannelId,
-                                    guildId: s.guildId
-                                });
-                                processQueue();
-                            } else {
-                                log(`Not owner of ${myChannelId} (Owner: ${ownerInfo?.userId}), skipping kick for ${s.userId}`);
-                            }
+                            log(`Adding ${s.userId} to auto-kick queue`);
+                            actionQueue.push({
+                                type: ActionType.KICK,
+                                userId: s.userId,
+                                channelId: myChannelId,
+                                guildId: s.guildId
+                            });
+                            processQueue();
                         }
                     }
                 }
             }
 
             // Kick Not In Role Logic
-            if (settings.store.kickNotInRole) {
+            if (settings.store.kickNotInRole && isOwner) {
                 for (const s of targetGuildVoiceStates) {
-                    if (s.userId === me.id) continue;
+                    if (s.userId === me.id || s.channelId !== myChannelId) continue;
 
-                    if (s.channelId === myChannelId) {
-                        const member = GuildMemberStore.getMember(s.guildId, s.userId);
-                        if (member && !member.roles.includes(settings.store.kickNotInRole)) {
-                            // Check ownership
-                            let ownerInfo = getOwnerForChannel(myChannelId);
-                            if (!ownerInfo || ownerInfo.userId === "") {
-                                // Async check might be tricky here, but we can try
-                                // For now, rely on cache or check if not cached
-                            }
-                            // Using the same logic as auto-kick which does:
-                            // if (!ownerInfo...) ownerInfo = await checkChannelOwner(...)
-                            // However, we are in a sync loop or async function?
-                            // VOICE_STATE_UPDATES is async.
-
-                            const checkAndKick = async () => {
-                                let ownerInfo = getOwnerForChannel(myChannelId);
-                                if (!ownerInfo || ownerInfo.userId === "") {
-                                    ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
-                                }
-
-                                if (ownerInfo?.userId === me.id) {
-                                    log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
-                                    actionQueue.push({
-                                        type: ActionType.KICK,
-                                        userId: s.userId,
-                                        channelId: myChannelId,
-                                        guildId: s.guildId
-                                    });
-                                    processQueue();
-                                }
-                            };
-                            checkAndKick();
-                        }
+                    const member = GuildMemberStore.getMember(s.guildId, s.userId);
+                    if (member && !member.roles.includes(settings.store.kickNotInRole)) {
+                        log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
+                        actionQueue.push({
+                            type: ActionType.KICK,
+                            userId: s.userId,
+                            channelId: myChannelId,
+                            guildId: s.guildId
+                        });
+                        processQueue();
                     }
                 }
             }
 
             // Ban rotation logic
-            if (settings.store.banRotateEnabled) {
+            if (settings.store.banRotateEnabled && isOwner) {
+                const kickList = getKickList();
+                const info = channelInfos.get(myChannelId);
+
                 for (const s of targetGuildVoiceStates) {
                     if (s.userId === me.id) continue;
 
                     if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
-                        const kickList = getKickList();
                         if (kickList.includes(s.userId)) {
                             // Check if user is already banned
-                            const info = channelInfos.get(myChannelId);
                             if (!info?.banned.includes(s.userId)) {
-                                let ownerInfo = getOwnerForChannel(myChannelId);
-                                if (!ownerInfo || ownerInfo.userId === "") {
-                                    // Async check
-                                    // ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
-                                }
+                                // Get first banned user to unban if limit reached
+                                const userToUnban = (info && info.banned.length >= settings.store.banLimit) ? info.banned[0] : null;
 
-                                if (ownerInfo?.userId === me.id) {
-                                    // Get first banned user to unban
-                                    const userToUnban = info?.banned[0];
+                                if (userToUnban) {
+                                    const unbanCmd = formatUnbanCommand(myChannelId, userToUnban);
+                                    log(`Ban rotation: Unbanning ${userToUnban}`);
+                                    sendMessage(myChannelId, { content: unbanCmd });
 
-                                    if (userToUnban) {
-                                        // Send unban command
-                                        const unbanCmd = formatUnbanCommand(myChannelId, userToUnban);
-                                        log(`Ban rotation: Unbanning ${userToUnban}`);
-                                        sendMessage(myChannelId, { content: unbanCmd });
+                                    if (info) {
+                                        info.banned = info.banned.filter(id => id !== userToUnban);
+                                    }
 
-                                        // Update cache - remove from banned
-                                        if (info) {
-                                            info.banned = info.banned.filter(id => id !== userToUnban);
-                                        // Save state? setChannelInfo calls saveState
-                                        // setChannelInfo(myChannelId, info);
-                                        // But we are mutating the object reference in the map directly here
-                                        // Better to clone and set to trigger save
-                                        }
-
-                                        // Send ephemeral message
-                                        if (settings.store.banRotationMessage) {
-                                            const msg = formatBanRotationMessage(myChannelId, userToUnban, s.userId);
+                                    if (settings.store.banRotationMessage) {
+                                        const msg = formatBanRotationMessage(myChannelId, userToUnban, s.userId);
                                         const { sendBotMessage } = require("@api/Commands");
                                         sendBotMessage(myChannelId, { content: msg });
-                                        }
                                     }
+                                }
 
-                                    // Send ban command for joining user
-                                    const banCmd = formatBanCommand(myChannelId, s.userId);
-                                    log(`Ban rotation: Banning ${s.userId}`);
-                                    sendMessage(myChannelId, { content: banCmd });
+                                const banCmd = formatBanCommand(myChannelId, s.userId);
+                                log(`Ban rotation: Banning ${s.userId}`);
+                                sendMessage(myChannelId, { content: banCmd });
 
-                                    sendMessage(myChannelId, { content: banCmd });
-
-                                    // Update cache - add to banned
-                                    if (info && !info.banned.includes(s.userId)) {
-                                        info.banned.push(s.userId);
-                                    }
-                                } else {
-                                    log(`Not owner of ${myChannelId} (Owner: ${ownerInfo?.userId}), skipping ban rotation for ${s.userId}`);
+                                if (info && !info.banned.includes(s.userId)) {
+                                    info.banned.push(s.userId);
                                 }
                             } else {
                                 log(`User ${s.userId} is already banned, skipping ban rotation`);
@@ -306,7 +267,6 @@ export default definePlugin({
                 const embed = message.embeds?.[0];
 
                 // Check if it's the specific channel info embed
-                // We use rawDescription via casting as it's an internal property, but fallback to standard description
                 const rawDesc = (embed as any)?.rawDescription || (embed as any)?.description;
                 if (embed && embed.author?.name === "Channel Settings" && rawDesc) {
                     const info = parseBotInfoMessage(message);
@@ -317,6 +277,11 @@ export default definePlugin({
                         log(`Failed to parse channel info`);
                     }
                 }
+            }
+
+            // Handle Voteban
+            if (settings.store.voteBanEnabled) {
+                handleVoteBan(message, channelId);
             }
         }
     },

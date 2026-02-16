@@ -1,78 +1,28 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
+import { state } from "./state";
 
 export const settings = definePluginSettings({
-    enabled: {
-        type: OptionType.BOOLEAN,
-        description: "Enable Plugin",
-        default: true,
+    autoKickList: {
+        type: OptionType.STRING,
+        description: "List of user IDs to act on (auto-kick, ban-rotate) [newline separated]",
+        default: "",
+        multiline: true,
         restartNeeded: false,
     },
-    guildId: {
+    userWhitelist: {
         type: OptionType.STRING,
-        description: "Guild ID",
-        default: "1336453916298641520",
-        restartNeeded: false,
-    },
-    categoryId: {
-        type: OptionType.STRING,
-        description: "Category ID",
-        default: "1339023477124300941",
-        restartNeeded: false,
-    },
-    botId: {
-        type: OptionType.STRING,
-        description: "Bot ID",
-        default: "1339023588974067742",
-        restartNeeded: false,
-    },
-    infoCommand: {
-        type: OptionType.STRING,
-        description: "Command to fetch channel info",
-        default: "!v info",
-        restartNeeded: false,
-    },
-    claimCommand: {
-        type: OptionType.STRING,
-        description: "Command to claim channel",
-        default: "!v claim {channel_id}",
-        restartNeeded: false,
-    },
-    setChannelNameCommand: {
-        type: OptionType.STRING,
-        description: "Command to set channel name",
-        default: "!v name {channel_id} {name}",
-        restartNeeded: false,
-    },
-    kickCommand: {
-        type: OptionType.STRING,
-        description: "Command to kick user",
-        default: "!v kick {user_id}",
-        restartNeeded: false,
-    },
-    banCommand: {
-        type: OptionType.STRING,
-        description: "Command to ban user",
-        default: "!v ban {user_id}",
-        restartNeeded: false,
-    },
-    unbanCommand: {
-        type: OptionType.STRING,
-        description: "Command to unban user",
-        default: "!v unban {user_id}",
+        description: "List of user IDs ignored by automated actions [newline separated]",
+        default: "",
+        multiline: true,
         restartNeeded: false,
     },
     autoKickEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Enable Auto-Kick from local ban list",
-        default: true,
+        description: "Enable auto kicking of banned users",
+        default: false,
         restartNeeded: false,
-    },
-    queueTime: {
-        type: OptionType.NUMBER,
-        description: "Queue Time (ms) between actions",
-        default: 1000,
-        restartNeeded: false,
+        hidden: true
     },
     kickNotInRole: {
         type: OptionType.STRING,
@@ -80,76 +30,220 @@ export const settings = definePluginSettings({
         default: "",
         restartNeeded: false,
     },
-    ownershipChangeMessage: {
-        type: OptionType.STRING,
-        description: "Message to send when ownership changes",
-        default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
-        restartNeeded: false,
-    },
-    ownershipChangeNotificationAny: {
-        type: OptionType.BOOLEAN,
-        description: "Show toast notification for ANY ownership change",
-        default: false,
-        restartNeeded: false,
-    },
-    showChannelInfoChangeMessage: {
-        type: OptionType.BOOLEAN,
-        description: "Show ephemeral message when channel info updates",
-        default: true,
-        restartNeeded: false,
-    },
     banRotateEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Enable Ban Rotation (Unban oldest when banning new if slot needed)",
+        description: "Enable rotating banlist",
         default: false,
         restartNeeded: false,
     },
-    banRotationMessage: {
-        type: OptionType.STRING,
-        description: "Message to send when ban rotation occurs",
-        default: "🔄 Unbanned <@{unbanned_id}> to make room for <@{banned_id}>",
-        restartNeeded: false,
-    },
-    rotateChannelNamesEnabled: {
+    voteBanEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Enable Channel Name Rotation",
+        description: "Enable vote ban system",
         default: false,
         restartNeeded: false,
     },
-    rotateChannelNamesTime: {
+    voteRequiredPercent: {
+        type: OptionType.SLIDER,
+        description: "Percentage of users required to vote ban someone (excludes owner)",
+        default: 51,
+        min: 1,
+        max: 100,
+        markers: [1, 25, 50, 75, 100],
+        stickToMarkers: false,
+        restartNeeded: false,
+    },
+    voteExpireMinutes: {
         type: OptionType.NUMBER,
-        description: "Time in minutes between name rotations (Min 11)",
+        description: "Time before a vote expires in minutes",
         default: 15,
+        min: 1,
+        max: 300,
         restartNeeded: false,
     },
     rotateChannelNames: {
         type: OptionType.STRING,
-        description: "Comma-separated list of names to rotate",
-        default: "General, Lounge, Music, Gaming", // Default example
+        description: "Will rotate through these channel names every rotateChannelNamesTime minutes",
+        default: "",
+        multiline: true,
+        onChange: () => state.onRotationSettingsChange(),
         restartNeeded: false,
     },
-    fetchOwnersOnStartup: {
+    rotateChannelNamesEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Fetch all channel owners on startup (Category only)",
-        default: true,
+        description: "Enable channel name rotation",
+        default: false,
+        onChange: () => state.onRotationSettingsChange(),
+        restartNeeded: false,
+    },
+    rotateChannelNamesTime: {
+        type: OptionType.SLIDER,
+        description: "Time before the next channel name is set in minutes",
+        default: 11,
+        min: 11,
+        markers: [11, 15, 30, 60, 120],
+        stickToMarkers: false,
+        restartNeeded: false,
+        onChange: () => state.onRotationSettingsChange(),
+    },
+    ownershipChangeNotificationAny: {
+        type: OptionType.BOOLEAN,
+        description: "Show notification for any channel ownership change",
+        default: false,
         restartNeeded: false,
     },
     autoClaimDisbanded: {
         type: OptionType.BOOLEAN,
-        description: "Auto-claim disbanded channels (Owner left & empty) if I am the owner",
-        default: true, // "Fix: if owner leaves and i claim manually or via plugin, make sure it knows i claimed" -> Helps keep state in sync
-        restartNeeded: false,
-    },
-    autoClaimDisbandedAny: {
-        type: OptionType.BOOLEAN,
-        description: "Auto-claim ANY disbanded channel (Owner left & empty)",
+        description: "Automatically claim the channel you're in when its owner leaves",
         default: false,
         restartNeeded: false,
     },
     autoNavigateToOwnedChannel: {
         type: OptionType.BOOLEAN,
-        description: "Auto-navigate to channel when I become owner",
+        description: "Automatically navigate to the channel you own",
         default: true,
+        restartNeeded: false,
+    },
+    fetchOwnersOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Fetch all owners in the category on startup",
+        default: false,
+        restartNeeded: false,
+    },
+    ownershipChangeMessage: {
+        type: OptionType.STRING,
+        description: "Message to show when ownership is detected",
+        default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
+        restartNeeded: false,
+    },
+    showChannelInfoChangeMessage: {
+        type: OptionType.BOOLEAN,
+        description: "Causes a message to be sent to the channel when the channel info changes",
+        default: false,
+        restartNeeded: false,
+    },
+    whitelistSkipMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when an action is skipped for a whitelisted user.",
+        default: "🛡️ Skipped {action} action for whitelisted user <@{user_id}>",
+        restartNeeded: false,
+    },
+    banRotationMessage: {
+        type: OptionType.STRING,
+        description: "Ephemeral message to show when a ban rotates.",
+        default: "♾️ Banned user <@{user_id_old}> has been replaced with <@{user_id}>",
+        restartNeeded: false,
+    },
+    voteBanCommand: {
+        type: OptionType.STRING,
+        description: "Message to parse for vote ban system",
+        default: "!vote ban {user name/mention/id}",
+        restartNeeded: false,
+    },
+    kickCommand: {
+        type: OptionType.STRING,
+        description: "Message to send when a user in the auto kick list joins",
+        default: "!v kick {user_id}",
+        restartNeeded: false,
+    },
+    banCommand: {
+        type: OptionType.STRING,
+        description: "Message to send when a user not in ban rotation joins",
+        default: "!v ban {user_id}",
+        restartNeeded: false,
+    },
+    unbanCommand: {
+        type: OptionType.STRING,
+        description: "Message to send when a user not in ban rotation joins",
+        default: "!v unban {user_id}",
+        restartNeeded: false,
+    },
+    setChannelNameCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to set a channel name",
+        default: "!v name {channel_name_new}",
+        restartNeeded: false,
+    },
+    claimCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to claim a channel",
+        default: "!v claim",
+        restartNeeded: false,
+    },
+    infoCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to get channel info",
+        default: "!v info",
+        restartNeeded: false,
+    },
+    queueTime: {
+        type: OptionType.SLIDER,
+        description: "Minimum time between actions in ms",
+        default: 2500,
+        min: 0,
+        max: 10000,
+        markers: [0, 250, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000],
+        stickToMarkers: false,
+        restartNeeded: false,
+    },
+    banLimit: {
+        type: OptionType.NUMBER,
+        description: "The amount of bans you can have before needing to rotate",
+        default: 5,
+        restartNeeded: false,
+    },
+    createChannelId: {
+        type: OptionType.STRING,
+        description: "The Channel ID to join when clicking 'Create Channel'",
+        default: "763914043252801566",
+        restartNeeded: false,
+    },
+    botId: {
+        type: OptionType.STRING,
+        description: "The Bot ID that sends the welcome message",
+        default: "913852862990262282",
+        restartNeeded: false,
+    },
+    categoryId: {
+        type: OptionType.STRING,
+        description: "The Category ID to monitor for channel owners",
+        default: "763914042628112455",
+        restartNeeded: false,
+    },
+    guildId: {
+        type: OptionType.STRING,
+        description: "The Guild ID for this plugin",
+        default: "505974446914535426",
+        restartNeeded: false,
+    },
+    enabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable automated actions",
+        default: true,
+        restartNeeded: false,
+    },
+    messageReference: {
+        type: OptionType.STRING,
+        description: "Template Reference - Variables: ",
+        default: `{now} = Datetime of message being sent
+{now:DD.MM.YY HH:mm:ss} = Datetime with custom format
+{my_id} = Your own User ID
+{my_name} = Your own User Name
+{guild_id} = Current Guild ID
+{guild_name} = Current Guild Name
+{channel_id} = Current Channel ID
+{channel_name} = Current Channel Name
+{user_id} = User ID [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
+{user_name} = User Name [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
+{user_id_old} = Old User ID [banRotationMessage]
+{user_name_old} = Old User Name [banRotationMessage]
+{action} = Action Type [whitelistSkipMessage]
+{reason} = Reason for ownership (Unknown/Created/Claimed) [ownershipChangeMessage, setChannelNameCommand]
+{channel_name_new} = New channel name [setChannelNameCommand]`,
+        readonly: true,
+        multiline: true,
+        onChange(_) {
+            settings.store.messageReference = settings.def.messageReference.default;
+        },
         restartNeeded: false,
     },
 });

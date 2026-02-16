@@ -10,13 +10,12 @@ import {
     showToast,
     SelectedChannelStore,
     VoiceStateStore,
-    ChannelActions,
 } from "@webpack/common";
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setChannelInfo, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
-import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage, navigateToChannel, formatWhitelistSkipMessage } from "./utils";
-
+import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateToChannel, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
+import { startRotation, stopRotation } from "./utils/rotation";
 
 export async function processQueue() {
     const { sendBotMessage } = require("@api/Commands");
@@ -125,7 +124,6 @@ export function notifyOwnership(channelId: string) {
         .replace(/{user_id}/g, ownerInfo.userId)
         .replace(/{user_name}/g, ownerName);
 
-    // Always send ephemeral message if configured
     sendBotMessage(channelId, {
         content: formatMessageCommon(formatted),
     });
@@ -206,101 +204,17 @@ export async function fetchAllOwners() {
     }
     log(`Finished batch fetching owners.`);
 }
+
 export function claimChannel(channelId: string, formerOwnerId?: string) {
     const formatted = formatclaimCommand(channelId, formerOwnerId);
     log(`Automatically claiming channel ${channelId}: ${formatted}`);
     sendMessage(channelId, { content: formatted });
 }
 
-export function rotateChannelName(channelId: string) {
-    const names = getRotateNames();
-    if (names.length === 0) {
-        log(`No names to rotate for channel ${channelId}, stopping rotation.`);
-        stopRotation(channelId);
-        return;
-    }
-
-    let index = state.rotationIndex.get(channelId) ?? 0;
-    if (index >= names.length) index = 0;
-
-    const nextName = names[index];
-    const formatted = formatsetChannelNameCommand(channelId, nextName);
-
-    log(`Rotating channel ${channelId} to name: ${nextName} (Index: ${index})`);
-    sendMessage(channelId, { content: formatted });
-
-    state.rotationIndex.set(channelId, (index + 1) % names.length);
-    state.lastRotationTime.set(channelId, Date.now());
-}
-
-export function startRotation(channelId: string) {
-    if (!settings.store.enabled) return;
-    if (state.rotationIntervals.has(channelId)) return;
-
-    if (!settings.store.rotateChannelNamesEnabled) {
-        log(`Channel name rotation is disabled in settings, skipping ${channelId}.`);
-        return;
-    }
-
-    const intervalMinutes = settings.store.rotateChannelNamesTime;
-    if (intervalMinutes < 11) {
-        log(`Rotation interval for ${channelId} is less than 11 minutes, skipping to prevent rate limits.`);
-        return;
-    }
-
-    const names = getRotateNames();
-    if (names.length === 0) {
-        log(`No names configured for rotation, skipping ${channelId}.`);
-        return;
-    }
-
-    log(`Starting channel name rotation for ${channelId} every ${intervalMinutes} minutes.`);
-
-    // Check if current name is in rotation list to determine starting index
-    const channel = ChannelStore.getChannel(channelId);
-    let startIndex = 0;
-    if (channel) {
-        // Strip potential configured prefixes/suffixes if needed? The user didn't ask for fuzzy matching, just "current channel name".
-        // Assuming exact match for now as stored in getRotateNames().
-        // Note: getRotateNames might return names to set. Channel name might effectively update.
-        const currentName = channel.name;
-        const idx = names.indexOf(currentName);
-        if (idx !== -1) {
-            startIndex = (idx + 1) % names.length;
-            log(`Current name '${currentName}' found at index ${idx}. Next rotation will use index ${startIndex}.`);
-        } else {
-            log(`Current name '${currentName}' not found in rotation list. Starting from index 0.`);
-        }
-    }
-    state.rotationIndex.set(channelId, startIndex);
-
-    // Waiting for first interval...
-    // rotateChannelName(channelId);
-
-    const intervalId = setInterval(() => {
-        rotateChannelName(channelId);
-    }, intervalMinutes * 60 * 1000);
-
-    state.rotationIntervals.set(channelId, intervalId);
-    state.lastRotationTime.set(channelId, Date.now());
-}
-
-export function stopRotation(channelId: string) {
-    const intervalId = state.rotationIntervals.get(channelId);
-    if (intervalId) {
-        log(`Stopping channel name rotation for ${channelId}.`);
-        clearInterval(intervalId);
-        state.rotationIntervals.delete(channelId);
-        state.rotationIndex.delete(channelId);
-        state.lastRotationTime.delete(channelId);
-    }
-}
-
 export function handleOwnershipChange(channelId: string, ownerId: string) {
     const me = UserStore.getCurrentUser();
     log(`Ownership change for ${channelId}: owner is ${ownerId}, me is ${me?.id}`);
     if (ownerId === me?.id) {
-        // We became the owner - start rotation and fetch channel info
         log(`We are the owner! Starting rotation and requesting channel info`);
         startRotation(channelId);
         requestChannelInfo(channelId);
@@ -319,39 +233,6 @@ export function handleOwnerUpdate(channelId: string, owner: OwnerEntry) {
     if (updateOwner(channelId, owner)) {
         notifyOwnership(channelId);
         handleOwnershipChange(channelId, owner.userId);
-
-        const settingAny = settings.store.ownershipChangeNotificationAny;
-        const isMyChannel = state.myLastVoiceChannelId === channelId;
-        const isCurrentChat = SelectedChannelStore.getChannelId() === channelId;
-
-        // Toast logic (optional)
-        if (settingAny || isMyChannel || isCurrentChat) {
-            const channel = ChannelStore.getChannel(channelId);
-            const user = UserStore.getUser(owner.userId);
-            const ownerName = user?.globalName || user?.username || owner.userId;
-            const channelName = channel?.name || channelId;
-            // showToast(`Channel "${channelName}" now owned by "${ownerName}"`);
-        }
-    }
-}
-
-export function restartAllRotations() {
-    log("Settings changed, updating rotations...");
-
-    // Stop everything first
-    const activeChannels = Array.from(state.rotationIntervals.keys());
-    for (const channelId of activeChannels) {
-        stopRotation(channelId);
-    }
-
-    // If enabled, try to start rotation in the current channel if we are the owner
-    if (settings.store.enabled && settings.store.rotateChannelNamesEnabled && state.myLastVoiceChannelId) {
-        const ownerInfo = getOwnerForChannel(state.myLastVoiceChannelId);
-        const me = UserStore.getCurrentUser();
-        if (ownerInfo?.userId === me?.id) {
-            log(`Restarting rotation for current channel ${state.myLastVoiceChannelId}`);
-            startRotation(state.myLastVoiceChannelId);
-        }
     }
 }
 
@@ -366,8 +247,7 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
 
     if (settings.store.showChannelInfoChangeMessage) {
         const { sendBotMessage } = require("@api/Commands");
-
-        const lines = [];
+        const lines: string[] = [];
         if (info.name) lines.push(`**Name:** ${info.name}`);
         if (info.limit) lines.push(`**Limit:** ${info.limit}`);
         if (info.status) lines.push(`**Status:** ${info.status}`);
@@ -385,8 +265,6 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
     }
 }
 
-state.onRotationSettingsChange = restartAllRotations;
-
 export function bulkBanAndKick(userIds: string[], channelId: string, guildId: string): number {
     const currentList = getKickList();
     const uniqueNewUsers = userIds.filter(id => !currentList.includes(id));
@@ -395,27 +273,22 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
         setKickList([...currentList, ...uniqueNewUsers]);
     }
 
-    // Queue kick commands for users currently in the channel
     let count = 0;
     const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId);
 
     for (const userId of userIds) {
-        // Ensure user is still in the channel
         if (voiceStates && voiceStates[userId]) {
             actionQueue.push({
                 type: ActionType.KICK,
                 userId: userId,
                 channelId: channelId,
                 guildId: guildId
-            } as any);
+            });
             count++;
         }
     }
 
-    if (count > 0) {
-        processQueue();
-    }
-
+    if (count > 0) processQueue();
     return count;
 }
 
@@ -423,9 +296,7 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
     const currentList = getKickList();
     const newList = currentList.filter(id => !userIds.includes(id));
 
-    if (currentList.length !== newList.length) {
-        setKickList(newList);
-    }
+    if (currentList.length !== newList.length) setKickList(newList);
 
     let count = 0;
     for (const userId of userIds) {
@@ -434,24 +305,18 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
             userId: userId,
             channelId: channelId,
             guildId: guildId
-        } as any);
+        });
         count++;
     }
 
-    if (count > 0) {
-        processQueue();
-    }
-
+    if (count > 0) processQueue();
     return count;
 }
 
-export function claimAllDisbandedChannels(guildId: string) {
+export async function claimAllDisbandedChannels(guildId: string) {
     if (!settings.store.enabled) return;
     const channels = GuildChannelStore.getChannels(guildId).VOCAL;
-    if (!channels || channels.length === 0) {
-        showToast("No voice channels found to check.");
-        return;
-    }
+    if (!channels || channels.length === 0) return;
 
     let count = 0;
     const me = UserStore.getCurrentUser();
@@ -465,15 +330,10 @@ export function claimAllDisbandedChannels(guildId: string) {
         const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channel.id);
 
         let shouldClaim = false;
-
         if (ownerInfo?.userId) {
             if (ownerInfo.userId === me.id) continue;
-            // If owner is not in channel, consider it disbanded
-            if (!voiceStates || !voiceStates[ownerInfo.userId]) {
-                shouldClaim = true;
-            }
+            if (!voiceStates || !voiceStates[ownerInfo.userId]) shouldClaim = true;
         } else {
-            // No known owner, consider it disbanded/claimable
             shouldClaim = true;
         }
 
@@ -483,15 +343,18 @@ export function claimAllDisbandedChannels(guildId: string) {
                 userId: me.id,
                 channelId: channel.id,
                 guildId: guildId
-            } as any);
+            });
             count++;
         }
     }
 
-    if (count > 0) {
-        showToast(`Queued claims for ${count} disbanded channels...`);
-        processQueue();
-    } else {
-        showToast("No disbanded channels found to claim.");
-    }
+    if (count > 0) processQueue();
 }
+
+// Re-export rotation and voteban
+export * from "./utils/rotation";
+export * from "./utils/voteban";
+
+// Local log helper
+import { log as utilLog } from "./utils/logging";
+const log = utilLog;

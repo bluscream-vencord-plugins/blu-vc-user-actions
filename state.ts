@@ -1,38 +1,5 @@
-export interface OwnerEntry {
-    userId: string;
-    reason: string; // "Created" | "Claimed" | "Unknown"
-    timestamp: number;
-}
-
-export interface ChannelOwnership {
-    first?: OwnerEntry; // The creator
-    last?: OwnerEntry;  // The current/last claimant
-}
-
-export interface MemberChannelInfo {
-    name?: string;
-    limit?: number;
-    status?: string;
-    permitted: string[];
-    banned: string[];
-    timestamp: number;
-    updated: number;
-    ownerId?: string; // Captured from "Channel Settings" embed author icon if available
-}
-
-export enum ActionType {
-    KICK = 'KICK',
-    BAN = 'BAN',
-    UNBAN = 'UNBAN',
-    CLAIM = 'CLAIM'
-}
-
-export interface ActionItem {
-    type: ActionType;
-    userId: string;
-    channelId: string;
-    guildId?: string;
-}
+import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry } from "./types";
+export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry };
 
 // Persistence - Try to load from localStorage
 const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v1";
@@ -73,7 +40,10 @@ export const state = {
     rotationIndex: new Map<string, number>(),
     rotationIntervals: new Map<string, any>(),
     lastRotationTime: new Map<string, number>(),
-    onRotationSettingsChange: () => { },
+    onRotationSettingsChange: () => {
+        const { restartAllRotations } = require("./utils/rotation");
+        restartAllRotations();
+    },
 };
 
 export function saveState() {

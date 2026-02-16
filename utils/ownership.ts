@@ -30,19 +30,29 @@ export function updateOwner(channelId: string, owner: OwnerEntry): boolean {
         }
     } else if (owner.reason === "Claimed") {
         // This is a claimant
-        if (!ownership.last || ownership.last.userId !== owner.userId) {
+        if (ownership.first && ownership.first.userId === owner.userId) {
+            // Creator claimed it back! Clear claimant (last)
+            if (ownership.last) {
+                ownership.last = undefined;
+                changed = true;
+            }
+        } else if (!ownership.last || ownership.last.userId !== owner.userId) {
             ownership.last = owner;
             changed = true;
         }
     } else {
-        // Unknown reason - treat as simple update or fallback?
-        // Maybe treat as "last" if we don't know better, or ignore?
-        // Let's assume generic "Owner" updates might be "Claimed" implicitly or just current state.
-        // For now, let's treat generic updates as "last" to be safe if they lack specific reason,
-        // BUT strict strict reason checking is better.
+        // Unknown reason - treat as 'last' claimant if it's a new owner
         if (!ownership.last || ownership.last.userId !== owner.userId) {
-            ownership.last = owner;
-            changed = true;
+            // If the person who is now owner is the creator, clear 'last'
+            if (ownership.first && ownership.first.userId === owner.userId) {
+                if (ownership.last) {
+                    ownership.last = undefined;
+                    changed = true;
+                }
+            } else {
+                ownership.last = owner;
+                changed = true;
+            }
         }
     }
 

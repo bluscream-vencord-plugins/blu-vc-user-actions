@@ -129,6 +129,20 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
                     }}
                     color="danger"
                 />
+                <Menu.MenuItem
+                    id="socialize-guild-reset-settings"
+                    label="Reset Settings"
+                    action={() => {
+                        for (const key in settings.def) {
+                            if (key === "enabled" || (settings.def as any)[key].readonly) continue;
+                            try {
+                                (settings.store as any)[key] = (settings.def as any)[key].default;
+                            } catch (e) { }
+                        }
+                        showToast("Settings have been reset to defaults.", { type: "success" } as any);
+                    }}
+                    color="danger"
+                />
                 {/* Settings reset typically handled by Vencord settings UI, but we can offer a manual cleared if needed.
                      However, 'Reset Settings' usually means 'Restore Defaults'. Vencord settings API might have this?
                      Or we just iterate and reset?

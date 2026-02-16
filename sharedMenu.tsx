@@ -110,7 +110,7 @@ export const getSharedMenuItems = () => {
         <Menu.MenuItem
             id="blu-vc-user-actions-settings"
             label="Edit Settings"
-            action={() => openPluginModal(plugins[pluginInfo.id])}
+            action={() => openPluginModal(plugins[pluginInfo.name])}
         />
     ];
 };
