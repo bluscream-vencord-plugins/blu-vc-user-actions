@@ -13,7 +13,7 @@ import {
     ChannelActions,
 } from "@webpack/common";
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, ChannelOwner, setChannelInfo, ChannelInfo, ActionType } from "./state";
+import { actionQueue, processedUsers, state, setChannelInfo, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
 import { log, formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, getRotateNames, formatsetChannelNameCommand, parseBotInfoMessage, navigateToChannel, formatWhitelistSkipMessage } from "./utils";
 
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
@@ -125,12 +125,13 @@ export function notifyOwnership(channelId: string) {
         .replace(/{user_id}/g, ownerInfo.userId)
         .replace(/{user_name}/g, ownerName);
 
+    // Always send ephemeral message if configured
     sendBotMessage(channelId, {
         content: formatMessageCommon(formatted),
     });
 }
 
-export function getMessageOwner(msg: any, botId: string): ChannelOwner | null {
+export function getMessageOwner(msg: any, botId: string): OwnerEntry | null {
     if (msg.author.id !== botId) return null;
 
     const embed = msg.embeds?.[0];
@@ -140,22 +141,22 @@ export function getMessageOwner(msg: any, botId: string): ChannelOwner | null {
     if (authorName === "Channel Created") {
         const userId = msg.mentions?.[0]?.id || msg.mentions?.[0] || msg.content?.match(/<@!?(\d+)>/)?.[1];
         const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-        if (userId) return { userId, reason: "Created", timestamp, updated: Date.now() };
+        if (userId) return { userId, reason: "Created", timestamp };
     } else if (authorName === "Channel Claimed") {
-        const iconURL = embed.author?.iconURL;
+        const iconURL = embed.author?.iconURL || embed.author?.icon_url;
         if (iconURL) {
             const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
             const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-            if (userIdFromUrl) return { userId: userIdFromUrl, reason: "Claimed", timestamp, updated: Date.now() };
+            if (userIdFromUrl) return { userId: userIdFromUrl, reason: "Claimed", timestamp };
         }
     }
     return null;
 }
 
-export async function checkChannelOwner(channelId: string, botId: string): Promise<ChannelOwner> {
-    const fallback: ChannelOwner = { userId: "", reason: "Unknown", timestamp: Date.now(), updated: Date.now() };
+export async function checkChannelOwner(channelId: string, botId: string): Promise<OwnerEntry> {
+    const fallback: OwnerEntry = { userId: "", reason: "Unknown", timestamp: Date.now() };
     const cached = MessageStore.getMessages(channelId);
-    let owner: ChannelOwner | null = null;
+    let owner: OwnerEntry | null = null;
 
     if (cached) {
         const msgsArray = cached.toArray ? cached.toArray() : cached;
@@ -314,7 +315,7 @@ export function handleOwnershipChange(channelId: string, ownerId: string) {
     }
 }
 
-export function handleOwnerUpdate(channelId: string, owner: ChannelOwner) {
+export function handleOwnerUpdate(channelId: string, owner: OwnerEntry) {
     if (updateOwner(channelId, owner)) {
         notifyOwnership(channelId);
         handleOwnershipChange(channelId, owner.userId);
@@ -323,12 +324,13 @@ export function handleOwnerUpdate(channelId: string, owner: ChannelOwner) {
         const isMyChannel = state.myLastVoiceChannelId === channelId;
         const isCurrentChat = SelectedChannelStore.getChannelId() === channelId;
 
+        // Toast logic (optional)
         if (settingAny || isMyChannel || isCurrentChat) {
             const channel = ChannelStore.getChannel(channelId);
             const user = UserStore.getUser(owner.userId);
             const ownerName = user?.globalName || user?.username || owner.userId;
             const channelName = channel?.name || channelId;
-            showToast(`Channel "${channelName}" now owned by "${ownerName}"`);
+            // showToast(`Channel "${channelName}" now owned by "${ownerName}"`);
         }
     }
 }
@@ -358,9 +360,29 @@ export function requestChannelInfo(channelId: string) {
     sendMessage(channelId, { content: settings.store.infoCommand });
 }
 
-export function handleInfoUpdate(channelId: string, info: ChannelInfo) {
-    setChannelInfo(info);
-    log(`Updated channel info`);
+export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
+    setChannelInfo(channelId, info);
+    log(`Updated channel info for ${channelId}`);
+
+    if (settings.store.showChannelInfoChangeMessage) {
+        const { sendBotMessage } = require("@api/Commands");
+
+        const lines = [];
+        if (info.name) lines.push(`**Name:** ${info.name}`);
+        if (info.limit) lines.push(`**Limit:** ${info.limit}`);
+        if (info.status) lines.push(`**Status:** ${info.status}`);
+        if (info.permitted.length > 0) lines.push(`**Permitted:** ${info.permitted.length} users`);
+        if (info.banned.length > 0) lines.push(`**Banned:** ${info.banned.length} users`);
+
+        const embed = {
+            title: "Channel Info Updated",
+            description: lines.join("\n"),
+            color: 0x5865F2,
+            timestamp: new Date().toISOString()
+        };
+
+        sendBotMessage(channelId, { embeds: [embed] });
+    }
 }
 
 state.onRotationSettingsChange = restartAllRotations;
@@ -385,7 +407,7 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
                 userId: userId,
                 channelId: channelId,
                 guildId: guildId
-            });
+            } as any);
             count++;
         }
     }
@@ -397,15 +419,30 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
     return count;
 }
 
-export function bulkUnban(userIds: string[]): number {
+export function bulkUnban(userIds: string[], channelId: string, guildId: string): number {
     const currentList = getKickList();
     const newList = currentList.filter(id => !userIds.includes(id));
 
     if (currentList.length !== newList.length) {
         setKickList(newList);
-        return currentList.length - newList.length;
     }
-    return 0;
+
+    let count = 0;
+    for (const userId of userIds) {
+        actionQueue.push({
+            type: ActionType.UNBAN,
+            userId: userId,
+            channelId: channelId,
+            guildId: guildId
+        } as any);
+        count++;
+    }
+
+    if (count > 0) {
+        processQueue();
+    }
+
+    return count;
 }
 
 export function claimAllDisbandedChannels(guildId: string) {
@@ -446,7 +483,7 @@ export function claimAllDisbandedChannels(guildId: string) {
                 userId: me.id,
                 channelId: channel.id,
                 guildId: guildId
-            });
+            } as any);
             count++;
         }
     }

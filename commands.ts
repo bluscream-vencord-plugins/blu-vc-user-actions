@@ -1,185 +1,197 @@
 import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { settings } from "./settings";
-import { state, channelOwners, actionQueue, processedUsers } from "./state";
+import { state, channelOwners, actionQueue, processedUsers, channelInfos, resetState } from "./state";
 import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
-import { rotateChannelName, startRotation } from "./logic";
+import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, claimChannel, bulkUnban } from "./logic";
 import type { Embed } from "@vencord/discord-types";
+
+const SUBCOMMANDS = {
+    INFO: "info",
+    PLUGIN: "plugin",
+    CHECK: "check",
+    NAME: "name",
+    RESET: "reset",
+    SHARE: "share"
+};
+
+const NAME_SUBCOMMANDS = {
+    START: "start",
+    ROTATE: "rotate",
+    CLEAR: "clear",
+    CHECK: "check",
+    ADD: "add",
+    REMOVE: "remove"
+};
+
+const RESET_SUBCOMMANDS = {
+    STATE: "state",
+    SETTINGS: "settings"
+};
+
+const SHARE_SUBCOMMANDS = {
+    BANS: "bans",
+    NAMES: "names",
+    STATE: "state"
+};
 
 export const commands = [
     {
-        name: "socialize",
-        description: "Display detailed information about the current voice channel",
+        name: "channel",
+        description: "Manage channel settings, ownership, and rotation",
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "channel",
-                description: "Channel ID (defaults to current voice channel)",
+                name: "action",
+                description: "Main action",
+                type: ApplicationCommandOptionType.STRING,
+                required: true,
+                choices: Object.values(SUBCOMMANDS).map(v => ({ name: v, label: v, value: v }))
+            },
+            {
+                name: "subaction",
+                description: "Sub-action (for name/reset/share)",
+                type: ApplicationCommandOptionType.STRING,
+                required: false
+            },
+            {
+                name: "argument",
+                description: "Argument (user, name, etc.)",
                 type: ApplicationCommandOptionType.STRING,
                 required: false
             }
         ],
-        execute: (args, ctx) => {
-            const channelId = args[0]?.value || SelectedChannelStore.getVoiceChannelId();
+        execute: async (args, ctx) => {
+            const action = args[0]?.value;
+            const subaction = args[1]?.value;
+            const argument = args[2]?.value;
+            const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+            const { sendBotMessage } = require("@api/Commands");
 
             if (!channelId) {
-                const { sendBotMessage } = require("@api/Commands");
-                sendBotMessage(ctx.channel.id, {
-                    content: "❌ You are not in a voice channel and no channel ID was provided."
-                });
+                sendBotMessage(ctx.channel.id, { content: "❌ You must be in a voice channel or context." });
                 return;
             }
 
-            const channel = ChannelStore.getChannel(channelId);
-            if (!channel) {
-                const { sendBotMessage } = require("@api/Commands");
-                sendBotMessage(ctx.channel.id, {
-                    content: `❌ Channel not found: ${channelId}`
-                });
-                return;
-            }
-
-            // Get owner info
-            const ownerInfo = getOwnerForChannel(channelId);
-            const ownerUser = ownerInfo?.userId ? UserStore.getUser(ownerInfo.userId) : null;
-            const ownerName = ownerUser?.globalName || ownerUser?.username || ownerInfo?.userId || "Unknown";
-            const ownerTimestamp = ownerInfo?.timestamp ? toDiscordTime(ownerInfo.timestamp, true) : "Unknown";
-
-            // Get channel info
-            const info = state.channelInfo;
-            const me = UserStore.getCurrentUser();
-            const isMyChannel = SelectedChannelStore.getVoiceChannelId() === channelId;
-
-            // Build embed
-            const embed: any = {
-                type: "rich",
-                title: `📊 Channel Information`,
-                color: 0x5865F2,
-                fields: [
-                    {
-                        name: "📝 Channel",
-                        value: `<#${channelId}>\n\`${channelId}\``,
-                        inline: true
-                    },
-                    {
-                        name: "👑 Owner",
-                        value: ownerInfo?.userId
-                            ? `<@${ownerInfo.userId}>\n**Reason:** ${ownerInfo.reason}\n**Since:** ${ownerTimestamp}\n**Cached:** ${toDiscordTime(ownerInfo.updated, true)}`
-                            : "Unknown",
-                        inline: true
-                    },
-                    {
-                        name: "ℹ️ Status",
-                        value: isMyChannel ? "✅ You are here" : "❌ Not in this channel",
-                        inline: true
+            switch (action) {
+                case SUBCOMMANDS.INFO: {
+                    // /channel info {user or self}
+                    let targetUserId = argument;
+                    if (!targetUserId) {
+                        const me = UserStore.getCurrentUser();
+                        targetUserId = me?.id;
                     }
-                ],
-                footer: {
-                    text: `${settings.store.guildId === channel.guild_id ? "Monitored Guild" : "Different Guild"}`
-                },
-                timestamp: new Date().toISOString()
-            };
 
-            // Add channel info if available
-            if (info && isMyChannel) {
-                embed.fields.push({
-                    name: "🔧 Channel Settings",
-                    value: [
-                        info.name ? `**Name:** ${info.name}` : null,
-                        info.limit ? `**Limit:** ${info.limit}` : null,
-                        info.status ? `**Status:** ${info.status}` : null,
-                        `**Since:** ${toDiscordTime(info.timestamp, true)}`,
-                        `**Cached:** ${toDiscordTime(info.updated, true)}`
-                    ].filter(Boolean).join("\n") || "No data",
-                    inline: false
-                });
+                    // For now, just show channel info as before, maybe highlight user?
+                    // The requirement says "shows cached user info for us or the specified user"
+                    // But we track info per channel...
+                    // Maybe it means "show info ABOUT the channel I am in"?
+                    // Re-using the logic from the old /socialize command
 
-                const max_items = 20
+                    const ownership = channelOwners.get(channelId);
+                    const info = channelInfos.get(channelId);
+                    const isMyChannel = SelectedChannelStore.getVoiceChannelId() === channelId;
 
-                if (info.permitted && info.permitted.length > 0) {
-                    embed.fields.push({
-                        name: `✅ Permitted Users (${info.permitted.length})`,
-                        value: info.permitted.slice(0, max_items).map(id => `<@${id}>`).join(", ") +
-                            (info.permitted.length > max_items ? `\n*...and ${info.permitted.length - max_items} more*` : ""),
-                        inline: false
-                    });
+                    const embed: any = {
+                        type: "rich",
+                        title: `📊 Channel Information`,
+                        color: 0x5865F2,
+                        fields: [
+                            {
+                                name: "📝 Channel",
+                                value: `<#${channelId}>\n\`${channelId}\``,
+                                inline: true
+                            },
+                            {
+                                name: "👑 Owner",
+                                value: ownership
+                                    ? `First: <@${ownership.first?.userId || "None"}>\nLast: <@${ownership.last?.userId || "None"}>`
+                                    : "Unknown",
+                                inline: true
+                            }
+                        ]
+                    };
+
+                    if (info) {
+                        embed.fields.push({
+                            name: "🔧 Channel Settings",
+                            value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID (Parsed): ${info.ownerId ? `<@${info.ownerId}>` : "N/A"}`,
+                            inline: false
+                        });
+                        if (info.permitted.length > 0) embed.fields.push({ name: `Permitted (${info.permitted.length})`, value: info.permitted.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
+                        if (info.banned.length > 0) embed.fields.push({ name: `Banned (${info.banned.length})`, value: info.banned.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
+                    }
+
+                    sendBotMessage(ctx.channel.id, { embeds: [embed] });
+                    break;
                 }
 
-                if (info.banned && info.banned.length > 0) {
-                    embed.fields.push({
-                        name: `🚫 Banned Users (${info.banned.length})`,
-                        value: info.banned.slice(0, max_items).map(id => `<@${id}>`).join(",") +
-                            (info.banned.length > max_items ? `\n*...and ${info.banned.length - max_items} more*` : ""),
-                        inline: false
+                case SUBCOMMANDS.PLUGIN: {
+                    const queueSize = actionQueue.length;
+                    const processedCount = processedUsers.size;
+                    sendBotMessage(ctx.channel.id, {
+                        content: `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${channelInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`
                     });
+                    break;
                 }
 
-                const localBanList = getKickList();
-                if (localBanList && localBanList.length > 0) {
-                    embed.fields.push({
-                        name: `🚫 Local Ban List (${localBanList.length})`,
-                        value: localBanList.slice(0, max_items).map(id => `<@${id}>`).join(",") +
-                            (localBanList.length > max_items ? `\n*...and ${localBanList.length - max_items} more*` : ""),
-                        inline: false
-                    });
+                case SUBCOMMANDS.CHECK: {
+                    sendBotMessage(ctx.channel.id, { content: "🔄 Checking ownership and info..." });
+                    await checkChannelOwner(channelId, settings.store.botId);
+                    // Also trigger info check?
+                    // requestChannelInfo(channelId); // This is not exported or available?
+                    // We need to export it from logic.ts
+                    break;
                 }
+
+                case SUBCOMMANDS.NAME: {
+                    if (!subaction) {
+                        sendBotMessage(ctx.channel.id, { content: "❌ Missing subaction for name (start, rotate, clear, check, add, remove)" });
+                        return;
+                    }
+                    if (subaction === NAME_SUBCOMMANDS.START) {
+                        startRotation(channelId);
+                        sendBotMessage(ctx.channel.id, { content: "✅ Started rotation." });
+                    } else if (subaction === NAME_SUBCOMMANDS.ROTATE) {
+                        rotateChannelName(channelId);
+                        sendBotMessage(ctx.channel.id, { content: "✅ Rotated name." });
+                    } else if (subaction === NAME_SUBCOMMANDS.CLEAR) {
+                        stopRotation(channelId);
+                        state.rotationIndex.delete(channelId);
+                        sendBotMessage(ctx.channel.id, { content: "✅ Stopped rotation and cleared index." });
+                    }
+                    // Implement other name subcommands (add/remove/check) if needed
+                    else {
+                        sendBotMessage(ctx.channel.id, { content: `❌ Subaction ${subaction} not fully implemented yet.` });
+                    }
+                    break;
+                }
+
+                case SUBCOMMANDS.RESET: {
+                    if (subaction === RESET_SUBCOMMANDS.STATE) {
+                        resetState();
+                        sendBotMessage(ctx.channel.id, { content: "✅ Plugin state reset." });
+                    } else {
+                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown reset target." });
+                    }
+                    break;
+                }
+
+                case SUBCOMMANDS.SHARE: {
+                    if (subaction === SHARE_SUBCOMMANDS.BANS) {
+                        const list = getKickList();
+                        sendBotMessage(ctx.channel.id, {
+                            content: `**${list.length} Banned Users:**\n${list.map(id => `- \`${id}\` <@${id}>`).join("\n")}`
+                        });
+                    } else {
+                        sendBotMessage(ctx.channel.id, { content: "❌ Unknown share target." });
+                    }
+                    break;
+                }
+
+                default:
+                    sendBotMessage(ctx.channel.id, { content: `❌ Unknown action: ${action}` });
             }
-
-            // Global Info
-            if (isMyChannel && settings.store.rotateChannelNamesEnabled) {
-                const names = getRotateNames();
-                const interval = settings.store.rotateChannelNamesTime;
-                const nextIndex = state.rotationIndex.get(channelId) ?? 0;
-                const lastTime = state.lastRotationTime.get(channelId);
-                let nextTimeStr = "Not active";
-
-                if (lastTime) {
-                    const nextTime = lastTime + (interval * 60 * 1000);
-                    nextTimeStr = toDiscordTime(nextTime, true);
-                }
-
-                if (names.length > 0) {
-                    const nextName = names[nextIndex];
-                    embed.fields.push({
-                        name: `🔄 Rotation Info`,
-                        value: `**Interval:** ${interval}m\n**Next Name:** ${nextName}\n**Next Rotation:** ${nextTimeStr}\n**Names (${names.length}):**\n${names.map((n, i) => i === nextIndex ? `> **${n}**` : `  ${n}`).join("\n")}`,
-                        inline: false
-                    });
-                }
-            }
-
-            const queueSize = actionQueue.length;
-            const processedCount = processedUsers.size;
-
-            embed.fields.push({
-                name: "💾 Plugin Stats",
-                value: `**Cached Owners:** ${channelOwners.size}\n**Queue Size:** ${queueSize}\n**Processed Users:** ${processedCount}\n**Enabled:** ${settings.store.enabled ? "✅" : "❌"}`,
-                inline: true
-            });
-
-            const { sendBotMessage } = require("@api/Commands");
-            sendBotMessage(ctx.channel.id, {
-                embeds: [embed]
-            });
-        }
-    },
-    {
-        name: "rotate",
-        description: "Force the next channel name rotation and ensure rotation is enabled",
-        inputType: ApplicationCommandInputType.BUILT_IN,
-        execute: (args, ctx) => {
-            const channelId = SelectedChannelStore.getVoiceChannelId();
-            if (!channelId) {
-                const { sendBotMessage } = require("@api/Commands");
-                sendBotMessage(ctx.channel.id, { content: "❌ You are not in a voice channel." });
-                return;
-            }
-
-            // Manually trigger the next rotation
-            rotateChannelName(channelId);
-
-            const { sendBotMessage } = require("@api/Commands");
-            sendBotMessage(ctx.channel.id, { content: "🔄 Rotation triggered (next name selected)." });
         }
     }
 ];

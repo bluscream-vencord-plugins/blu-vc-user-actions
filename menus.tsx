@@ -118,6 +118,23 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
     children.push(
         <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginInfo.name}>
             {getSharedMenuItems()}
+            <Menu.MenuGroup>
+                <Menu.MenuItem
+                    id="socialize-guild-reset-state"
+                    label="Reset Plugin State"
+                    action={() => {
+                        const { resetState } = require("./state");
+                        resetState();
+                        showToast("Plugin state has been reset.", { type: "success" } as any);
+                    }}
+                    color="danger"
+                />
+                {/* Settings reset typically handled by Vencord settings UI, but we can offer a manual cleared if needed.
+                     However, 'Reset Settings' usually means 'Restore Defaults'. Vencord settings API might have this?
+                     Or we just iterate and reset?
+                     For now, let's just do State. Settings can be reset in the settings menu.
+                  */}
+            </Menu.MenuGroup>
         </Menu.MenuItem>
     );
 };
@@ -186,8 +203,8 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                     }
 
                     if (userIds.length > 0) {
-                        const count = bulkUnban(userIds);
-                        showToast(`Removed ${count} users from local ban list.`);
+                        const count = bulkUnban(userIds, channel.id, channel.guild_id);
+                        showToast(`Removed ${count} users from local ban list and queued unbans.`);
                     } else {
                         showToast("No other users found in voice channel.");
                     }

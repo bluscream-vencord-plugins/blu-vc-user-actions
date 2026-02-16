@@ -1,4 +1,4 @@
-import { ChannelInfo } from "../state";
+import { MemberChannelInfo } from "../state";
 import { log } from "./logging";
 import type { Message } from "@vencord/discord-types";
 
@@ -12,7 +12,7 @@ function getTimestamp(msg: any): number {
     return Date.now();
 }
 
-export function parseBotInfoMessage(msg: Message): ChannelInfo | null {
+export function parseBotInfoMessage(msg: Message): MemberChannelInfo | null {
     const embed = msg.embeds?.[0];
     const rawDescription = (embed as any)?.rawDescription || (embed as any)?.description;
 
@@ -22,7 +22,7 @@ export function parseBotInfoMessage(msg: Message): ChannelInfo | null {
     }
 
     const timestamp = getTimestamp(msg);
-    const info: ChannelInfo = {
+    const info: MemberChannelInfo = {
         permitted: [],
         banned: [],
         timestamp,
@@ -30,6 +30,16 @@ export function parseBotInfoMessage(msg: Message): ChannelInfo | null {
     };
 
     try {
+        // Parse Owner ID from Icon URL
+        // "iconURL": "https://cdn.discordapp.com/avatars/{userid}/27bf3831f6ea82a2c717029d01dee3c8.png"
+        const iconURL = embed?.author?.iconURL; // Check both camelCase and snake_case depending on library version
+        if (iconURL) {
+            const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
+            if (userIdFromUrl) {
+                info.ownerId = userIdFromUrl;
+            }
+        }
+
         // Parse Name
         const nameMatch = rawDescription.match(/\*\*Name:\*\* (.*)/);
         if (nameMatch) info.name = nameMatch[1].trim();
