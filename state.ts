@@ -1,6 +1,6 @@
 import * as DataStore from "@api/DataStore";
-import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry } from "./types";
-export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry };
+import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant } from "./types";
+export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant };
 
 // Persistence Keys
 const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v1";

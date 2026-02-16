@@ -20,7 +20,7 @@ import {
     formatUnbanCommand,
     isVoiceChannel
 } from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels } from "./logic";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels, getMemberInfoForChannel } from "./logic";
 import { actionQueue, ActionType } from "./state";
 import { sendMessage } from "@utils/discord";
 
@@ -46,23 +46,44 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                     : [...kickList, user.id];
                 setKickList(newList);
 
-                if (!isBanned && isTargetInMyChannel) {
-                    const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
-                    const me = UserStore.getCurrentUser();
-                    let ownerInfo = getOwnerForChannel(myChannelId);
-                    if (!ownerInfo || ownerInfo.userId === "") {
-                        ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                const me = UserStore.getCurrentUser();
+                if (!me || !myChannelId) return;
+
+                let ownerInfo = getOwnerForChannel(myChannelId);
+                if (!ownerInfo || ownerInfo.userId === "") {
+                    ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
+                }
+
+                if (ownerInfo.userId !== me.id) return;
+
+                const info = getMemberInfoForChannel(myChannelId);
+
+                if (isBanned) {
+                    // We are unbanning.
+                    // If they are in the bot's ban list, we must send an unban command.
+                    if (info?.banned.includes(user.id)) {
+                        log(`Unban from VC: Queuing UNBAN for ${user.id} in ${myChannelId}`);
+                        actionQueue.push({
+                            type: ActionType.UNBAN,
+                            userId: user.id,
+                            channelId: myChannelId,
+                            guildId: chatChannel?.guild_id
+                        });
+                        processQueue();
                     }
-                    if (ownerInfo.userId === me?.id) {
+                } else {
+                    // We are banning.
+                    // If they are in the channel, we should kick them.
+                    if (isTargetInMyChannel) {
+                        const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                        log(`Ban from VC: Queuing KICK for ${user.id} in ${myChannelId}`);
                         actionQueue.push({
                             type: ActionType.KICK,
                             userId: user.id,
                             channelId: myChannelId,
-                            guildId: voiceState?.guildId
+                            guildId: voiceState?.guildId || chatChannel?.guild_id
                         });
                         processQueue();
-                    } else {
-                        showToast(`Not owner of channel (Owner: ${ownerInfo.userId || "None"})`);
                     }
                 }
             }}

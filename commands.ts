@@ -101,7 +101,7 @@ export const commands = [
                     if (info && targetUserId) {
                         // Find any channel associated with this owner to show in the embed
                         for (const [cid, ownership] of channelOwners.entries()) {
-                            if (ownership.last?.userId === targetUserId || ownership.first?.userId === targetUserId) {
+                            if (ownership.claimant?.userId === targetUserId || ownership.creator?.userId === targetUserId) {
                                 targetChannelId = cid;
                                 break;
                             }
@@ -126,7 +126,7 @@ export const commands = [
                             {
                                 name: "👑 Owner",
                                 value: ownership
-                                    ? `First: <@${ownership.first?.userId || "None"}>\nLast: <@${ownership.last?.userId || "None"}>`
+                                    ? `Creator: <@${ownership.creator?.userId || "None"}>\nClaimant: <@${ownership.claimant?.userId || "None"}>`
                                     : "Unknown",
                                 inline: true
                             }
@@ -147,8 +147,8 @@ export const commands = [
                         let content = `### 📊 Channel Information for <#${targetChannelId}>\n`;
                         content += `- **Channel ID:** \`${targetChannelId}\`\n`;
                         if (ownership) {
-                            content += `- **Creator:** <@${ownership.first?.userId || "None"}>\n`;
-                            content += `- **Claimant:** <@${ownership.last?.userId || "None"}>\n`;
+                            content += `- **Creator:** <@${ownership.creator?.userId || "None"}>\n`;
+                            content += `- **Claimant:** <@${ownership.claimant?.userId || "None"}>\n`;
                         }
                         if (info) {
                             content += `**🔧 Settings:**\n`;

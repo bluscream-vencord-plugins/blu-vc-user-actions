@@ -145,8 +145,8 @@ export default definePlugin({
                     if (!ownership) continue;
 
                     // Check if the person who left was either the creator or the claimant
-                    const isCreator = ownership.first?.userId === s.userId;
-                    const isClaimant = ownership.last?.userId === s.userId;
+                    const isCreator = ownership.creator?.userId === s.userId;
+                    const isClaimant = ownership.claimant?.userId === s.userId;
 
                     if (isCreator || isClaimant) {
                         log(`Owner (${isCreator ? "Creator" : "Claimant"}) ${s.userId} left channel ${s.oldChannelId}`);
