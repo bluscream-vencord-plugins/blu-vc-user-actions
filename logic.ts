@@ -177,7 +177,7 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
                 }
             }
         } catch (e) {
-            console.error("[SocializeGuild] Failed to fetch messages for ownership check:", e);
+            log("[SocializeGuild] Failed to fetch messages for ownership check:", e);
         }
     }
 

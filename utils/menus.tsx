@@ -72,7 +72,6 @@ export function registerSharedContextMenu(pluginName: string, handlers: Record<s
                 handler(children, args[0]);
             } catch (e) {
                 if (log) log(`Error in context menu handler for ${navId}:`, e);
-                else console.error(`[${pluginName}] Error in context menu handler for ${navId}:`, e);
             }
         }
     };

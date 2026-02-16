@@ -8,22 +8,26 @@ export const settings = definePluginSettings({
         description: "List of user IDs to act on (auto-kick, ban-rotate) [newline separated]",
         default: "",
         multiline: true,
+        restartNeeded: false,
     },
     userWhitelist: {
         type: OptionType.STRING,
         description: "List of user IDs ignored by automated actions [newline separated]",
         default: "",
         multiline: true,
+        restartNeeded: false,
     },
     autoKickEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable auto kicking of banned users",
-        default: false
+        default: false,
+        restartNeeded: false,
     },
     banRotateEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable rotating banlist",
-        default: false
+        default: false,
+        restartNeeded: false,
     },
     rotateChannelNames: {
         type: OptionType.STRING,
@@ -31,12 +35,14 @@ export const settings = definePluginSettings({
         default: "",
         multiline: true,
         onChange: () => state.onRotationSettingsChange(),
+        restartNeeded: false,
     },
     rotateChannelNamesEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable channel name rotation",
         default: false,
         onChange: () => state.onRotationSettingsChange(),
+        restartNeeded: false,
     },
     rotateChannelNamesTime: {
         type: OptionType.SLIDER,
@@ -45,77 +51,91 @@ export const settings = definePluginSettings({
         min: 11,
         markers: [11, 15, 30, 60, 120],
         onChange: () => state.onRotationSettingsChange(),
+        restartNeeded: false,
     },
     ownershipChangeNotificationAny: {
         type: OptionType.BOOLEAN,
         description: "Show notification for any channel ownership change",
         default: false,
+        restartNeeded: false,
     },
     autoClaimDisbanded: {
         type: OptionType.BOOLEAN,
         description: "Automatically claim the channel you're in when its owner leaves",
         default: false,
+        restartNeeded: false,
     },
     autoClaimDisbandedAny: {
         type: OptionType.BOOLEAN,
         description: "Automatically claim any channel when their owner left",
         default: false,
+        restartNeeded: false,
     },
     autoNavigateToOwnedChannel: {
         type: OptionType.BOOLEAN,
         description: "Automatically navigate to the channel you own",
         default: true,
+        restartNeeded: false,
     },
     fetchOwnersOnStartup: {
         type: OptionType.BOOLEAN,
         description: "Fetch all owners in the category on startup",
         default: false,
+        restartNeeded: false,
     },
     ownershipChangeMessage: {
         type: OptionType.STRING,
         description: "Message to show when ownership is detected",
         default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
+        restartNeeded: false,
     },
     whitelistSkipMessage: {
         type: OptionType.STRING,
         description: "Ephemeral message to show when an action is skipped for a whitelisted user.",
         default: "🛡️ Skipped {action} action for whitelisted user <@{user_id}>",
+        restartNeeded: false,
     },
     banRotationMessage: {
         type: OptionType.STRING,
         description: "Ephemeral message to show when a ban rotates.",
         default: "♾️ Banned user <@{user_id_old}> has been replaced with <@{user_id}>",
+        restartNeeded: false,
     },
     kickCommand: {
         type: OptionType.STRING,
         description: "Message to send when a user in the auto kick list joins",
         default: "!v kick {user_id}",
+        restartNeeded: false,
     },
     banCommand: {
         type: OptionType.STRING,
         description: "Message to send when a user not in ban rotation joins",
         default: "!v ban {user_id}",
+        restartNeeded: false,
     },
     unbanCommand: {
         type: OptionType.STRING,
         description: "Message to send when a user not in ban rotation joins",
         default: "!v unban {user_id}",
+        restartNeeded: false,
     },
     setChannelNameCommand: {
         type: OptionType.STRING,
         description: "Message to send to set a channel name",
         default: "!v name {channel_name_new}",
-        group: ""
+        restartNeeded: false,
     },
     claimCommand: {
         type: OptionType.STRING,
         description: "Message to send to claim a channel",
         default: "!v claim",
+        restartNeeded: false,
     },
     infoCommand: {
         type: OptionType.STRING,
         description: "Message to send to get channel info",
         default: "!v info",
+        restartNeeded: false,
     },
     queueTime: {
         type: OptionType.SLIDER,
@@ -124,31 +144,37 @@ export const settings = definePluginSettings({
         min: 0,
         max: 10000,
         markers: [0, 250, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000],
+        restartNeeded: false,
     },
     createChannelId: {
         type: OptionType.STRING,
         description: "The Channel ID to join when clicking 'Create Channel'",
         default: "763914043252801566",
+        restartNeeded: false,
     },
     botId: {
         type: OptionType.STRING,
         description: "The Bot ID that sends the welcome message",
         default: "913852862990262282",
+        restartNeeded: false,
     },
     categoryId: {
         type: OptionType.STRING,
         description: "The Category ID to monitor for channel owners",
         default: "763914042628112455",
+        restartNeeded: false,
     },
     guildId: {
         type: OptionType.STRING,
         description: "The Guild ID for this plugin",
         default: "505974446914535426",
+        restartNeeded: false,
     },
     enabled: {
         type: OptionType.BOOLEAN,
         description: "Enable automated actions",
         default: true,
+        restartNeeded: false,
     },
     messageReference: {
         type: OptionType.STRING,
@@ -172,6 +198,7 @@ export const settings = definePluginSettings({
         multiline: true,
         onChange(_) {
             settings.store.messageReference = settings.def.messageReference.default;
-        }
+        },
+        restartNeeded: false,
     },
 });

@@ -1,45 +1,28 @@
-export const pluginInfo = {
-    id: "socializeGuild",
-    name: "Socialize Guild",
-    description: "Automatically takes actions against users joining your voice channel.",
-    color: "#7289da"
-};
-
+//// Plugin originally written for Equicord at 2026-02-16 by https://github.com/Bluscream, https://antigravity.google
+// region Imports
 import definePlugin from "@utils/types";
 import { sendBotMessage } from "@api/Commands";
 import { sendMessage } from "@utils/discord";
-import { openPluginModal } from "@components/settings/tabs";
-import { plugins } from "@api/PluginManager";
 import type { Message } from "@vencord/discord-types";
 import {
     ChannelStore,
     UserStore,
     SelectedChannelStore,
-    SelectedGuildStore,
     VoiceStateStore,
-    Menu,
     showToast,
-    ChannelActions,
-    ChannelRouter,
     GuildStore,
-    React,
 } from "@webpack/common";
 
 import { settings } from "./settings";
 import { ActionType, state, actionQueue, processedUsers } from "./state";
-import { logger, log, getKickList, getOwnerForChannel, updateOwner, formatBanCommand, formatUnbanCommand, formatMessageCommon, formatBanRotationMessage, navigateToChannel } from "./utils";
+import { logger as utilLogger, log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
     fetchAllOwners,
-    notifyOwnership,
-    getMessageOwner,
     claimChannel,
-    startRotation,
     stopRotation,
-    handleOwnershipChange,
     handleOwnerUpdate,
-    requestChannelInfo,
     handleInfoUpdate,
 } from "./logic";
 import { parseBotInfoMessage } from "./utils";
@@ -51,21 +34,40 @@ import {
 import { registerSharedContextMenu } from "./utils/menus";
 import { getToolboxActions } from "./toolbox";
 import { commands } from "./commands";
+import { Logger } from "@utils/Logger";
+// endregion Imports
 
+// region PluginInfo
+export const pluginInfo = {
+    id: "socializeGuild",
+    name: "SocializeGuild",
+    description: "Automatically takes actions against users joining your voice channel",
+    color: "#7289da",
+    authors: [
+        { name: "Bluscream", id: 467777925790564352n },
+        { name: "Assistant", id: 0n }
+    ],
+};
+// endregion PluginInfo
+
+// region Variables
+const logger = new Logger(pluginInfo.id, pluginInfo.color);
+// endregion Variables
+
+// region Types
 interface MessageCreatePayload {
     channelId: string;
     guildId: string;
     message: Message;
     optimistic?: boolean;
 }
+// endregion Types
 
+// region Definition
 export default definePlugin({
-    name: "Socialize Guild",
-    authors: [
-        { name: "Bluscream", id: 1205616252488519723n },
-        { name: "Antigravity", id: 0n }
-    ],
-    description: "Automatically takes actions against users joining your voice channel.",
+    name: pluginInfo.name,
+    description: pluginInfo.description,
+    authors: pluginInfo.authors,
     settings,
     commands,
     toolboxActions: getToolboxActions,
@@ -281,7 +283,7 @@ export default definePlugin({
         if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }
-        this.stopCleanup = registerSharedContextMenu(pluginInfo.name, {
+        this.stopCleanup = registerSharedContextMenu(pluginInfo.id, {
             "user-context": (children, props) => {
                 if (props.user) UserContextMenuPatch(children, props);
             },
@@ -297,3 +299,23 @@ export default definePlugin({
         this.stopCleanup?.();
     }
 });
+
+// region Internal
+function getMessageOwner(message: Message, botId: string) {
+    if (message.author.id !== botId) return null;
+    const content = message.content;
+    if (!content) return null;
+
+    // ✨ <@userid> is now the owner of <#channelid> (Reason: Created)
+    const match = content.match(/✨ <@!?(\d+)> is now the owner of <#(\d+)> \(Reason: (.*?)\)/);
+    if (match) {
+        return {
+            userId: match[1],
+            channelId: match[2],
+            reason: match[3]
+        };
+    }
+    return null;
+}
+// endregion Internal
+// endregion Definition
