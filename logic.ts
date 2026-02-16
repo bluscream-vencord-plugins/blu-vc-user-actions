@@ -18,6 +18,7 @@ import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionT
 import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
+import { BotResponse, BotResponseType } from "./utils/BotResponse";
 
 const sendMessage = (channelId: string, options: any) => {
     if (channelId === settings.store.createChannelId) {
@@ -174,16 +175,23 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
     const cached = MessageStore.getMessages(channelId);
     let owner: OwnerEntry | null = null;
 
-    const { BotResponse } = require("./utils/BotResponse");
-
     const msgsArray = cached ? (cached.toArray ? cached.toArray() : cached) : [];
 
     for (let i = 0; i < msgsArray.length; i++) {
         const msg = msgsArray[i];
         const response = new BotResponse(msg, botId);
-        if (response.initiatorId) {
+        const isBot = msg.author.id === botId;
+        const isOwnership = response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED);
+
+        let logMsg = `[OwnershipCheck] [Cache] Msg ${msg.id}: type=${response.type}, initiator=${response.initiatorId}, isOwnership=${!!isOwnership}`;
+        if (isBot && response.type === BotResponseType.UNKNOWN) {
+            logMsg += ` (Title: "${response.embed?.title}", Author: "${response.embed?.author?.name}")`;
+        }
+        log(logMsg);
+
+        if (isOwnership) {
             owner = {
-                userId: response.initiatorId,
+                userId: response.initiatorId!,
                 reason: response.type,
                 timestamp: response.timestamp
             };
@@ -192,33 +200,86 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
     }
 
     // If we haven't found a creator yet, try fetching more from API
+    // We need to rebuild the history of ownership, so we fetch messages going back in time
+    // and then replay them chronologically from the oldest we found.
     const currentOwnership = channelOwners.get(channelId);
     if (!currentOwnership?.creator) {
-        try {
-            const res = await RestAPI.get({
-                url: Constants.Endpoints.MESSAGES(channelId),
-                query: { limit: 50 }
-            });
-            if (res.body && Array.isArray(res.body)) {
-                // Process API messages oldest to newest (Discord returns newest first)
-                for (let i = res.body.length - 1; i >= 0; i--) {
-                    const response = new BotResponse(res.body[i], botId);
-                    if (response.initiatorId) {
-                        owner = {
-                            userId: response.initiatorId,
-                            reason: response.type,
-                            timestamp: response.timestamp
-                        };
-                        updateOwner(channelId, owner);
+        const BATCH_LIMIT = 100;
+        const MAX_BATCHES = 5; // Up to 500 messages
+        let collectedBatches: any[][] = [];
+        let beforeId: string | undefined;
+
+        for (let batch = 0; batch < MAX_BATCHES; batch++) {
+            try {
+                const query: any = { limit: BATCH_LIMIT };
+                if (beforeId) query.before = beforeId;
+
+                log(`[OwnershipCheck] Fetching batch ${batch + 1} (before: ${beforeId || "latest"})...`);
+
+                const res = await RestAPI.get({
+                    url: Constants.Endpoints.MESSAGES(channelId),
+                    query
+                });
+
+                if (!res.body || !Array.isArray(res.body) || res.body.length === 0) {
+                    log(`[OwnershipCheck] Batch ${batch + 1} empty or invalid.`);
+                    break;
+                }
+
+                const messages = res.body;
+                collectedBatches.push(messages);
+
+                // Check if we found the creation event in this batch
+                let foundCreation = false;
+                for (const msg of messages) {
+                    const response = new BotResponse(msg, botId);
+                    if (response.type === BotResponseType.CREATED) {
+                        foundCreation = true;
+                        break;
                     }
                 }
+
+                if (foundCreation) {
+                    log(`[OwnershipCheck] Found creation event in batch ${batch + 1}. Stopping fetch.`);
+                    break;
+                }
+
+                beforeId = messages[messages.length - 1].id;
+            } catch (e) {
+                log(`[OwnershipCheck] Error fetching batch ${batch + 1}:`, e);
+                break;
             }
-        } catch (e) {
-            log("[SocializeGuild] Failed to fetch messages for ownership check:", e);
+        }
+
+        // Process batches from Oldest (last batch) to Newest (first batch)
+        // Inside each batch, messages are Newest -> Oldest (Discord API default), so we iterate backwards.
+        for (let b = collectedBatches.length - 1; b >= 0; b--) {
+            const batch = collectedBatches[b];
+            for (let i = batch.length - 1; i >= 0; i--) {
+                const msg = batch[i];
+                const response = new BotResponse(msg, botId);
+                const isBot = msg.author.id === botId;
+                const isOwnership = response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED);
+
+                let logMsg = `[OwnershipCheck] [API] Msg ${msg.id}: type=${response.type}, initiator=${response.initiatorId}, isOwnership=${!!isOwnership}`;
+                if (isBot && response.type === BotResponseType.UNKNOWN) {
+                    logMsg += ` (Title: "${response.embed?.title}", Author: "${response.embed?.author?.name}")`;
+                }
+                log(logMsg);
+
+                if (isOwnership) {
+                    owner = {
+                        userId: response.initiatorId!,
+                        reason: response.type,
+                        timestamp: response.timestamp
+                    };
+                    updateOwner(channelId, owner);
+                }
+            }
         }
     }
 
-    return fallback;
+    return owner || fallback;
 }
 
 export async function fetchAllOwners() {

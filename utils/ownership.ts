@@ -35,20 +35,6 @@ export function updateOwner(channelId: string, owner: OwnerEntry): boolean {
             ownership.claimant = new ChannelClaimant(owner.userId, owner.reason, owner.timestamp);
             changed = true;
         }
-    } else {
-        // Unknown reason - treat as claimant if it's a new owner
-        if (!ownership.claimant || ownership.claimant.userId !== owner.userId) {
-            // If the person who is now owner is the creator, clear claimant
-            if (ownership.creator && ownership.creator.userId === owner.userId) {
-                if (ownership.claimant) {
-                    ownership.claimant = undefined;
-                    changed = true;
-                }
-            } else {
-                ownership.claimant = new ChannelClaimant(owner.userId, owner.reason, owner.timestamp);
-                changed = true;
-            }
-        }
     }
 
     if (changed) {

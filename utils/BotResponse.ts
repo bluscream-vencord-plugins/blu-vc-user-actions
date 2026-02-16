@@ -29,10 +29,14 @@ export class BotResponse {
     }
 
     private parseType() {
-        const authorName = this.embed.author?.name;
-        const title = this.embed.title;
+        const authorName = this.embed.author?.name?.toLowerCase() || "";
+        const title = this.embed.title?.toLowerCase() || "";
+        const description = this.getRawDescription().toLowerCase();
 
-        const check = (str: string) => authorName === str || title === str;
+        const check = (str: string) => {
+            const s = str.toLowerCase();
+            return authorName.includes(s) || title.includes(s) || description.includes(s);
+        };
 
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
         else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
@@ -44,8 +48,12 @@ export class BotResponse {
         if (this.type === BotResponseType.CREATED) {
             const mentionedUser = this.msg.mentions?.[0];
             if (mentionedUser) return typeof mentionedUser === "string" ? mentionedUser : (mentionedUser as any).id;
+
             const contentMatch = this.msg.content?.match(/<@!?(\d+)>/);
             if (contentMatch) return contentMatch[1];
+
+            const descMatch = this.getRawDescription().match(/<@!?(\d+)>/);
+            if (descMatch) return descMatch[1];
         }
 
         // 2. Icon URL (Claimed/Info)
