@@ -11,8 +11,10 @@ import {
     SelectedChannelStore,
     VoiceStateStore,
 } from "@webpack/common";
+import { findStoreLazy } from "@webpack";
+const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, setChannelInfo, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
+import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo } from "./state";
 import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
@@ -136,16 +138,48 @@ export function getMessageOwner(msg: any, botId: string): OwnerEntry | null {
     if (!embed) return null;
 
     const authorName = embed.author?.name;
+    const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+
     if (authorName === "Channel Created") {
         const userId = msg.mentions?.[0]?.id || msg.mentions?.[0] || msg.content?.match(/<@!?(\d+)>/)?.[1];
-        const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
         if (userId) return { userId, reason: "Created", timestamp };
-    } else if (authorName === "Channel Claimed") {
+    } else if (authorName === "Channel Claimed" || authorName === "Channel Settings") {
+        let userId: string | undefined;
+
+        // Try parsing from Icon URL
         const iconURL = embed.author?.iconURL || embed.author?.icon_url;
         if (iconURL) {
-            const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
-            const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-            if (userIdFromUrl) return { userId: userIdFromUrl, reason: "Claimed", timestamp };
+            userId = iconURL.split("/avatars/")[1]?.split("/")[0];
+        }
+
+        // Fallback: Check the message being replied to (Best practice based on ValidReply & NoBlockedMessages)
+        if (!userId) {
+            if (msg.referenced_message) {
+                userId = msg.referenced_message.author?.id;
+            } else {
+                const ref = msg.message_reference || msg.messageReference;
+                if (ref && ref.message_id) {
+                    // Try getting from ReferencedMessageStore first (best for replies)
+                    const refData = ReferencedMessageStore?.getMessageByReference?.(ref);
+                    if (refData?.message) {
+                        userId = refData.message.author?.id;
+                    } else {
+                        // Fallback to general MessageStore
+                        const cachedRef = MessageStore.getMessage(ref.channel_id || msg.channel_id, ref.message_id);
+                        if (cachedRef) {
+                            userId = cachedRef.author?.id;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (userId) {
+            return {
+                userId,
+                reason: authorName === "Channel Claimed" ? "Claimed" : "Info",
+                timestamp
+            };
         }
     }
     return null;
@@ -241,9 +275,26 @@ export function requestChannelInfo(channelId: string) {
     sendMessage(channelId, { content: settings.store.infoCommand });
 }
 
+export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | undefined {
+    const owner = getOwnerForChannel(channelId);
+    if (!owner) return undefined;
+    return memberInfos.get(owner.userId);
+}
+
 export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
-    setChannelInfo(channelId, info);
-    log(`Updated channel info for ${channelId}`);
+    let targetOwnerId = info.ownerId;
+
+    if (!targetOwnerId) {
+        const owner = getOwnerForChannel(channelId);
+        targetOwnerId = owner?.userId;
+    }
+
+    if (targetOwnerId) {
+        setMemberInfo(targetOwnerId, info);
+        log(`Updated member info for ${targetOwnerId} (via channel ${channelId})`);
+    } else {
+        log(`Could not update info for ${channelId}: Owner unknown.`);
+    }
 
     if (settings.store.showChannelInfoChangeMessage) {
         const { sendBotMessage } = require("@api/Commands");

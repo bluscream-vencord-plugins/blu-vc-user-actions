@@ -12,14 +12,9 @@ function getTimestamp(msg: any): number {
     return Date.now();
 }
 
-export function parseBotInfoMessage(msg: Message): MemberChannelInfo | null {
+export function parseBotInfoMessage(msg: Message): { info: MemberChannelInfo, channelId: string } | null {
     const embed = msg.embeds?.[0];
-    const rawDescription = (embed as any)?.rawDescription || (embed as any)?.description;
-
-    if (!rawDescription) {
-        log("parseBotInfoMessage: No description found in embed");
-        return null;
-    }
+    const rawDescription = (embed as any)?.rawDescription || (embed as any)?.description || "";
 
     const timestamp = getTimestamp(msg);
     const info: MemberChannelInfo = {
@@ -29,7 +24,14 @@ export function parseBotInfoMessage(msg: Message): MemberChannelInfo | null {
         updated: Date.now()
     };
 
+    let targetChannelId = msg.channel_id;
+
     try {
+        // Parse Channel ID from Description or Title
+        const channelMatch = rawDescription.match(/<#(\d+)>/) ||
+            rawDescription.match(/\*\*Channel ID:\*\* `(\d+)`/) ||
+            ((embed as any).title || "").match(/<#(\d+)>/);
+        if (channelMatch) targetChannelId = channelMatch[1];
         // Parse Owner ID from Icon URL
         // "iconURL": "https://cdn.discordapp.com/avatars/{userid}/27bf3831f6ea82a2c717029d01dee3c8.png"
         const iconURL = embed?.author?.iconURL; // Check both camelCase and snake_case depending on library version
@@ -84,7 +86,7 @@ export function parseBotInfoMessage(msg: Message): MemberChannelInfo | null {
         }
 
 
-        return info;
+        return { info, channelId: targetChannelId };
     } catch (e) {
         log("Error parsing channel info embed:", e);
         return null;

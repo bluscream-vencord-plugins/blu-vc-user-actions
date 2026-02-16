@@ -14,7 +14,7 @@ import {
     ChannelActions
 } from "@webpack/common";
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, processedUsers, channelInfos, channelOwners } from "./state";
+import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners } from "./state";
 import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
 import {
     processQueue,
@@ -27,6 +27,7 @@ import {
     getMessageOwner,
     handleVoteBan,
     requestChannelInfo,
+    getMemberInfoForChannel,
 } from "./logic";
 import { parseBotInfoMessage } from "./utils";
 import {
@@ -50,6 +51,7 @@ const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
 import { MessageCreatePayload } from "./types";
+import SectionedGridList from "@plugins/decor/ui/components/SectionedGridList";
 
 // region Definition
 export default definePlugin({
@@ -97,39 +99,37 @@ export default definePlugin({
                         if (newChannelId) {
                             const channel = ChannelStore.getChannel(newChannelId);
                             if (channel?.guild_id === settings.store.guildId && channel.parent_id === settings.store.categoryId) {
-                                if (!channelInfos.has(newChannelId)) {
+                                if (!getMemberInfoForChannel(newChannelId)) {
                                     log(`Joined unrecognized channel ${newChannelId}, requesting info.`);
                                     requestChannelInfo(newChannelId);
                                 }
-                                log(`Scrolling to start of ${newChannelId}`);
+                                log(`Opening text chat of voice channel ${newChannelId}`);
                                 ChannelActions.selectChannel(newChannelId);
-                                jumpToFirstMessage(newChannelId, channel.guild_id);
-                                // Request first message to ensure we have the context
-                                if (MessageActions?.fetchMessages) {
-                                    MessageActions.fetchMessages({
-                                        channelId: newChannelId,
-                                        limit: 50,
-                                    });
-                                }
-                            }
+                                setTimeout(() => {
+                                    log(`Scrolling to start of ${newChannelId}`);
+                                    jumpToFirstMessage(newChannelId, channel.guild_id);
+                                    // if (MessageActions?.fetchMessages) {
+                                    //     MessageActions.fetchMessages({
+                                    //         channelId: newChannelId,
+                                    //         limit: 50,
+                                    //     });
+                                    // }
+                                    checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
+                                        if (owner.userId) {
+                                            log(`Detailed ownership check: userId=${owner.userId}`);
+                                            handleOwnerUpdate(newChannelId, owner);
 
-                            // Wait 1 second before checking ownership to give the bot time to send welcome message
-                            setTimeout(() => {
-                                checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
-                                    if (owner.userId) {
-                                        log(`Detailed ownership check: userId=${owner.userId}`);
-                                        handleOwnerUpdate(newChannelId, owner);
-
-                                        if (settings.store.autoClaimDisbanded && owner.userId !== me.id) {
-                                            const voiceStates = VoiceStateStore.getVoiceStatesForChannel(newChannelId);
-                                            if (!voiceStates[owner.userId]) {
-                                                log(`Owner ${owner.userId} not in channel, claiming disbanded channel.`);
-                                                claimChannel(newChannelId, owner.userId);
+                                            if (settings.store.autoClaimDisbanded && owner.userId !== me.id) {
+                                                const voiceStates = VoiceStateStore.getVoiceStatesForChannel(newChannelId);
+                                                if (!voiceStates[owner.userId]) {
+                                                    log(`Owner ${owner.userId} not in channel, claiming disbanded channel.`);
+                                                    claimChannel(newChannelId, owner.userId);
+                                                }
                                             }
                                         }
-                                    }
-                                });
-                            }, 1000);
+                                    });
+                                }, 1000);
+                            }
                         }
                     }
                 }
@@ -228,7 +228,7 @@ export default definePlugin({
             // Ban rotation logic
             if (settings.store.banRotateEnabled && isOwner) {
                 const kickList = getKickList();
-                const info = channelInfos.get(myChannelId);
+                const info = getMemberInfoForChannel(myChannelId);
 
                 for (const s of targetGuildVoiceStates) {
                     if (s.userId === me.id) continue;
@@ -289,10 +289,10 @@ export default definePlugin({
                 // Check if it's the specific channel info embed
                 const rawDesc = (embed as any)?.rawDescription || (embed as any)?.description;
                 if (embed && embed.author?.name === "Channel Settings" && rawDesc) {
-                    const info = parseBotInfoMessage(message);
-                    if (info) {
-                        log(`Successfully parsed channel info for ${channelId}`);
-                        handleInfoUpdate(channelId, info);
+                    const result = parseBotInfoMessage(message);
+                    if (result) {
+                        log(`Successfully parsed channel info for ${result.channelId}`);
+                        handleInfoUpdate(result.channelId, result.info);
                     } else {
                         log(`Failed to parse channel info`);
                     }

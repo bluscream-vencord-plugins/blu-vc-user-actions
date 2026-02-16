@@ -2,9 +2,9 @@ import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/
 import { ChannelStore, UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
-import { state, channelOwners, actionQueue, processedUsers, channelInfos, resetState } from "./state";
+import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState } from "./state";
 import { getOwnerForChannel, getKickList, getRotateNames, toDiscordTime } from "./utils";
-import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, claimChannel, bulkUnban, requestChannelInfo } from "./logic";
+import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, claimChannel, bulkUnban, requestChannelInfo, getMemberInfoForChannel } from "./logic";
 import type { Embed } from "@vencord/discord-types";
 
 const SUBCOMMANDS = {
@@ -96,17 +96,22 @@ export const commands = [
                     }
 
                     let targetChannelId = channelId;
-                    if (targetUserId) {
-                        for (const [cid, info] of channelInfos.entries()) {
-                            if (info.ownerId === targetUserId) {
+                    let info = targetUserId ? memberInfos.get(targetUserId) : undefined;
+
+                    if (info && targetUserId) {
+                        // Find any channel associated with this owner to show in the embed
+                        for (const [cid, ownership] of channelOwners.entries()) {
+                            if (ownership.last?.userId === targetUserId || ownership.first?.userId === targetUserId) {
                                 targetChannelId = cid;
                                 break;
                             }
                         }
+                    } else if (!info) {
+                        // Fallback to current channel
+                        info = getMemberInfoForChannel(channelId);
                     }
 
                     const ownership = channelOwners.get(targetChannelId);
-                    const info = channelInfos.get(targetChannelId);
 
                     const embed: any = {
                         type: "rich",
@@ -163,7 +168,7 @@ export const commands = [
                 case SUBCOMMANDS.STATS: {
                     const queueSize = actionQueue.length;
                     const processedCount = processedUsers.size;
-                    const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${channelInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`;
+                    const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${memberInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`;
                     if (subaction === STATS_SUBCOMMANDS.SHARE) {
                         sendMessage(ctx.channel.id, { content });
                     } else {

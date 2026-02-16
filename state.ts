@@ -16,20 +16,22 @@ try {
     console.error("[SocializeGuild] Failed to load owners:", e);
 }
 
-let loadedInfo = new Map<string, MemberChannelInfo>();
+const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v1";
+
+let loadedMembers = new Map<string, MemberChannelInfo>();
 try {
-    const raw = localStorage.getItem(STORAGE_KEY_INFO);
+    const raw = localStorage.getItem(STORAGE_KEY_MEMBERS);
     if (raw) {
         const parsed = JSON.parse(raw);
-        loadedInfo = new Map(Object.entries(parsed));
+        loadedMembers = new Map(Object.entries(parsed));
     }
 } catch (e) {
-    console.error("[SocializeGuild] Failed to load info:", e);
+    console.error("[SocializeGuild] Failed to load member info:", e);
 }
 
 
 export const channelOwners = loadedOwners;
-export const channelInfos = loadedInfo; // Map<channelId, MemberChannelInfo>
+export const memberInfos = loadedMembers; // Map<ownerId, MemberChannelInfo>
 
 export const actionQueue: Array<ActionItem> = [];
 export const processedUsers = new Map<string, number>();
@@ -49,20 +51,20 @@ export const state = {
 export function saveState() {
     try {
         localStorage.setItem(STORAGE_KEY_OWNERS, JSON.stringify(Object.fromEntries(channelOwners)));
-        localStorage.setItem(STORAGE_KEY_INFO, JSON.stringify(Object.fromEntries(channelInfos)));
+        localStorage.setItem(STORAGE_KEY_MEMBERS, JSON.stringify(Object.fromEntries(memberInfos)));
     } catch (e) {
         console.error("[SocializeGuild] Failed to save state:", e);
     }
 }
 
-export function setChannelInfo(channelId: string, info: MemberChannelInfo) {
-    channelInfos.set(channelId, info);
+export function setMemberInfo(ownerId: string, info: MemberChannelInfo) {
+    memberInfos.set(ownerId, info);
     saveState();
 }
 
 export function resetState() {
     channelOwners.clear();
-    channelInfos.clear();
+    memberInfos.clear();
     state.rotationIndex.clear();
     processedUsers.clear();
     saveState();
