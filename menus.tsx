@@ -93,7 +93,7 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
         />,
         <Menu.MenuItem
             id="vc-blu-vc-user-whitelist"
-            label={getWhitelist().includes(user.id) ? "Unwhitelist User" : "Whitelist User"}
+            label={getWhitelist().includes(user.id) ? "Unwhitelist" : "Whitelist"}
             action={() => {
                 const whitelist = getWhitelist();
                 const isWhitelisted = whitelist.includes(user.id);
