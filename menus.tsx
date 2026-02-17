@@ -6,6 +6,9 @@ import {
     VoiceStateStore,
     Menu,
     showToast,
+    Alerts,
+    TextInput,
+    React,
 } from "@webpack/common";
 import { type User } from "@vencord/discord-types";
 import { settings } from "./settings";
@@ -267,6 +270,113 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                     }
                 }}
             />
+            <Menu.MenuItem
+                id="socialize-guild-rename-channel"
+                label="Rename Channel"
+                action={() => {
+                    let newName = channel.name;
+                    Alerts.show({
+                        title: "Rename Channel",
+                        confirmText: "Rename",
+                        cancelText: "Cancel",
+                        onConfirm: () => {
+                            if (newName && newName !== channel.name) {
+                                actionQueue.push({
+                                    type: ActionType.NAME,
+                                    userId: "",
+                                    channelId: channel.id,
+                                    guildId: channel.guild_id,
+                                    channelName: newName
+                                });
+                                processQueue();
+                            }
+                        },
+                        body: (
+                            <div style={{ marginTop: "1rem" }}>
+                                <TextInput
+                                    value={newName}
+                                    onChange={(v: string) => newName = v}
+                                    placeholder="Enter new channel name..."
+                                    autoFocus
+                                />
+                            </div>
+                        )
+                    });
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-lock-channel"
+                label="Lock Channel"
+                action={() => {
+                    actionQueue.push({
+                        type: ActionType.LOCK,
+                        userId: "",
+                        channelId: channel.id,
+                        guildId: channel.guild_id
+                    });
+                    processQueue();
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-unlock-channel"
+                label="Unlock Channel"
+                action={() => {
+                    actionQueue.push({
+                        type: ActionType.UNLOCK,
+                        userId: "",
+                        channelId: channel.id,
+                        guildId: channel.guild_id
+                    });
+                    processQueue();
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-reset-channel"
+                label="Reset Channel"
+                action={() => {
+                    actionQueue.push({
+                        type: ActionType.RESET,
+                        userId: "",
+                        channelId: channel.id,
+                        guildId: channel.guild_id
+                    });
+                    processQueue();
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-info-command"
+                label="Send Info Command"
+                action={() => {
+                    actionQueue.push({
+                        type: ActionType.INFO,
+                        userId: "",
+                        channelId: channel.id,
+                        guildId: channel.guild_id
+                    });
+                    processQueue();
+                }}
+            />
+            <Menu.MenuItem
+                id="socialize-guild-set-size-submenu"
+                label="Set Channel Size"
+            >
+                {[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 99].map(size => (
+                    <Menu.MenuItem
+                        id={`socialize-guild-set-size-${size}`}
+                        label={size === 0 ? "Unlimited" : `${size} Users`}
+                        action={() => {
+                            actionQueue.push({
+                                type: ActionType.LIMIT,
+                                userId: "",
+                                channelId: channel.id,
+                                guildId: channel.guild_id,
+                                channelLimit: size
+                            });
+                            processQueue();
+                        }}
+                    />
+                ))}
+            </Menu.MenuItem>
             <Menu.MenuItem
                 id="socialize-guild-ban-all-vc"
                 label="Ban All Users in VC"

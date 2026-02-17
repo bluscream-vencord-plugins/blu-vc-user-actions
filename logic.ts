@@ -136,6 +136,21 @@ export async function processQueue() {
             case ActionType.UNPERMIT:
                 template = settings.store.unpermitCommand;
                 break;
+            case ActionType.NAME:
+                template = settings.store.setChannelNameCommand;
+                break;
+            case ActionType.LIMIT:
+                template = settings.store.setChannelUserLimitCommand;
+                break;
+            case ActionType.LOCK:
+                template = settings.store.lockCommand;
+                break;
+            case ActionType.UNLOCK:
+                template = settings.store.unlockCommand;
+                break;
+            case ActionType.RESET:
+                template = settings.store.resetCommand;
+                break;
             default:
                 console.error(`Unknown action type: ${activeType}`);
                 continue;
@@ -146,7 +161,9 @@ export async function processQueue() {
             .replace(/{channel_id}/g, channelId)
             .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
             .replace(/{guild_id}/g, guildId || "")
-            .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
+            .replace(/{guild_name}/g, guild?.name || "Unknown Guild")
+            .replace(/{channel_name_new}/g, item.channelName || "")
+            .replace(/{channel_limit}/g, item.channelLimit?.toString() || "");
 
         formattedMessage = formatMessageCommon(formattedMessage);
 

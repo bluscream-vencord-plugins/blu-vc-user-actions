@@ -5,5 +5,10 @@ export enum ActionType {
     CLAIM = 'CLAIM',
     INFO = 'INFO',
     PERMIT = 'PERMIT',
-    UNPERMIT = 'UNPERMIT'
+    UNPERMIT = 'UNPERMIT',
+    NAME = 'NAME',
+    LIMIT = 'LIMIT',
+    LOCK = 'LOCK',
+    UNLOCK = 'UNLOCK',
+    RESET = 'RESET'
 }

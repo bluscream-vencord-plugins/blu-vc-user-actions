@@ -192,6 +192,30 @@ export const settings = definePluginSettings({
         default: "!v info",
         restartNeeded: false,
     },
+    setChannelUserLimitCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to set a channel limit",
+        default: "!v size {channel_limit}",
+        restartNeeded: false,
+    },
+    lockCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to lock a channel",
+        default: "!v lock",
+        restartNeeded: false,
+    },
+    unlockCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to unlock a channel",
+        default: "!v unlock",
+        restartNeeded: false,
+    },
+    resetCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to reset channel settings",
+        default: "!v reset",
+        restartNeeded: false,
+    },
     queueTime: {
         type: OptionType.SLIDER,
         description: "Minimum time between actions in ms",

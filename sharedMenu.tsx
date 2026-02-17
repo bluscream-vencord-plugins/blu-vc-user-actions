@@ -3,7 +3,7 @@ import { getKickList, jumpToFirstMessage } from "./utils";
 import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners } from "./logic";
 import { settings } from "./settings";
 import { pluginInfo } from "./info";
-import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React } from "@webpack/common";
+import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React, Alerts, TextInput } from "@webpack/common";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
 
@@ -62,6 +62,75 @@ export const getSharedMenuItems = () => {
             }}
         />,
         <Menu.MenuItem
+            id="blu-vc-user-actions-lock"
+            label="Lock Channel"
+            disabled={!channelId}
+            action={async () => {
+                const cid = SelectedChannelStore.getVoiceChannelId();
+                if (cid) {
+                    actionQueue.push({
+                        type: ActionType.LOCK,
+                        userId: "",
+                        channelId: cid,
+                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                    });
+                    processQueue();
+                }
+            }}
+        />,
+        <Menu.MenuItem
+            id="blu-vc-user-actions-unlock"
+            label="Unlock Channel"
+            disabled={!channelId}
+            action={async () => {
+                const cid = SelectedChannelStore.getVoiceChannelId();
+                if (cid) {
+                    actionQueue.push({
+                        type: ActionType.UNLOCK,
+                        userId: "",
+                        channelId: cid,
+                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                    });
+                    processQueue();
+                }
+            }}
+        />,
+        <Menu.MenuItem
+            id="blu-vc-user-actions-reset"
+            label="Reset Channel"
+            disabled={!channelId}
+            action={async () => {
+                const cid = SelectedChannelStore.getVoiceChannelId();
+                if (cid) {
+                    actionQueue.push({
+                        type: ActionType.RESET,
+                        userId: "",
+                        channelId: cid,
+                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                    });
+                    processQueue();
+                }
+            }}
+        />,
+        <Menu.MenuItem
+            id="blu-vc-user-actions-claim"
+            label="Claim Channel"
+            disabled={!channelId}
+            action={async () => {
+                const cid = SelectedChannelStore.getVoiceChannelId();
+                const me = UserStore.getCurrentUser();
+                if (cid && me) {
+                    actionQueue.push({
+                        type: ActionType.CLAIM,
+                        userId: me.id,
+                        channelId: cid,
+                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                    });
+                    processQueue();
+                }
+            }}
+        />,
+        <Menu.MenuItem
             id="blu-vc-user-actions-create-channel"
             label="Create Channel"
             action={() => {
@@ -111,6 +180,69 @@ export const getSharedMenuItems = () => {
                 }
             }}
         />,
+        <Menu.MenuItem
+            id="blu-vc-user-actions-rename"
+            label="Rename Channel"
+            disabled={!channelId}
+            action={() => {
+                const cid = SelectedChannelStore.getVoiceChannelId();
+                if (!cid) return;
+                const chan = ChannelStore.getChannel(cid);
+                if (!chan) return;
+                let newName = chan.name;
+                Alerts.show({
+                    title: "Rename Channel",
+                    confirmText: "Rename",
+                    cancelText: "Cancel",
+                    onConfirm: () => {
+                        if (newName && newName !== chan.name) {
+                            actionQueue.push({
+                                type: ActionType.NAME,
+                                userId: "",
+                                channelId: cid,
+                                guildId: chan.guild_id,
+                                channelName: newName
+                            });
+                            processQueue();
+                        }
+                    },
+                    body: (
+                        <div style={{ marginTop: "1rem" }}>
+                            <TextInput
+                                value={newName}
+                                onChange={(v: string) => newName = v}
+                                placeholder="Enter new channel name..."
+                                autoFocus
+                            />
+                        </div>
+                    )
+                });
+            }}
+        />,
+        <Menu.MenuItem
+            id="blu-vc-user-actions-set-size-submenu"
+            label="Set Channel Size"
+            disabled={!channelId}
+        >
+            {[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 99].map(size => (
+                <Menu.MenuItem
+                    id={`blu-vc-user-actions-set-size-${size}`}
+                    label={size === 0 ? "Unlimited" : `${size} Users`}
+                    action={() => {
+                        const cid = SelectedChannelStore.getVoiceChannelId();
+                        if (!cid) return;
+                        actionQueue.push({
+                            type: ActionType.LIMIT,
+                            userId: "",
+                            channelId: cid,
+                            guildId: ChannelStore.getChannel(cid)?.guild_id,
+                            channelLimit: size
+                        });
+                        processQueue();
+                    }}
+                />
+            ))}
+        </Menu.MenuItem>,
         <Menu.MenuItem
             id="blu-vc-user-actions-get-info"
             label="Get Channel Info"
