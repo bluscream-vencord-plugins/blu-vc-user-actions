@@ -98,10 +98,6 @@ export default definePlugin({
                         if (newChannelId) {
                             const channel = ChannelStore.getChannel(newChannelId);
                             if (channel?.guild_id === settings.store.guildId && channel.parent_id === settings.store.categoryId) {
-                                if (!getMemberInfoForChannel(newChannelId)) {
-                                    log(`Joined unrecognized channel ${newChannelId}, requesting info.`);
-                                    requestChannelInfo(newChannelId);
-                                }
                                 log(`Opening text chat of voice channel ${newChannelId}`);
                                 ChannelActions.selectChannel(newChannelId);
                                 setTimeout(() => {

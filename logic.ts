@@ -103,6 +103,9 @@ export async function processQueue() {
             case ActionType.CLAIM:
                 template = settings.store.claimCommand;
                 break;
+            case ActionType.INFO:
+                template = settings.store.infoCommand;
+                break;
             default:
                 console.error(`Unknown action type: ${activeType}`);
                 continue;
@@ -349,8 +352,14 @@ export function requestChannelInfo(channelId: string) {
     }
     requestedInfo.set(channelId, now);
 
-    log(`Requesting channel info for ${channelId} using command: ${settings.store.infoCommand}`);
-    sendMessage(channelId, { content: settings.store.infoCommand });
+    log(`Queuing channel info request for ${channelId}`);
+    actionQueue.unshift({
+        type: ActionType.INFO,
+        userId: UserStore.getCurrentUser()?.id || "",
+        channelId: channelId,
+        guildId: ChannelStore.getChannel(channelId)?.guild_id || settings.store.guildId
+    });
+    processQueue();
 }
 
 export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | undefined {
@@ -391,7 +400,7 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
             timestamp: new Date().toISOString()
         };
 
-        sendBotMessage(channelId, { embeds: [embed] });
+        sendBotMessage(channelId, { content: lines.join("\n")/*, embeds: [embed]*/ });
     }
 }
 
