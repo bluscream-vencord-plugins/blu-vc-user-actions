@@ -7,15 +7,12 @@ import {
     MessageStore,
     RestAPI,
     Constants,
-    showToast,
     SelectedChannelStore,
     VoiceStateStore,
     RelationshipStore,
     PresenceStore,
     GuildMemberStore,
 } from "@webpack/common";
-import { findStoreLazy } from "@webpack";
-const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
 import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage, requestGuildMembers } from "./utils";

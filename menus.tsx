@@ -1,5 +1,4 @@
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { registerSharedContextMenu } from "./utils/menus";
 import {
     ChannelStore,
     SelectedChannelStore,
@@ -15,15 +14,12 @@ import {
     getKickList,
     setKickList,
     log,
-    formatBanCommand,
-    formatUnbanCommand,
     isVoiceChannel,
     getWhitelist,
     setWhitelist
 } from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, claimAllDisbandedChannels, getMemberInfoForChannel } from "./logic";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel } from "./logic";
 import { actionQueue, ActionType, channelOwners } from "./state";
-import { sendMessage } from "@utils/discord";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
     const chatChannelId = SelectedChannelStore.getChannelId();

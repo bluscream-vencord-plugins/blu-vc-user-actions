@@ -1,8 +1,8 @@
 import { ActionType, actionQueue, channelOwners } from "./state";
-import { getKickList, navigateTo, jumpToFirstMessage } from "./utils";
+import { getKickList, jumpToFirstMessage } from "./utils";
 import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners } from "./logic";
 import { settings } from "./settings";
-import { pluginInfo } from "./index";
+import { pluginInfo } from "./info";
 import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React } from "@webpack/common";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";

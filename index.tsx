@@ -3,19 +3,17 @@
 import definePlugin from "@utils/types";
 
 import { sendMessage } from "@utils/discord";
-import type { Message } from "@vencord/discord-types";
 import {
     ChannelStore,
     UserStore,
     SelectedChannelStore,
     VoiceStateStore,
     GuildMemberStore,
-    MessageActions,
     ChannelActions
 } from "@webpack/common";
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners, loadState, saveState } from "./state";
-import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
+import { ActionType, state, actionQueue, channelOwners, loadState, saveState } from "./state";
+import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, jumpToFirstMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -24,7 +22,6 @@ import {
     stopRotation,
     handleOwnerUpdate,
     handleInfoUpdate,
-    requestChannelInfo,
     getMemberInfoForChannel,
 } from "./logic";
 import { handleVoteBan } from "./utils/voteban";
@@ -50,7 +47,6 @@ const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
 import { MessageCreatePayload } from "./types";
-import SectionedGridList from "@plugins/decor/ui/components/SectionedGridList";
 
 // region Definition
 export default definePlugin({
