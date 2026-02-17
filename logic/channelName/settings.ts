@@ -1,5 +1,6 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
+import { state } from "../../state";
 
 export const channelNameSettings = {
     rotateChannelNames: {
@@ -8,18 +9,21 @@ export const channelNameSettings = {
         default: "General\nGaming\nMusic\nChilling",
         multiline: true,
         restartNeeded: false,
+        onChange: state.onRotationSettingsChange
     },
     rotateChannelNamesTime: {
         type: OptionType.NUMBER as const,
         description: "Interval in minutes for channel name rotation",
         default: 30,
         restartNeeded: false,
+        onChange: state.onRotationSettingsChange
     },
     rotateChannelNamesEnabled: {
         type: OptionType.BOOLEAN as const,
         description: "Enable channel name rotation",
         default: false,
         restartNeeded: false,
+        onChange: state.onRotationSettingsChange
     },
     setChannelNameCommand: {
         type: OptionType.STRING as const,
