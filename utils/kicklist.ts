@@ -1,19 +1,19 @@
 import { settings } from "../settings";
 
 export function getKickList(): string[] {
-    return settings.store.autoKickList.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
+    return settings.store.localUserBlacklist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
 }
 
 export function setKickList(list: string[]) {
-    settings.store.autoKickList = list.join("\n");
+    settings.store.localUserBlacklist = list.join("\n");
 }
 
 export function getWhitelist(): string[] {
-    return settings.store.userWhitelist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
+    return settings.store.localUserWhitelist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
 }
 
 export function setWhitelist(list: string[]) {
-    settings.store.userWhitelist = list.join("\n");
+    settings.store.localUserWhitelist = list.join("\n");
 }
 
 export function isWhitelisted(userId: string): boolean {

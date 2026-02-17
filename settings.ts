@@ -3,14 +3,14 @@ import { OptionType } from "@utils/types";
 import { state } from "./state";
 
 export const settings = definePluginSettings({
-    autoKickList: {
+    localUserBlacklist: {
         type: OptionType.STRING,
         description: "List of user IDs to act on (auto-kick, ban-rotate) [newline separated]",
         default: "",
         multiline: true,
         restartNeeded: false,
     },
-    userWhitelist: {
+    localUserWhitelist: {
         type: OptionType.STRING,
         description: "List of user IDs ignored by automated actions [newline separated]",
         default: "",
@@ -26,7 +26,13 @@ export const settings = definePluginSettings({
     banRotateEnabled: {
         type: OptionType.BOOLEAN,
         description: "Enable rotating banlist",
-        default: false,
+        default: true,
+        restartNeeded: false,
+    },
+    permitRotateEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable rotating whitelist",
+        default: true,
         restartNeeded: false,
     },
     voteBanEnabled: {
@@ -229,6 +235,12 @@ export const settings = definePluginSettings({
     banLimit: {
         type: OptionType.NUMBER,
         description: "The amount of bans you can have before needing to rotate",
+        default: 5,
+        restartNeeded: false,
+    },
+    permitLimit: {
+        type: OptionType.NUMBER,
+        description: "The amount of permits you can have before needing to rotate",
         default: 5,
         restartNeeded: false,
     },

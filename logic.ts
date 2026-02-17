@@ -16,7 +16,7 @@ import {
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
 import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage, requestGuildMembers } from "./utils";
-import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
+import { getKickList, setKickList, isWhitelisted, getWhitelist, setWhitelist } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
 import { BotResponse, BotResponseType } from "./utils/BotResponse";
 
@@ -90,7 +90,7 @@ export async function processQueue() {
                 activeType = ActionType.KICK;
             } else if (!item.rotationTriggered) {
                 // Check for ban limit rotation
-                const ownerId = ownership?.claimant?.userId || ownership?.creator?.userId;
+                const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
                 if (ownerId) {
                     const info = memberInfos.get(ownerId);
                     if (info && info.banned && info.banned.length >= settings.store.banLimit) {
@@ -104,6 +104,31 @@ export async function processQueue() {
                         actionQueue.unshift({
                             type: ActionType.UNBAN,
                             userId: userToUnban,
+                            channelId: channelId,
+                            guildId: guildId
+                        });
+
+                        continue; // Process the new unshift(s) next
+                    }
+                }
+            }
+        } else if (activeType === ActionType.PERMIT) {
+            if (settings.store.permitRotateEnabled && !item.rotationTriggered) {
+                const ownership = channelOwners.get(channelId);
+                const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
+                if (ownerId) {
+                    const info = memberInfos.get(ownerId);
+                    if (info && info.permitted && info.permitted.length >= settings.store.permitLimit) {
+                        const userToUnpermit = info.permitted[0];
+                        log(`Permit limit reached for owner ${ownerId}. Rotating permit: unpermitting ${userToUnpermit} to make room for ${userId}`);
+
+                        // Re-queue the current PERMIT with the trigger flag
+                        actionQueue.unshift({ ...item, rotationTriggered: true });
+
+                        // Prepend the UNPERMIT action
+                        actionQueue.unshift({
+                            type: ActionType.UNPERMIT,
+                            userId: userToUnpermit,
                             channelId: channelId,
                             guildId: guildId
                         });
@@ -508,6 +533,50 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
             guildId: guildId
         });
         state.roleKickedUsers.delete(userId);
+        count++;
+    }
+
+    if (count > 0) processQueue();
+    return count;
+}
+
+export function bulkPermit(userIds: string[], channelId: string, guildId: string): number {
+    const currentList = getWhitelist();
+    const uniqueNewUsers = userIds.filter(id => !currentList.includes(id));
+
+    if (uniqueNewUsers.length > 0) {
+        setWhitelist([...currentList, ...uniqueNewUsers]);
+    }
+
+    let count = 0;
+    for (const userId of userIds) {
+        actionQueue.push({
+            type: ActionType.PERMIT,
+            userId: userId,
+            channelId: channelId,
+            guildId: guildId
+        });
+        count++;
+    }
+
+    if (count > 0) processQueue();
+    return count;
+}
+
+export function bulkUnpermit(userIds: string[], channelId: string, guildId: string): number {
+    const currentList = getWhitelist();
+    const newList = currentList.filter(id => !userIds.includes(id));
+
+    if (currentList.length !== newList.length) setWhitelist(newList);
+
+    let count = 0;
+    for (const userId of userIds) {
+        actionQueue.push({
+            type: ActionType.UNPERMIT,
+            userId: userId,
+            channelId: channelId,
+            guildId: guildId
+        });
         count++;
     }
 

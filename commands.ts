@@ -238,15 +238,15 @@ export const commands = [
                         }
                     }
 
-                    const autoKickList = getKickList();
+                    const localUserBlacklist = getKickList();
                     const bannedIds = info?.banned || [];
-                    const allIds = Array.from(new Set([...bannedIds, ...autoKickList]));
+                    const allIds = Array.from(new Set([...bannedIds, ...localUserBlacklist]));
                     const nextToReplace = (bannedIds.length >= settings.store.banLimit) ? bannedIds[0] : null;
 
                     const lines = allIds.map(id => {
                         const user = UserStore.getUser(id);
                         const name = user ? `<@${id}>` : `Unknown (\`${id}\`)`;
-                        const isAuto = autoKickList.includes(id);
+                        const isAuto = localUserBlacklist.includes(id);
                         const isChannel = bannedIds.includes(id);
 
                         let marker = "";
@@ -272,7 +272,7 @@ export const commands = [
                         fields: [
                             {
                                 name: "📊 Stats",
-                                value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nGlobal Sync: ${autoKickList.length}`,
+                                value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nGlobal Sync: ${localUserBlacklist.length}`,
                                 inline: false
                             }
                         ],

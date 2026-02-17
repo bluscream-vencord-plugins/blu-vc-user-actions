@@ -21,7 +21,7 @@ import {
     getWhitelist,
     setWhitelist
 } from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel } from "./logic";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel, handleOwnerUpdate, bulkPermit, bulkUnpermit } from "./logic";
 import { actionQueue, ActionType, channelOwners } from "./state";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
@@ -134,59 +134,20 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
         );
     }
 
-    if (myChannelId) {
-        const { permitted = [] } = getMemberInfoForChannel(myChannelId) || {};
-        const isPermitted = permitted.includes(user.id);
-
-        submenuItems.push(
-            <Menu.MenuItem
-                id="socialize-guild-permit-vc"
-                label={isPermitted ? "Unpermit" : "Permit"}
-                color={isPermitted ? "danger" : "success"}
-                action={async () => {
-                    const me = UserStore.getCurrentUser();
-                    let ownership = channelOwners.get(myChannelId);
-                    const isCached = ownership && (ownership.creator || ownership.claimant);
-
-                    if (!isCached) {
-                        await checkChannelOwner(myChannelId, settings.store.botId);
-                        ownership = channelOwners.get(myChannelId);
-                    }
-
-                    const isCreator = ownership?.creator?.userId === me.id;
-                    const isClaimant = ownership?.claimant?.userId === me.id;
-
-                    if (isCreator || isClaimant) {
-                        actionQueue.push({
-                            type: isPermitted ? ActionType.UNPERMIT : ActionType.PERMIT,
-                            userId: user.id,
-                            channelId: myChannelId,
-                            guildId: chatChannel?.guild_id
-                        });
-                        processQueue();
-                    } else {
-                        showToast("Not owner of channel.");
-                    }
-                }}
-            />
-        );
-    }
 
     submenuItems.push(
         <Menu.MenuItem
             id="vc-blu-vc-user-whitelist"
             label={getWhitelist().includes(user.id) ? "Unwhitelist" : "Whitelist"}
             action={() => {
-                const whitelist = getWhitelist();
-                const isWhitelisted = whitelist.includes(user.id);
-                const newList = isWhitelisted
-                    ? whitelist.filter(id => id !== user.id)
-                    : [...whitelist, user.id];
-
-                setWhitelist(newList);
+                const isWhitelisted = getWhitelist().includes(user.id);
+                if (isWhitelisted) {
+                    bulkUnpermit([user.id], myChannelId || "", chatChannel?.guild_id || "");
+                } else {
+                    bulkPermit([user.id], myChannelId || "", chatChannel?.guild_id || "");
+                }
                 showToast(isWhitelisted ? `Removed ${user.username} from whitelist.` : `Added ${user.username} to whitelist.`, { type: "success" } as any);
             }}
-            color="success"
         />
     );
 
