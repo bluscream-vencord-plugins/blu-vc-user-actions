@@ -1,7 +1,6 @@
 //// Plugin originally written for Equicord at 2026-02-16 by https://github.com/Bluscream, https://antigravity.google
 // region Imports
 import definePlugin from "@utils/types";
-
 import { sendMessage } from "@utils/discord";
 import {
     ChannelStore,
