@@ -3,8 +3,11 @@ import { UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
 import { state, channelOwners, actionQueue, memberInfos, resetState, MemberChannelInfo } from "./state";
-import { getKickList, getRotateNames } from "./utils";
-import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, requestChannelInfo, getMemberInfoForChannel, getFriendsOnGuild } from "./logic";
+import { getKickList } from "./logic/blacklist/utils";
+import { getRotateNames } from "./logic/channelName/formatting";
+import { rotateChannelName, startRotation, stopRotation } from "./logic/channelName";
+import { checkChannelOwner, requestChannelInfo, getMemberInfoForChannel } from "./logic/channelClaim";
+import { getFriendsOnGuild } from "./logic/core/friends";
 
 export const commands = [
     {

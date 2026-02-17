@@ -1,41 +1,45 @@
 //// Plugin originally written for Equicord at 2026-02-16 by https://github.com/Bluscream, https://antigravity.google
 // region Imports
 import definePlugin from "@utils/types";
-import { sendMessage } from "@utils/discord";
 import {
     ChannelStore,
     UserStore,
     SelectedChannelStore,
     VoiceStateStore,
-    GuildMemberStore,
     ChannelActions
 } from "@webpack/common";
+
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, channelOwners, loadState, saveState } from "./state";
-import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, jumpToFirstMessage, formatKickCommand, formatCustomMessage } from "./utils";
+import { state, actionQueue, channelOwners, loadState, saveState } from "./state"; // Keeps state management here?
+import { log, jumpToFirstMessage, parseBotInfoMessage } from "./utils"; // Utils exports everything
+import { BotResponse, BotResponseType } from "./utils/BotResponse";
+
+// New Logic Modules
+import { queueAction, processQueue } from "./logic/queue";
+import { checkBlacklistEnforcement } from "./logic/blacklist";
+import { checkKickNotInRole } from "./logic/kickNotInRole";
+import { stopRotation } from "./logic/channelName";
+import { handleVoteBan } from "./logic/voteban";
 import {
-    processQueue,
-    queueAction,
     checkChannelOwner,
     fetchAllOwners,
     claimChannel,
-    stopRotation,
     handleOwnerUpdate,
     handleInfoUpdate,
     handleBotResponse,
-    getMemberInfoForChannel,
-} from "./logic";
-import { handleVoteBan } from "./utils/voteban";
-import { parseBotInfoMessage, BotResponse, BotResponseType } from "./utils";
+    handleOwnershipChange
+} from "./logic/channelClaim";
+import { registerSharedContextMenu } from "./utils/menus"; // Assuming menus stays in utils
 import {
     UserContextMenuPatch,
     GuildContextMenuPatch,
     ChannelContextMenuPatch,
-} from "./menus";
-import { registerSharedContextMenu } from "./utils/menus";
+} from "./menus"; // Menus stays in root
 import { getToolboxActions } from "./toolbox";
 import { commands } from "./commands";
 import { Logger } from "@utils/Logger";
+import { MessageCreatePayload } from "./types";
+
 // endregion Imports
 
 // region PluginInfo
@@ -47,7 +51,6 @@ export { pluginInfo };
 const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
-import { MessageCreatePayload } from "./types";
 
 // region Definition
 export default definePlugin({
@@ -100,12 +103,7 @@ export default definePlugin({
                                 setTimeout(() => {
                                     log(`Scrolling to start of ${newChannelId}`);
                                     jumpToFirstMessage(newChannelId, channel.guild_id);
-                                    // if (MessageActions?.fetchMessages) {
-                                    //     MessageActions.fetchMessages({
-                                    //         channelId: newChannelId,
-                                    //         limit: 50,
-                                    //     });
-                                    // }
+
                                     checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
                                         if (owner.userId) {
                                             log(`Detailed ownership check: userId=${owner.userId}`);
@@ -156,11 +154,6 @@ export default definePlugin({
 
                         const isMyChannel = state.myLastVoiceChannelId === s.oldChannelId;
                         if (settings.store.autoClaimDisbanded && isMyChannel) {
-                        // If it was the claimant who left, but the creator is still there, do we claim?
-                        // User requirement: "when creator joins back the claimant will still have owner perms until the creator claims the channel again"
-                        // So if claimant leaves, we should probably try to claim if we want it.
-
-                            // Check if there is still an owner present
                             const creatorId = ownership.creator?.userId;
                             const claimantId = ownership.claimant?.userId;
 
@@ -183,104 +176,22 @@ export default definePlugin({
             const ownership = channelOwners.get(myChannelId);
             const isOwner = ownership && (ownership.creator?.userId === me.id || ownership.claimant?.userId === me.id);
 
-            // Kick Not In Role Logic
-            if (settings.store.kickNotInRoleEnabled && settings.store.kickNotInRole && isOwner) {
-                for (const s of targetGuildVoiceStates) {
-                    if (s.userId === me.id || s.channelId !== myChannelId) continue;
-
-                    const member = GuildMemberStore.getMember(s.guildId, s.userId);
-                    if (member && !member.roles.includes(settings.store.kickNotInRole)) {
-                        const hasBeenKicked = state.roleKickedUsers.has(s.userId);
-
-                        if (hasBeenKicked) {
-                            log(`User ${s.userId} rejoined without role ${settings.store.kickNotInRole}, upgrading to BAN`);
-                            const banMsg = formatBanCommand(myChannelId, s.userId);
-                            queueAction({
-                                type: ActionType.BAN,
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId,
-                                external: banMsg
-                            });
-                        } else {
-                            log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
-                            state.roleKickedUsers.add(s.userId);
-
-                            const ephemeral = settings.store.kickNotInRoleMessage ? formatCustomMessage(settings.store.kickNotInRoleMessage, myChannelId, s.userId) : undefined;
-
-                            let external = formatKickCommand(myChannelId, s.userId);
-                            if (settings.store.kickNotInRoleMessageExternalEnabled && settings.store.kickNotInRoleMessageExternal) {
-                                // If custom external message is enabled, append it or replace?
-                                // Previously logic.ts did: external.push(content).
-                                // So we send custom external message AND the kick command.
-                                // Wait, the user said "a single ActionItem can have both a ephemeral and a external message at the same time but never more than one of each".
-                                // So I can only have ONE external message.
-                                // If I want to send a custom warning AND the kick command, I should prioritize the kick command?
-                                // Or maybe the kick command IS the external message?
-                                // "kickNotInRoleMessageExternal" -> likely a public shame message.
-                                // If I can only send one literal message to Discord, I should send the one that performs the action (the kick command).
-                                // Unless the kick command is just a message too? Yes.
-                                // If I want to send TWO messages (shame + kick), I need TWO ActionItems.
-                                // The user said "Sequential Processing now intelligently splits...".
-                                // And then said "a single ActionItem... never more than one of each".
-                                // This implies I should queue TWO items if I really need to send two external messages.
-                                // But `queueAction` used to handle arrays.
-                                // If I queue two items, they will be processed sequentially.
-                                // So: Item 1: Custom Shame Message. Item 2: Kick Command.
-
-                                const shameMsg = formatCustomMessage(settings.store.kickNotInRoleMessageExternal, myChannelId, s.userId);
-                                queueAction({
-                                    type: ActionType.INFO, // Use INFO so it doesn't trigger kick logic again? Or just standard?
-                                    // If I use INFO, it's just a message.
-                                    userId: s.userId,
-                                    channelId: myChannelId,
-                                    guildId: s.guildId,
-                                    external: shameMsg
-                                });
-                            }
-
-                            queueAction({
-                                type: ActionType.KICK,
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId,
-                                ephemeral: ephemeral, // Ephemeral goes on the main Kick action? Sure, why not.
-                                external: external
-                            });
-                        }
+            // Logic loops
+            if (isOwner) {
+                // Kick Not In Role Logic
+                if (settings.store.kickNotInRoleEnabled && settings.store.kickNotInRole) {
+                    for (const s of targetGuildVoiceStates) {
+                        if (s.userId === me.id || s.channelId !== myChannelId) continue;
+                        checkKickNotInRole(s.userId, myChannelId, s.guildId);
                     }
                 }
-            }
 
-            // Ban rotation logic (Auto-ban kicklist users)
-            if (settings.store.banRotateEnabled && isOwner) {
-                const kickList = getKickList();
-                for (const s of targetGuildVoiceStates) {
-                    if (s.userId === me.id) continue;
-                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId && kickList.includes(s.userId)) {
-                        const hasBeenKicked = state.roleKickedUsers.has(s.userId);
-                        if (hasBeenKicked) {
-                            log(`User ${s.userId} rejoined while on kicklist, upgrading to BAN`);
-                            const banMsg = formatBanCommand(myChannelId, s.userId);
-                            queueAction({
-                                type: ActionType.BAN,
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId,
-                                external: banMsg
-                            });
-                        } else {
-                            log(`User ${s.userId} joined while on kicklist, queueing initial KICK`);
-                            state.roleKickedUsers.add(s.userId);
-                            const kickMsg = formatKickCommand(myChannelId, s.userId);
-                            queueAction({
-                                type: ActionType.KICK,
-                                userId: s.userId,
-                                channelId: myChannelId,
-                                guildId: s.guildId,
-                                external: kickMsg
-                            });
-                        }
+                // Ban rotation enforcement (kicklist)
+                if (settings.store.banRotateEnabled) {
+                    for (const s of targetGuildVoiceStates) {
+                        if (s.userId === me.id) continue;
+                        // checkBlacklistEnforcement handles the check if user is in channel/oldChannel logic
+                        checkBlacklistEnforcement(s.userId, myChannelId, s.guildId, s.oldChannelId);
                     }
                 }
             }
@@ -338,7 +249,3 @@ export default definePlugin({
         this.stopCleanup?.();
     }
 });
-
-// region Internal
-// endregion Internal
-// endregion Definition

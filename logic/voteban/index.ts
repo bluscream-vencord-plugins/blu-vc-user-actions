@@ -1,7 +1,10 @@
-import { settings } from "../settings";
-import { actionQueue, ActionType, channelOwners } from "../state";
-import { log } from "./logging";
-import { isWhitelisted } from "./kicklist";
+import { settings } from "../../settings";
+import { ActionType, channelOwners } from "../../state";
+import { log } from "../../utils/logging";
+import { isWhitelisted } from "../whitelist";
+import { queueAction } from "../queue";
+import { formatBanCommand } from "../blacklist/formatting";
+import { formatVoteSubmittedMessage } from "./formatting";
 import { VoiceStateStore, UserStore } from "@webpack/common";
 
 const activeVotes = new Map<string, { voters: Set<string>, expires: number }>();
@@ -61,11 +64,7 @@ export function handleVoteBan(message: any, channelId: string) {
 
     // Send ephemeral confirmation
     const { sendBotMessage } = require("@api/Commands");
-    const seconds = Math.floor(vote.expires / 1000);
-    const uniqueVoteMsg = settings.store.voteSubmittedMessage
-        .replace(/{user_id}/g, voterId)
-        .replace(/{target_user_id}/g, targetUserId)
-        .replace(/{expires}/g, seconds.toString());
+    const uniqueVoteMsg = formatVoteSubmittedMessage(voterId, targetUserId, vote.expires);
 
     sendBotMessage(channelId, { content: uniqueVoteMsg });
 
@@ -77,8 +76,6 @@ export function handleVoteBan(message: any, channelId: string) {
 
     if (vote.voters.size >= requiredVotes) {
         log(`Voteban: Threshold reached for ${targetUserId}, banning...`);
-        const { queueAction } = require("../logic");
-        const { formatBanCommand } = require("./formatting");
         const banMsg = formatBanCommand(channelId, targetUserId);
         queueAction({
             type: ActionType.BAN,

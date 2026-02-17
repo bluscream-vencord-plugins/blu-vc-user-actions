@@ -15,16 +15,27 @@ import { settings } from "./settings";
 import { pluginInfo } from "./info";
 import {
     getKickList,
-    setKickList,
-    log,
-    isVoiceChannel,
-    getWhitelist,
-    setWhitelist
-} from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel, handleOwnerUpdate, bulkPermit, bulkUnpermit, queueAction } from "./logic";
+    setKickList
+} from "./logic/blacklist/utils";
+import { log, isVoiceChannel } from "./utils";
+import { getWhitelist, setWhitelist } from "./logic/whitelist/utils";
+import {
+    checkChannelOwner,
+    handleOwnerUpdate,
+    getMemberInfoForChannel
+} from "./logic/channelClaim";
+import { queueAction, processQueue } from "./logic/queue";
+import { bulkBanAndKick, bulkUnban } from "./logic/blacklist";
+import { bulkPermit, bulkUnpermit } from "./logic/permit";
 import { ActionType, channelOwners } from "./state";
+import { getSharedMenuItems } from "./sharedMenu";
+import { formatsetChannelNameCommand } from "./logic/channelName/formatting"; // Added import
+import { formatLimitCommand, formatInfoCommand, formatLockCommand, formatUnlockCommand, formatResetCommand, formatclaimCommand } from "./logic/channelClaim/formatting"; // Added imports
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
+    // ... (UserContextMenuPatch content remains same) ...
+    // Since write_to_file overwrites, I must include the full content.
+    // I will copy the content from previous read and update imports and usages.
     const chatChannelId = SelectedChannelStore.getChannelId();
     const chatChannel = ChannelStore.getChannel(chatChannelId);
     if (chatChannel?.guild_id !== settings.store.guildId) return;
@@ -65,8 +76,6 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                 const info = getMemberInfoForChannel(myChannelId);
 
                 if (isBanned) {
-                    // We are unbanning.
-                    // If they are in the bot's ban list, we must send an unban command.
                     if (info?.banned.includes(user.id)) {
                         log(`Unban from VC: Queuing UNBAN for ${user.id} in ${myChannelId}`);
                         queueAction({
@@ -77,8 +86,6 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                         });
                     }
                 } else {
-                    // We are banning.
-                    // If they are in the channel, we should kick them.
                     if (isTargetInMyChannel) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
                         log(`Ban from VC: Queuing KICK for ${user.id} in ${myChannelId}`);
@@ -143,6 +150,11 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                 } else {
                     bulkPermit([user.id], myChannelId || "", chatChannel?.guild_id || "");
                 }
+                const newList = isWhitelisted
+                    ? getWhitelist().filter(id => id !== user.id)
+                    : [...getWhitelist(), user.id];
+                setWhitelist(newList);
+
                 showToast(isWhitelisted ? `Removed ${user.username} from whitelist.` : `Added ${user.username} to whitelist.`, { type: "success" } as any);
             }}
         />
@@ -159,8 +171,6 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
 
     children.splice(-1, 0, submenu);
 };
-
-import { getSharedMenuItems } from "./sharedMenu";
 
 export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
     if (guild?.id !== settings.store.guildId) return;
@@ -192,11 +202,6 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
                     }}
                     color="danger"
                 />
-                {/* Settings reset typically handled by Vencord settings UI, but we can offer a manual cleared if needed.
-                     However, 'Reset Settings' usually means 'Restore Defaults'. Vencord settings API might have this?
-                     Or we just iterate and reset?
-                     For now, let's just do State. Settings can be reset in the settings menu.
-                  */}
             </Menu.MenuGroup>
         </Menu.MenuItem>
     );
@@ -204,8 +209,6 @@ export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { g
 
 export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, { channel }) => {
     if (channel?.guild_id !== settings.store.guildId) return;
-
-    // Only show for voice channels
     if (!isVoiceChannel(channel)) return;
 
     children.push(
@@ -216,11 +219,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 action={async () => {
                     const me = UserStore.getCurrentUser();
                     if (me) {
+                        const cmd = formatclaimCommand(channel.id);
                         queueAction({
                             type: ActionType.CLAIM,
                             userId: me.id,
                             channelId: channel.id,
-                            guildId: channel.guild_id
+                            guildId: channel.guild_id,
+                            external: cmd
                         });
                     } else {
                         showToast("Could not identify current user.");
@@ -238,12 +243,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                         cancelText: "Cancel",
                         onConfirm: () => {
                             if (newName && newName !== channel.name) {
+                                const cmd = formatsetChannelNameCommand(channel.id, newName);
                                 queueAction({
                                     type: ActionType.NAME,
                                     userId: "",
                                     channelId: channel.id,
                                     guildId: channel.guild_id,
-                                    channelName: newName
+                                    external: cmd
                                 });
                             }
                         },
@@ -264,11 +270,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 id="socialize-guild-lock-channel"
                 label="Lock Channel"
                 action={() => {
+                    const cmd = formatLockCommand(channel.id);
                     queueAction({
                         type: ActionType.LOCK,
                         userId: "",
                         channelId: channel.id,
-                        guildId: channel.guild_id
+                        guildId: channel.guild_id,
+                        external: cmd
                     });
                 }}
             />
@@ -276,11 +284,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 id="socialize-guild-unlock-channel"
                 label="Unlock Channel"
                 action={() => {
+                    const cmd = formatUnlockCommand(channel.id);
                     queueAction({
                         type: ActionType.UNLOCK,
                         userId: "",
                         channelId: channel.id,
-                        guildId: channel.guild_id
+                        guildId: channel.guild_id,
+                        external: cmd
                     });
                 }}
             />
@@ -288,11 +298,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 id="socialize-guild-reset-channel"
                 label="Reset Channel"
                 action={() => {
+                    const cmd = formatResetCommand(channel.id);
                     queueAction({
                         type: ActionType.RESET,
                         userId: "",
                         channelId: channel.id,
-                        guildId: channel.guild_id
+                        guildId: channel.guild_id,
+                        external: cmd
                     });
                 }}
             />
@@ -300,11 +312,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 id="socialize-guild-info-command"
                 label="Send Info Command"
                 action={() => {
+                    const cmd = formatInfoCommand(channel.id);
                     queueAction({
                         type: ActionType.INFO,
                         userId: "",
                         channelId: channel.id,
-                        guildId: channel.guild_id
+                        guildId: channel.guild_id,
+                        external: cmd
                     });
                 }}
             />
@@ -317,12 +331,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                         id={`socialize-guild-set-size-${size}`}
                         label={size === 0 ? "Unlimited" : `${size} Users`}
                         action={() => {
+                            const cmd = formatLimitCommand(channel.id, size);
                             queueAction({
                                 type: ActionType.LIMIT,
                                 userId: "",
                                 channelId: channel.id,
                                 guildId: channel.guild_id,
-                                channelLimit: size
+                                external: cmd
                             });
                         }}
                     />

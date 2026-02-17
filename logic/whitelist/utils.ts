@@ -1,12 +1,4 @@
-import { settings } from "../settings";
-
-export function getKickList(): string[] {
-    return settings.store.localUserBlacklist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);
-}
-
-export function setKickList(list: string[]) {
-    settings.store.localUserBlacklist = list.join("\n");
-}
+import { settings } from "../../settings";
 
 export function getWhitelist(): string[] {
     return settings.store.localUserWhitelist.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0);

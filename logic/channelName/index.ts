@@ -1,6 +1,6 @@
-import { settings } from "../settings";
-import { state, channelOwners } from "../state";
-import { log } from "./logging";
+import { settings } from "../../settings";
+import { state, channelOwners } from "../../state";
+import { log } from "../../utils/logging";
 import { getRotateNames, formatsetChannelNameCommand } from "./formatting";
 import { sendMessage } from "@utils/discord";
 import { ChannelStore, SelectedChannelStore, UserStore } from "@webpack/common";
@@ -49,7 +49,6 @@ export function startRotation(channelId: string) {
 
     log(`Starting channel name rotation for ${channelId} every ${intervalMinutes} minutes.`);
 
-    // Check if current name is in rotation list to determine starting index
     const channel = ChannelStore.getChannel(channelId);
     let startIndex = 0;
     if (channel) {
@@ -86,13 +85,11 @@ export function stopRotation(channelId: string) {
 export function restartAllRotations() {
     log("Settings changed, updating rotations...");
 
-    // Stop everything first
     const activeChannels = Array.from(state.rotationIntervals.keys());
     for (const channelId of activeChannels) {
         stopRotation(channelId);
     }
 
-    // If enabled, try to start rotation in the current channel if we are the owner
     const myChannelId = SelectedChannelStore.getVoiceChannelId();
     if (settings.store.enabled && settings.store.rotateChannelNamesEnabled && myChannelId) {
         const ownership = channelOwners.get(myChannelId);

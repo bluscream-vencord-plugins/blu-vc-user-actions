@@ -1,6 +1,23 @@
 import { ActionType, channelOwners } from "./state";
-import { getKickList, jumpToFirstMessage } from "./utils";
-import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners, queueAction } from "./logic";
+import { jumpToFirstMessage } from "./utils";
+import {
+    checkChannelOwner,
+    handleOwnerUpdate,
+    requestChannelInfo,
+    fetchAllOwners
+} from "./logic/channelClaim";
+import { queueAction } from "./logic/queue";
+import { getKickList } from "./logic/blacklist/utils";
+import {
+    formatLockCommand,
+    formatUnlockCommand,
+    formatResetCommand,
+    formatclaimCommand,
+    formatLimitCommand
+} from "./logic/channelClaim/formatting";
+import { formatsetChannelNameCommand } from "./logic/channelName/formatting";
+import { formatKickCommand } from "./logic/blacklist/formatting";
+
 import { settings } from "./settings";
 import { pluginInfo } from "./info";
 import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React, Alerts, TextInput } from "@webpack/common";
@@ -68,11 +85,13 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
+                    const cmd = formatLockCommand(cid);
                     queueAction({
                         type: ActionType.LOCK,
                         userId: "",
                         channelId: cid,
-                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                        guildId: ChannelStore.getChannel(cid)?.guild_id,
+                        external: cmd
                     });
                 }
             }}
@@ -84,11 +103,13 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
+                    const cmd = formatUnlockCommand(cid);
                     queueAction({
                         type: ActionType.UNLOCK,
                         userId: "",
                         channelId: cid,
-                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                        guildId: ChannelStore.getChannel(cid)?.guild_id,
+                        external: cmd
                     });
                 }
             }}
@@ -100,11 +121,13 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
+                    const cmd = formatResetCommand(cid);
                     queueAction({
                         type: ActionType.RESET,
                         userId: "",
                         channelId: cid,
-                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                        guildId: ChannelStore.getChannel(cid)?.guild_id,
+                        external: cmd
                     });
                 }
             }}
@@ -117,11 +140,13 @@ export const getSharedMenuItems = () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 const me = UserStore.getCurrentUser();
                 if (cid && me) {
+                    const cmd = formatclaimCommand(cid);
                     queueAction({
                         type: ActionType.CLAIM,
                         userId: me.id,
                         channelId: cid,
-                        guildId: ChannelStore.getChannel(cid)?.guild_id
+                        guildId: ChannelStore.getChannel(cid)?.guild_id,
+                        external: cmd
                     });
                 }
             }}
@@ -159,11 +184,13 @@ export const getSharedMenuItems = () => {
                 let count = 0;
                 for (const uid in voiceStates) {
                     if (kickList.includes(uid)) {
+                        const cmd = formatKickCommand(cid, uid);
                         queueAction({
                             type: ActionType.KICK,
                             userId: uid,
                             channelId: cid,
-                            guildId: chan.guild_id
+                            guildId: chan.guild_id,
+                            external: cmd
                         });
                         count++;
                     }
@@ -191,12 +218,13 @@ export const getSharedMenuItems = () => {
                     cancelText: "Cancel",
                     onConfirm: () => {
                         if (newName && newName !== chan.name) {
+                            const cmd = formatsetChannelNameCommand(cid, newName);
                             queueAction({
                                 type: ActionType.NAME,
                                 userId: "",
                                 channelId: cid,
                                 guildId: chan.guild_id,
-                                channelName: newName
+                                external: cmd
                             });
                         }
                     },
@@ -225,12 +253,13 @@ export const getSharedMenuItems = () => {
                     action={() => {
                         const cid = SelectedChannelStore.getVoiceChannelId();
                         if (!cid) return;
+                        const cmd = formatLimitCommand(cid, size);
                         queueAction({
                             type: ActionType.LIMIT,
                             userId: "",
                             channelId: cid,
                             guildId: ChannelStore.getChannel(cid)?.guild_id,
-                            channelLimit: size
+                            external: cmd
                         });
                     }}
                 />

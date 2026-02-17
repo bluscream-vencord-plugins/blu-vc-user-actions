@@ -39,9 +39,10 @@ export const state = {
     lastRotationTime: new Map<string, number>(),
     roleKickedUsers: new Set<string>(),
     onRotationSettingsChange: () => {
-        const { restartAllRotations } = require("./utils/rotation");
+        const { restartAllRotations } = require("./logic/channelName");
         restartAllRotations();
     },
+    requestedInfo: new Map<string, number>(),
 };
 
 export async function saveState() {
