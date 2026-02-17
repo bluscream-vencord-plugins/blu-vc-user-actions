@@ -20,7 +20,13 @@ export const settings = definePluginSettings({
     kickNotInRole: {
         type: OptionType.STRING,
         description: "Role ID required to stay in the channel (Auto-Kick if missing)",
-        default: "",
+        default: "507816351339905024", // Level 5
+        restartNeeded: false,
+    },
+    kickNotInRoleEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable auto-kick for users missing the required role",
+        default: false,
         restartNeeded: false,
     },
     banRotateEnabled: {
@@ -124,6 +130,18 @@ export const settings = definePluginSettings({
         type: OptionType.STRING,
         description: "Ephemeral message to show when a user is kicked for missing the required role",
         default: "🚫 Kicking <@{user_id}> because they are missing the required role",
+        restartNeeded: false,
+    },
+    kickNotInRoleMessageExternalEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable external message to send when a user is kicked for missing the required role",
+        default: false,
+        restartNeeded: false,
+    },
+    kickNotInRoleMessageExternal: {
+        type: OptionType.STRING,
+        description: "Message to show when a user is kicked for missing the required role",
+        default: "Sorry <@{user_id}>, you need to have atleast level 5 to join this channel.",
         restartNeeded: false,
     },
     whitelistSkipMessage: {

@@ -7,6 +7,13 @@ export enum BotResponseType {
     CREATED = "Channel Created",
     CLAIMED = "Channel Claimed",
     INFO = "Channel Settings",
+    BANNED = "Banned",
+    UNBANNED = "Unbanned",
+    PERMITTED = "Permitted",
+    UNPERMITTED = "Unpermitted",
+    SIZE_SET = "Size Set",
+    LOCKED = "Locked",
+    UNLOCKED = "Unlocked",
     UNKNOWN = "Unknown"
 }
 
@@ -41,6 +48,13 @@ export class BotResponse {
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
         else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
         else if (check("Channel Settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
+        else if (description.includes("__banned__")) this.type = BotResponseType.BANNED;
+        else if (description.includes("__unbanned__")) this.type = BotResponseType.UNBANNED;
+        else if (description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
+        else if (description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;
+        else if (description.includes("__channel size__")) this.type = BotResponseType.SIZE_SET;
+        else if (description.includes("__locked__")) this.type = BotResponseType.LOCKED;
+        else if (description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
     }
 
     private findInitiatorId(): string | undefined {

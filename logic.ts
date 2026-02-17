@@ -79,6 +79,24 @@ export async function processQueue() {
             await new Promise(r => setTimeout(r, 500));
         }
 
+        if (item.externalMessage) {
+            let externalMsg = item.externalMessage
+                .replace(/{user_id}/g, userId)
+                .replace(/{channel_id}/g, channelId)
+                .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
+                .replace(/{guild_id}/g, guildId || "")
+                .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
+
+            if (user) {
+                externalMsg = externalMsg.replace(/{user_name}/g, user.username);
+            } else {
+                externalMsg = externalMsg.replace(/{user_name}/g, userId);
+            }
+
+            log(`Sending external message for ${userId} in ${channelId}: ${externalMsg}`);
+            sendMessage(channelId, { content: externalMsg });
+        }
+
         let template: string;
         let activeType = type;
 
@@ -460,7 +478,7 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
 
     if (!targetOwnerId) {
         const ownership = channelOwners.get(channelId);
-        targetOwnerId = ownership?.claimant?.userId || ownership?.creator?.userId;
+        targetOwnerId = ownership?.creator?.userId || ownership?.claimant?.userId;
     }
 
     if (targetOwnerId) {
@@ -480,14 +498,88 @@ export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
         if (info.permitted.length > 0) lines.push(`**Permitted:** ${info.permitted.length} users`);
         if (info.banned.length > 0) lines.push(`**Banned:** ${info.banned.length} users`);
 
-        const embed = {
-            title: "Channel Info Updated",
-            description: lines.join("\n"),
-            color: 0x5865F2,
-            timestamp: new Date().toISOString()
-        };
+        sendBotMessage(channelId, { content: lines.join("\n") });
+    }
+}
 
-        sendBotMessage(channelId, { content: lines.join("\n")/*, embeds: [embed]*/ });
+export function handleBotResponse(response: BotResponse) {
+    const initiatorId = response.initiatorId;
+    if (!initiatorId) return;
+
+    const info = memberInfos.get(initiatorId);
+    if (!info) return;
+
+    const description = response.getRawDescription();
+    const targetMatch = description.match(/<@!?(\d+)>/);
+    const targetUserId = targetMatch ? targetMatch[1] : undefined;
+
+    let changed = false;
+
+    switch (response.type) {
+        case BotResponseType.BANNED:
+            if (targetUserId && !info.banned.includes(targetUserId)) {
+                info.banned.push(targetUserId);
+                changed = true;
+                log(`Dynamically added ${targetUserId} to banned list for ${initiatorId}`);
+            }
+            break;
+        case BotResponseType.UNBANNED:
+            if (targetUserId) {
+                const initialLen = info.banned.length;
+                info.banned = info.banned.filter(id => id !== targetUserId);
+                if (info.banned.length !== initialLen) {
+                    changed = true;
+                    log(`Dynamically removed ${targetUserId} from banned list for ${initiatorId}`);
+                }
+            }
+            break;
+        case BotResponseType.PERMITTED:
+            if (targetUserId && !info.permitted.includes(targetUserId)) {
+                info.permitted.push(targetUserId);
+                changed = true;
+                log(`Dynamically added ${targetUserId} to permitted list for ${initiatorId}`);
+            }
+            break;
+        case BotResponseType.UNPERMITTED:
+            if (targetUserId) {
+                const initialLen = info.permitted.length;
+                info.permitted = info.permitted.filter(id => id !== targetUserId);
+                if (info.permitted.length !== initialLen) {
+                    changed = true;
+                    log(`Dynamically removed ${targetUserId} from permitted list for ${initiatorId}`);
+                }
+            }
+            break;
+        case BotResponseType.SIZE_SET:
+            const sizeMatch = description.match(/\*\*(\d+)\*\*/);
+            if (sizeMatch) {
+                const newLimit = parseInt(sizeMatch[1]);
+                if (info.limit !== newLimit) {
+                    info.limit = newLimit;
+                    changed = true;
+                    log(`Dynamically updated limit to ${info.limit} for ${initiatorId}`);
+                }
+            }
+            break;
+        case BotResponseType.LOCKED:
+            if (!info.status || !info.status.includes("locked")) {
+                info.status = info.status ? info.status + ", locked" : "locked";
+                changed = true;
+                log(`Dynamically updated status to locked for ${initiatorId}`);
+            }
+            break;
+        case BotResponseType.UNLOCKED:
+            if (info.status && info.status.includes("locked")) {
+                info.status = info.status.replace(/,? ?locked/, "").trim();
+                if (info.status === "") info.status = undefined;
+                changed = true;
+                log(`Dynamically updated status to unlocked for ${initiatorId}`);
+            }
+            break;
+    }
+
+    if (changed) {
+        setMemberInfo(initiatorId, info);
     }
 }
 

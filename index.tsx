@@ -21,6 +21,7 @@ import {
     stopRotation,
     handleOwnerUpdate,
     handleInfoUpdate,
+    handleBotResponse,
     getMemberInfoForChannel,
 } from "./logic";
 import { handleVoteBan } from "./utils/voteban";
@@ -182,7 +183,7 @@ export default definePlugin({
             const isOwner = ownership && (ownership.creator?.userId === me.id || ownership.claimant?.userId === me.id);
 
             // Kick Not In Role Logic
-            if (settings.store.kickNotInRole && isOwner) {
+            if (settings.store.kickNotInRoleEnabled && settings.store.kickNotInRole && isOwner) {
                 for (const s of targetGuildVoiceStates) {
                     if (s.userId === me.id || s.channelId !== myChannelId) continue;
 
@@ -209,7 +210,8 @@ export default definePlugin({
                                 userId: s.userId,
                                 channelId: myChannelId,
                                 guildId: s.guildId,
-                                ephemeralMessage: settings.store.kickNotInRoleMessage
+                                ephemeralMessage: settings.store.kickNotInRoleMessage,
+                                externalMessage: settings.store.kickNotInRoleMessageExternalEnabled ? settings.store.kickNotInRoleMessageExternal : undefined
                             });
                         }
                         processQueue();
@@ -283,6 +285,8 @@ export default definePlugin({
                     log(`Successfully parsed channel info for ${result.channelId}`);
                     handleInfoUpdate(result.channelId, result.info);
                 }
+            } else {
+                handleBotResponse(response);
             }
 
             // Handle Voteban
