@@ -30,7 +30,6 @@ export async function loadState() {
 }
 
 export const actionQueue: Array<ActionItem> = [];
-export const processedUsers = new Map<string, number>();
 
 export const state = {
     isProcessing: false,
@@ -64,6 +63,5 @@ export function resetState() {
     memberInfos.clear();
     state.rotationIndex.clear();
     state.roleKickedUsers.clear();
-    processedUsers.clear();
     saveState();
 }

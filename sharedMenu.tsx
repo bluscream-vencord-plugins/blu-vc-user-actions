@@ -1,6 +1,6 @@
-import { ActionType, actionQueue, channelOwners } from "./state";
+import { ActionType, channelOwners } from "./state";
 import { getKickList, jumpToFirstMessage } from "./utils";
-import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners } from "./logic";
+import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners, queueAction } from "./logic";
 import { settings } from "./settings";
 import { pluginInfo } from "./info";
 import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React, Alerts, TextInput } from "@webpack/common";
@@ -68,13 +68,12 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.LOCK,
                         userId: "",
                         channelId: cid,
                         guildId: ChannelStore.getChannel(cid)?.guild_id
                     });
-                    processQueue();
                 }
             }}
         />,
@@ -85,13 +84,12 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.UNLOCK,
                         userId: "",
                         channelId: cid,
                         guildId: ChannelStore.getChannel(cid)?.guild_id
                     });
-                    processQueue();
                 }
             }}
         />,
@@ -102,13 +100,12 @@ export const getSharedMenuItems = () => {
             action={async () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 if (cid) {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.RESET,
                         userId: "",
                         channelId: cid,
                         guildId: ChannelStore.getChannel(cid)?.guild_id
                     });
-                    processQueue();
                 }
             }}
         />,
@@ -120,13 +117,12 @@ export const getSharedMenuItems = () => {
                 const cid = SelectedChannelStore.getVoiceChannelId();
                 const me = UserStore.getCurrentUser();
                 if (cid && me) {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.CLAIM,
                         userId: me.id,
                         channelId: cid,
                         guildId: ChannelStore.getChannel(cid)?.guild_id
                     });
-                    processQueue();
                 }
             }}
         />,
@@ -163,7 +159,7 @@ export const getSharedMenuItems = () => {
                 let count = 0;
                 for (const uid in voiceStates) {
                     if (kickList.includes(uid)) {
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.KICK,
                             userId: uid,
                             channelId: cid,
@@ -174,7 +170,6 @@ export const getSharedMenuItems = () => {
                 }
                 if (count > 0) {
                     showToast(`Adding ${count} banned user(s) to kick queue...`);
-                    processQueue();
                 } else {
                     showToast("No banned users found in current channel.");
                 }
@@ -196,14 +191,13 @@ export const getSharedMenuItems = () => {
                     cancelText: "Cancel",
                     onConfirm: () => {
                         if (newName && newName !== chan.name) {
-                            actionQueue.push({
+                            queueAction({
                                 type: ActionType.NAME,
                                 userId: "",
                                 channelId: cid,
                                 guildId: chan.guild_id,
                                 channelName: newName
                             });
-                            processQueue();
                         }
                     },
                     body: (
@@ -231,14 +225,13 @@ export const getSharedMenuItems = () => {
                     action={() => {
                         const cid = SelectedChannelStore.getVoiceChannelId();
                         if (!cid) return;
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.LIMIT,
                             userId: "",
                             channelId: cid,
                             guildId: ChannelStore.getChannel(cid)?.guild_id,
                             channelLimit: size
                         });
-                        processQueue();
                     }}
                 />
             ))}

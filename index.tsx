@@ -12,9 +12,10 @@ import {
 } from "@webpack/common";
 import { settings } from "./settings";
 import { ActionType, state, actionQueue, channelOwners, loadState, saveState } from "./state";
-import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, jumpToFirstMessage } from "./utils";
+import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, jumpToFirstMessage, formatKickCommand, formatCustomMessage } from "./utils";
 import {
     processQueue,
+    queueAction,
     checkChannelOwner,
     fetchAllOwners,
     claimChannel,
@@ -189,77 +190,96 @@ export default definePlugin({
 
                     const member = GuildMemberStore.getMember(s.guildId, s.userId);
                     if (member && !member.roles.includes(settings.store.kickNotInRole)) {
-                        // Avoid duplicate queue items for the same user
-                        if (actionQueue.some(item => item.userId === s.userId)) continue;
-
                         const hasBeenKicked = state.roleKickedUsers.has(s.userId);
 
                         if (hasBeenKicked) {
                             log(`User ${s.userId} rejoined without role ${settings.store.kickNotInRole}, upgrading to BAN`);
-                            actionQueue.push({
+                            const banMsg = formatBanCommand(myChannelId, s.userId);
+                            queueAction({
                                 type: ActionType.BAN,
                                 userId: s.userId,
                                 channelId: myChannelId,
-                                guildId: s.guildId
+                                guildId: s.guildId,
+                                external: banMsg
                             });
                         } else {
                             log(`User ${s.userId} missing role ${settings.store.kickNotInRole}, adding to kick queue`);
                             state.roleKickedUsers.add(s.userId);
-                            actionQueue.push({
+
+                            const ephemeral = settings.store.kickNotInRoleMessage ? formatCustomMessage(settings.store.kickNotInRoleMessage, myChannelId, s.userId) : undefined;
+
+                            let external = formatKickCommand(myChannelId, s.userId);
+                            if (settings.store.kickNotInRoleMessageExternalEnabled && settings.store.kickNotInRoleMessageExternal) {
+                                // If custom external message is enabled, append it or replace?
+                                // Previously logic.ts did: external.push(content).
+                                // So we send custom external message AND the kick command.
+                                // Wait, the user said "a single ActionItem can have both a ephemeral and a external message at the same time but never more than one of each".
+                                // So I can only have ONE external message.
+                                // If I want to send a custom warning AND the kick command, I should prioritize the kick command?
+                                // Or maybe the kick command IS the external message?
+                                // "kickNotInRoleMessageExternal" -> likely a public shame message.
+                                // If I can only send one literal message to Discord, I should send the one that performs the action (the kick command).
+                                // Unless the kick command is just a message too? Yes.
+                                // If I want to send TWO messages (shame + kick), I need TWO ActionItems.
+                                // The user said "Sequential Processing now intelligently splits...".
+                                // And then said "a single ActionItem... never more than one of each".
+                                // This implies I should queue TWO items if I really need to send two external messages.
+                                // But `queueAction` used to handle arrays.
+                                // If I queue two items, they will be processed sequentially.
+                                // So: Item 1: Custom Shame Message. Item 2: Kick Command.
+
+                                const shameMsg = formatCustomMessage(settings.store.kickNotInRoleMessageExternal, myChannelId, s.userId);
+                                queueAction({
+                                    type: ActionType.INFO, // Use INFO so it doesn't trigger kick logic again? Or just standard?
+                                    // If I use INFO, it's just a message.
+                                    userId: s.userId,
+                                    channelId: myChannelId,
+                                    guildId: s.guildId,
+                                    external: shameMsg
+                                });
+                            }
+
+                            queueAction({
                                 type: ActionType.KICK,
                                 userId: s.userId,
                                 channelId: myChannelId,
                                 guildId: s.guildId,
-                                ephemeralMessage: settings.store.kickNotInRoleMessage,
-                                externalMessage: settings.store.kickNotInRoleMessageExternalEnabled ? settings.store.kickNotInRoleMessageExternal : undefined
+                                ephemeral: ephemeral, // Ephemeral goes on the main Kick action? Sure, why not.
+                                external: external
                             });
                         }
-                        processQueue();
                     }
                 }
             }
 
-            // Ban rotation logic
+            // Ban rotation logic (Auto-ban kicklist users)
             if (settings.store.banRotateEnabled && isOwner) {
                 const kickList = getKickList();
-                const info = getMemberInfoForChannel(myChannelId);
-
                 for (const s of targetGuildVoiceStates) {
                     if (s.userId === me.id) continue;
-
-                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId) {
-                        if (kickList.includes(s.userId)) {
-                            // Check if user is already banned
-                            if (!info?.banned.includes(s.userId)) {
-                                // Get first banned user to unban if limit reached
-                                const userToUnban = (info && info.banned.length >= settings.store.banLimit) ? info.banned[0] : null;
-
-                                if (userToUnban) {
-                                    const unbanCmd = formatUnbanCommand(myChannelId, userToUnban);
-                                    log(`Ban rotation: Unbanning ${userToUnban}`);
-                                    sendMessage(myChannelId, { content: unbanCmd });
-
-                                    if (info) {
-                                        info.banned = info.banned.filter(id => id !== userToUnban);
-                                    }
-
-                                    if (settings.store.banRotationMessage) {
-                                        const msg = formatBanRotationMessage(myChannelId, userToUnban, s.userId);
-                                        const { sendBotMessage } = require("@api/Commands");
-                                        sendBotMessage(myChannelId, { content: msg });
-                                    }
-                                }
-
-                                const banCmd = formatBanCommand(myChannelId, s.userId);
-                                log(`Ban rotation: Banning ${s.userId}`);
-                                sendMessage(myChannelId, { content: banCmd });
-
-                                if (info && !info.banned.includes(s.userId)) {
-                                    info.banned.push(s.userId);
-                                }
-                            } else {
-                                log(`User ${s.userId} is already banned, skipping ban rotation`);
-                            }
+                    if (s.oldChannelId !== myChannelId && s.channelId === myChannelId && kickList.includes(s.userId)) {
+                        const hasBeenKicked = state.roleKickedUsers.has(s.userId);
+                        if (hasBeenKicked) {
+                            log(`User ${s.userId} rejoined while on kicklist, upgrading to BAN`);
+                            const banMsg = formatBanCommand(myChannelId, s.userId);
+                            queueAction({
+                                type: ActionType.BAN,
+                                userId: s.userId,
+                                channelId: myChannelId,
+                                guildId: s.guildId,
+                                external: banMsg
+                            });
+                        } else {
+                            log(`User ${s.userId} joined while on kicklist, queueing initial KICK`);
+                            state.roleKickedUsers.add(s.userId);
+                            const kickMsg = formatKickCommand(myChannelId, s.userId);
+                            queueAction({
+                                type: ActionType.KICK,
+                                userId: s.userId,
+                                channelId: myChannelId,
+                                guildId: s.guildId,
+                                external: kickMsg
+                            });
                         }
                     }
                 }

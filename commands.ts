@@ -2,7 +2,7 @@ import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption }
 import { UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
-import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState, MemberChannelInfo } from "./state";
+import { state, channelOwners, actionQueue, memberInfos, resetState, MemberChannelInfo } from "./state";
 import { getKickList, getRotateNames } from "./utils";
 import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, requestChannelInfo, getMemberInfoForChannel, getFriendsOnGuild } from "./logic";
 
@@ -140,8 +140,7 @@ export const commands = [
 
                 case "stats": {
                     const queueSize = actionQueue.length;
-                    const processedCount = processedUsers.size;
-                    const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${memberInfos.size}\nQueue: ${queueSize}\nProcessed: ${processedCount}`;
+                    const content = `**Plugin Stats**\nCached Owners: ${channelOwners.size}\nCached Infos: ${memberInfos.size}\nQueue: ${queueSize}`;
                     if (findOption(finalOptions, "share", false) as boolean) {
                         sendMessage(ctx.channel.id, { content });
                     } else {

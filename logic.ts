@@ -14,8 +14,15 @@ import {
     GuildMemberStore,
 } from "@webpack/common";
 import { settings } from "./settings";
-import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
-import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage, requestGuildMembers } from "./utils";
+import { ActionItem } from "./types/ActionItem";
+import { actionQueue, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
+import {
+    formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage,
+    formatWhitelistSkipMessage, requestGuildMembers, formatKickCommand, formatBanCommand,
+    formatUnbanCommand, formatPermitCommand, formatUnpermitCommand, formatLimitCommand,
+    formatLockCommand, formatUnlockCommand, formatChannelNameCommand, formatResetCommand,
+    formatInfoCommand
+} from "./utils";
 import { getKickList, setKickList, isWhitelisted, getWhitelist, setWhitelist } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
 import { BotResponse, BotResponseType } from "./utils/BotResponse";
@@ -28,209 +35,115 @@ const sendMessage = (channelId: string, options: any) => {
     _sendMessage(channelId, options);
 };
 
+export function queueAction(options: {
+    type: ActionType;
+    userId: string;
+    channelId: string;
+    guildId?: string;
+    rotationTriggered?: boolean;
+    ephemeral?: string;
+    external?: string;
+    // channelName and channelLimit removed as they are for formatting only
+}) {
+    const { userId, channelId, guildId, type, rotationTriggered, ephemeral, external } = options;
+    const { sendBotMessage } = require("@api/Commands");
+
+    // 1. Whitelist Check
+    if ((type === ActionType.KICK || type === ActionType.BAN) && isWhitelisted(userId)) {
+        log(`Skipping ${type} for whitelisted user ${userId}`);
+        const skipMsg = formatWhitelistSkipMessage(channelId, userId, type);
+        sendBotMessage(channelId, { content: skipMsg });
+        return;
+    }
+
+    // 2. Rotation / Ownership Check
+    if (type === ActionType.BAN && !rotationTriggered) {
+        const ownership = channelOwners.get(channelId);
+        const isClaim = (ownership?.claimant?.reason?.toLowerCase().includes("claim")) || (ownership?.creator?.reason?.toLowerCase().includes("claim"));
+        if (isClaim) {
+            log(`Downgrading BAN to KICK for ${userId} (Claim channel)`);
+            // We need to re-queue with KICK type and KICK message.
+            // Since queueAction no longer formats, we must format it here.
+            const kickMsg = formatKickCommand(channelId, userId);
+            queueAction({ ...options, type: ActionType.KICK, external: kickMsg });
+            return;
+        }
+
+        const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
+        if (ownerId && settings.store.banRotateEnabled) {
+            const info = memberInfos.get(ownerId);
+            if (info?.banned && info.banned.length >= settings.store.banLimit) {
+                const userToUnban = info.banned[0];
+                log(`Ban limit reached for owner ${ownerId}. Rotating ban: unbanning ${userToUnban} for ${userId}`);
+                const unbanMsg = formatUnbanCommand(channelId, userToUnban);
+                queueAction({ type: ActionType.UNBAN, userId: userToUnban, channelId, guildId, external: unbanMsg });
+                queueAction({ ...options, rotationTriggered: true });
+                return;
+            }
+        }
+    } else if (type === ActionType.PERMIT && !rotationTriggered && settings.store.permitRotateEnabled) {
+        const ownership = channelOwners.get(channelId);
+        const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
+        if (ownerId) {
+            const info = memberInfos.get(ownerId);
+            if (info?.permitted && info.permitted.length >= settings.store.permitLimit) {
+                const userToUnpermit = info.permitted[0];
+                log(`Permit limit reached for owner ${ownerId}. Rotating permit: unpermitting ${userToUnpermit} for ${userId}`);
+                const unpermitMsg = formatUnpermitCommand(channelId, userToUnpermit);
+                queueAction({ type: ActionType.UNPERMIT, userId: userToUnpermit, channelId, guildId, external: unpermitMsg });
+                queueAction({ ...options, rotationTriggered: true });
+                return;
+            }
+        }
+    }
+
+    // 3. Queue Item
+    // We already have formatted messages in options.ephemeral and options.external
+    const item: ActionItem = {
+        ephemeral,
+        external
+    };
+
+    if (type === ActionType.INFO || type === ActionType.CLAIM) {
+        actionQueue.unshift(item);
+    } else {
+        actionQueue.push(item);
+    }
+
+    processQueue();
+}
+
 export async function processQueue() {
     const { sendBotMessage } = require("@api/Commands");
     if (state.isProcessing || actionQueue.length === 0) return;
+    const channelId = state.myLastVoiceChannelId;
+    if (!channelId) {
+        log("No active channel, clearing queue.");
+        actionQueue.length = 0;
+        return;
+    }
+
     state.isProcessing = true;
 
     while (actionQueue.length > 0) {
-        const item = actionQueue.shift();
-        if (!item) continue;
+        const item = actionQueue[0];
 
-        const { userId, channelId, guildId, type } = item;
+        // Consume item
+        actionQueue.shift();
 
-        if ((type === ActionType.KICK || type === ActionType.BAN) && isWhitelisted(userId)) {
-            log(`Skipping ${type} for whitelisted user ${userId}`);
-            const skipMsg = formatWhitelistSkipMessage(channelId, userId, type);
-            sendBotMessage(channelId, { content: skipMsg });
-            processedUsers.set(userId, Date.now());
-            continue;
-        }
-
-        const now = Date.now();
-        const lastAction = processedUsers.get(userId) || 0;
-
-        if (now - lastAction < settings.store.queueTime) {
-            continue;
-        }
-
-        log(`Processing ${type} for ${userId} in ${channelId}`);
-        const user = UserStore.getUser(userId);
-        const channel = ChannelStore.getChannel(channelId);
-        const guild = guildId ? GuildStore.getGuild(guildId) : null;
-
-        if (item.ephemeralMessage) {
-            let ephemeralMsg = item.ephemeralMessage
-                .replace(/{user_id}/g, userId)
-                .replace(/{channel_id}/g, channelId)
-                .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
-                .replace(/{guild_id}/g, guildId || "")
-                .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
-
-            if (user) {
-                ephemeralMsg = ephemeralMsg.replace(/{user_name}/g, user.username);
-            } else {
-                ephemeralMsg = ephemeralMsg.replace(/{user_name}/g, userId);
-            }
-
-            log(`Sending ephemeral message: ${ephemeralMsg}`);
-            sendBotMessage(channelId, { content: ephemeralMsg });
-            // Small delay to ensure the ephemeral message appears before the kick action
+        if (item.ephemeral) {
+            sendBotMessage(channelId, { content: item.ephemeral });
+            // Small delay after ephemeral
             await new Promise(r => setTimeout(r, 500));
         }
 
-        if (item.externalMessage) {
-            let externalMsg = item.externalMessage
-                .replace(/{user_id}/g, userId)
-                .replace(/{channel_id}/g, channelId)
-                .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
-                .replace(/{guild_id}/g, guildId || "")
-                .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
-
-            if (user) {
-                externalMsg = externalMsg.replace(/{user_name}/g, user.username);
-            } else {
-                externalMsg = externalMsg.replace(/{user_name}/g, userId);
+        if (item.external) {
+            log(`Sending command/message to ${channelId}: ${item.external}`);
+            sendMessage(channelId, { content: item.external });
+        // Full queue delay after external
+            if (settings.store.queueTime > 0) {
+                await new Promise(r => setTimeout(r, settings.store.queueTime));
             }
-
-            log(`Sending external message for ${userId} in ${channelId}: ${externalMsg}`);
-            sendMessage(channelId, { content: externalMsg });
-        }
-
-        let template: string;
-        let activeType = type;
-
-        if (activeType === ActionType.BAN) {
-            const ownership = channelOwners.get(channelId);
-            const isClaim = (ownership?.claimant?.reason?.toLowerCase().includes("claim")) || (ownership?.creator?.reason?.toLowerCase().includes("claim"));
-            if (isClaim) {
-                log(`Downgrading BAN to KICK for ${userId} in ${channelId} (Ownership Reason: ${ownership?.claimant?.reason || ownership?.creator?.reason})`);
-                activeType = ActionType.KICK;
-            } else if (!item.rotationTriggered) {
-                // Check for ban limit rotation
-                const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
-                if (ownerId) {
-                    const info = memberInfos.get(ownerId);
-                    if (info && info.banned && info.banned.length >= settings.store.banLimit) {
-                        const userToUnban = info.banned[0];
-                        log(`Ban limit reached for owner ${ownerId}. Rotating ban: unbanning ${userToUnban} to make room for ${userId}`);
-
-                        // Re-queue the current BAN with the trigger flag
-                        actionQueue.unshift({ ...item, rotationTriggered: true });
-
-                        // Prepend the UNBAN action
-                        actionQueue.unshift({
-                            type: ActionType.UNBAN,
-                            userId: userToUnban,
-                            channelId: channelId,
-                            guildId: guildId
-                        });
-
-                        continue; // Process the new unshift(s) next
-                    }
-                }
-            }
-        } else if (activeType === ActionType.PERMIT) {
-            if (settings.store.permitRotateEnabled && !item.rotationTriggered) {
-                const ownership = channelOwners.get(channelId);
-                const ownerId = ownership?.creator?.userId || ownership?.claimant?.userId;
-                if (ownerId) {
-                    const info = memberInfos.get(ownerId);
-                    if (info && info.permitted && info.permitted.length >= settings.store.permitLimit) {
-                        const userToUnpermit = info.permitted[0];
-                        log(`Permit limit reached for owner ${ownerId}. Rotating permit: unpermitting ${userToUnpermit} to make room for ${userId}`);
-
-                        // Re-queue the current PERMIT with the trigger flag
-                        actionQueue.unshift({ ...item, rotationTriggered: true });
-
-                        // Prepend the UNPERMIT action
-                        actionQueue.unshift({
-                            type: ActionType.UNPERMIT,
-                            userId: userToUnpermit,
-                            channelId: channelId,
-                            guildId: guildId
-                        });
-
-                        continue; // Process the new unshift(s) next
-                    }
-                }
-            }
-        }
-
-        switch (activeType) {
-            case ActionType.KICK:
-                template = settings.store.kickCommand;
-                break;
-            case ActionType.BAN:
-                template = settings.store.banCommand;
-                break;
-            case ActionType.UNBAN:
-                template = settings.store.unbanCommand;
-                break;
-            case ActionType.CLAIM:
-                template = settings.store.claimCommand;
-                break;
-            case ActionType.INFO:
-                template = settings.store.infoCommand;
-                break;
-            case ActionType.PERMIT:
-                template = settings.store.permitCommand;
-                break;
-            case ActionType.UNPERMIT:
-                template = settings.store.unpermitCommand;
-                break;
-            case ActionType.NAME:
-                template = settings.store.setChannelNameCommand;
-                break;
-            case ActionType.LIMIT:
-                template = settings.store.setChannelUserLimitCommand;
-                break;
-            case ActionType.LOCK:
-                template = settings.store.lockCommand;
-                break;
-            case ActionType.UNLOCK:
-                template = settings.store.unlockCommand;
-                break;
-            case ActionType.RESET:
-                template = settings.store.resetCommand;
-                break;
-            default:
-                console.error(`Unknown action type: ${activeType}`);
-                continue;
-        }
-
-        let formattedMessage = template
-            .replace(/{user_id}/g, userId)
-            .replace(/{channel_id}/g, channelId)
-            .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
-            .replace(/{guild_id}/g, guildId || "")
-            .replace(/{guild_name}/g, guild?.name || "Unknown Guild")
-            .replace(/{channel_name_new}/g, item.channelName || "")
-            .replace(/{channel_limit}/g, item.channelLimit?.toString() || "");
-
-        formattedMessage = formatMessageCommon(formattedMessage);
-
-        if (user) {
-            formattedMessage = formattedMessage.replace(/{user_name}/g, user.username);
-        } else {
-            formattedMessage = formattedMessage.replace(/{user_name}/g, userId);
-        }
-
-        if (type === ActionType.CLAIM) {
-            jumpToFirstMessage(channelId, guildId);
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        try {
-            log(`Sending ${activeType} message: ${formattedMessage}`);
-            sendMessage(channelId, { content: formattedMessage });
-            processedUsers.set(userId, now);
-        } catch (e) {
-            console.error(`[SocializeGuild] Failed to send message:`, e);
-        }
-
-        if (settings.store.queueTime > 0) {
-            await new Promise(r => setTimeout(r, settings.store.queueTime));
         }
     }
 
@@ -449,13 +362,14 @@ export function requestChannelInfo(channelId: string) {
     requestedInfo.set(channelId, now);
 
     log(`Queuing channel info request for ${channelId}`);
-    actionQueue.unshift({
+    const msg = formatInfoCommand(channelId);
+    queueAction({
         type: ActionType.INFO,
         userId: UserStore.getCurrentUser()?.id || "",
         channelId: channelId,
-        guildId: ChannelStore.getChannel(channelId)?.guild_id || settings.store.guildId
+        guildId: ChannelStore.getChannel(channelId)?.guild_id || settings.store.guildId,
+        external: msg
     });
-    processQueue();
 }
 
 export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | undefined {
@@ -596,17 +510,18 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
 
     for (const userId of userIds) {
         if (voiceStates && voiceStates[userId]) {
-            actionQueue.push({
+            const msg = formatKickCommand(channelId, userId);
+            queueAction({
                 type: ActionType.KICK,
                 userId: userId,
                 channelId: channelId,
-                guildId: guildId
+                guildId: guildId,
+                external: msg
             });
             count++;
         }
     }
 
-    if (count > 0) processQueue();
     return count;
 }
 
@@ -618,17 +533,18 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
 
     let count = 0;
     for (const userId of userIds) {
-        actionQueue.push({
+        const msg = formatUnbanCommand(channelId, userId);
+        queueAction({
             type: ActionType.UNBAN,
             userId: userId,
             channelId: channelId,
-            guildId: guildId
+            guildId: guildId,
+            external: msg
         });
         state.roleKickedUsers.delete(userId);
         count++;
     }
 
-    if (count > 0) processQueue();
     return count;
 }
 
@@ -642,16 +558,17 @@ export function bulkPermit(userIds: string[], channelId: string, guildId: string
 
     let count = 0;
     for (const userId of userIds) {
-        actionQueue.push({
+        const msg = formatPermitCommand(channelId, userId);
+        queueAction({
             type: ActionType.PERMIT,
             userId: userId,
             channelId: channelId,
-            guildId: guildId
+            guildId: guildId,
+            external: msg
         });
         count++;
     }
 
-    if (count > 0) processQueue();
     return count;
 }
 
@@ -663,16 +580,17 @@ export function bulkUnpermit(userIds: string[], channelId: string, guildId: stri
 
     let count = 0;
     for (const userId of userIds) {
-        actionQueue.push({
+        const msg = formatUnpermitCommand(channelId, userId);
+        queueAction({
             type: ActionType.UNPERMIT,
             userId: userId,
             channelId: channelId,
-            guildId: guildId
+            guildId: guildId,
+            external: msg
         });
         count++;
     }
 
-    if (count > 0) processQueue();
     return count;
 }
 

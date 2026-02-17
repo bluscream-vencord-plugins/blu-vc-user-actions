@@ -21,8 +21,8 @@ import {
     getWhitelist,
     setWhitelist
 } from "./utils";
-import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel, handleOwnerUpdate, bulkPermit, bulkUnpermit } from "./logic";
-import { actionQueue, ActionType, channelOwners } from "./state";
+import { checkChannelOwner, processQueue, bulkBanAndKick, bulkUnban, getMemberInfoForChannel, handleOwnerUpdate, bulkPermit, bulkUnpermit, queueAction } from "./logic";
+import { ActionType, channelOwners } from "./state";
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
     const chatChannelId = SelectedChannelStore.getChannelId();
@@ -69,13 +69,12 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                     // If they are in the bot's ban list, we must send an unban command.
                     if (info?.banned.includes(user.id)) {
                         log(`Unban from VC: Queuing UNBAN for ${user.id} in ${myChannelId}`);
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.UNBAN,
                             userId: user.id,
                             channelId: myChannelId,
                             guildId: chatChannel?.guild_id
                         });
-                        processQueue();
                     }
                 } else {
                     // We are banning.
@@ -83,13 +82,12 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
                     if (isTargetInMyChannel) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
                         log(`Ban from VC: Queuing KICK for ${user.id} in ${myChannelId}`);
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.KICK,
                             userId: user.id,
                             channelId: myChannelId,
                             guildId: voiceState?.guildId || chatChannel?.guild_id
                         });
-                        processQueue();
                     }
                 }
             }}
@@ -118,13 +116,12 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
 
                     if (isCreator || isClaimant) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.KICK,
                             userId: user.id,
                             channelId: myChannelId,
                             guildId: voiceState?.guildId
                         });
-                        processQueue();
                     } else {
                         const ownerText = `Creator: ${ownership?.creator?.userId || "None"}, Claimant: ${ownership?.claimant?.userId || "None"}`;
                         showToast(`Not owner of channel (${ownerText})`);
@@ -219,13 +216,12 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 action={async () => {
                     const me = UserStore.getCurrentUser();
                     if (me) {
-                        actionQueue.push({
+                        queueAction({
                             type: ActionType.CLAIM,
                             userId: me.id,
                             channelId: channel.id,
                             guildId: channel.guild_id
                         });
-                        processQueue();
                     } else {
                         showToast("Could not identify current user.");
                     }
@@ -242,14 +238,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                         cancelText: "Cancel",
                         onConfirm: () => {
                             if (newName && newName !== channel.name) {
-                                actionQueue.push({
+                                queueAction({
                                     type: ActionType.NAME,
                                     userId: "",
                                     channelId: channel.id,
                                     guildId: channel.guild_id,
                                     channelName: newName
                                 });
-                                processQueue();
                             }
                         },
                         body: (
@@ -269,52 +264,48 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                 id="socialize-guild-lock-channel"
                 label="Lock Channel"
                 action={() => {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.LOCK,
                         userId: "",
                         channelId: channel.id,
                         guildId: channel.guild_id
                     });
-                    processQueue();
                 }}
             />
             <Menu.MenuItem
                 id="socialize-guild-unlock-channel"
                 label="Unlock Channel"
                 action={() => {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.UNLOCK,
                         userId: "",
                         channelId: channel.id,
                         guildId: channel.guild_id
                     });
-                    processQueue();
                 }}
             />
             <Menu.MenuItem
                 id="socialize-guild-reset-channel"
                 label="Reset Channel"
                 action={() => {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.RESET,
                         userId: "",
                         channelId: channel.id,
                         guildId: channel.guild_id
                     });
-                    processQueue();
                 }}
             />
             <Menu.MenuItem
                 id="socialize-guild-info-command"
                 label="Send Info Command"
                 action={() => {
-                    actionQueue.push({
+                    queueAction({
                         type: ActionType.INFO,
                         userId: "",
                         channelId: channel.id,
                         guildId: channel.guild_id
                     });
-                    processQueue();
                 }}
             />
             <Menu.MenuItem
@@ -326,14 +317,13 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
                         id={`socialize-guild-set-size-${size}`}
                         label={size === 0 ? "Unlimited" : `${size} Users`}
                         action={() => {
-                            actionQueue.push({
+                            queueAction({
                                 type: ActionType.LIMIT,
                                 userId: "",
                                 channelId: channel.id,
                                 guildId: channel.guild_id,
                                 channelLimit: size
                             });
-                            processQueue();
                         }}
                     />
                 ))}

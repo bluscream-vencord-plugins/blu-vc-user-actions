@@ -77,12 +77,15 @@ export function handleVoteBan(message: any, channelId: string) {
 
     if (vote.voters.size >= requiredVotes) {
         log(`Voteban: Threshold reached for ${targetUserId}, banning...`);
-        actionQueue.push({
+        const { queueAction } = require("../logic");
+        const { formatBanCommand } = require("./formatting");
+        const banMsg = formatBanCommand(channelId, targetUserId);
+        queueAction({
             type: ActionType.BAN,
             userId: targetUserId,
             channelId: channelId,
-        } as any);
-        require("../logic").processQueue();
+            external: banMsg
+        });
         activeVotes.delete(voteKey);
     }
 }

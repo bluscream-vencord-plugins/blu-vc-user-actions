@@ -72,6 +72,10 @@ function formatCommand(
     return formatMessageCommon(formatted);
 }
 
+export function formatCustomMessage(template: string, channelId: string, userId?: string, newChannelName?: string): string {
+    return formatCommand(template, channelId, { userId, newChannelName });
+}
+
 export function formatclaimCommand(channelId: string, formerOwnerId?: string): string {
     return formatCommand(settings.store.claimCommand, channelId, { userId: formerOwnerId });
 }
@@ -112,6 +116,59 @@ export function formatWhitelistSkipMessage(channelId: string, userId: string, ac
     let formatted = formatCommand(settings.store.whitelistSkipMessage, channelId, { userId });
     formatted = formatted.replace(/{action}/g, actionType);
     return formatted;
+}
+
+export function formatKickCommand(channelId: string, userId: string): string {
+    return formatCommand(settings.store.kickCommand, channelId, { userId });
+}
+
+export function formatPermitCommand(channelId: string, userId: string): string {
+    return formatCommand(settings.store.permitCommand, channelId, { userId });
+}
+
+export function formatUnpermitCommand(channelId: string, userId: string): string {
+    return formatCommand(settings.store.unpermitCommand, channelId, { userId });
+}
+
+export function formatLockCommand(channelId: string): string {
+    return formatCommand(settings.store.lockCommand, channelId);
+}
+
+export function formatUnlockCommand(channelId: string): string {
+    return formatCommand(settings.store.unlockCommand, channelId);
+}
+
+export function formatLimitCommand(channelId: string, limit: number | string): string {
+    // There is no specific setChannelUserLimitCommand template that takes a limit in the settings store currently shown in logic.ts switch,
+    // assuming it exists or using the standard command.
+    // logic.ts: case ActionType.LIMIT: return settings.store.setChannelUserLimitCommand;
+    // We need to handle the limit replacement.
+    let cmd = settings.store.setChannelUserLimitCommand;
+    // formatCommand doesn't support generic replacements yet, let's look at logic.ts replacement.
+    // .replace(/{channel_limit}/g, options.channelLimit?.toString() || "");
+    // formatCommand supports options? No, let's check formatCommand above.
+    // It supports newChannelName and reason.
+    // We should probably update formatCommand or just do it here.
+
+    // Let's implement it here using formatCommand as base if possible, or just raw.
+    // formatCommand uses formatMessageCommon.
+    const channel = ChannelStore.getChannel(channelId);
+    let msg = cmd.replace(/{channel_limit}/g, limit.toString())
+        .replace(/{channel_id}/g, channelId)
+        .replace(/{channel_name}/g, channel?.name || "Unknown Channel");
+    return formatMessageCommon(msg);
+}
+
+export function formatChannelNameCommand(channelId: string, name: string): string {
+    return formatsetChannelNameCommand(channelId, name);
+}
+
+export function formatResetCommand(channelId: string): string {
+    return formatCommand(settings.store.resetCommand, channelId);
+}
+
+export function formatInfoCommand(channelId: string): string {
+    return formatCommand(settings.store.infoCommand, channelId);
 }
 
 export function toDiscordTime(datetime: number | Date, relative = false): string {
