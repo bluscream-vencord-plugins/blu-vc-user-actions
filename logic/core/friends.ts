@@ -4,8 +4,7 @@ export async function getFriendsOnGuild(guildId: string): Promise<string> {
     const me = UserStore.getCurrentUser();
     if (!me) return "❌ Could not identify current user.";
 
-    const relationships = (RelationshipStore as any).getRelationships();
-    const friendIds = Object.keys(relationships).filter(id => relationships[id] === 1); // 1 = Friend
+    const friendIds = RelationshipStore.getFriendIDs();
 
     if (friendIds.length === 0) return "Forever Alone (No friends found).";
 

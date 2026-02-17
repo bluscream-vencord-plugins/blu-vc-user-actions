@@ -12,9 +12,13 @@ export const channelNameSettings = {
         onChange: state.onRotationSettingsChange
     },
     rotateChannelNamesTime: {
-        type: OptionType.NUMBER as const,
+        type: OptionType.SLIDER as const,
         description: "Interval in minutes for channel name rotation",
-        default: 30,
+        default: 15,
+        min: 11,
+        max: 120,
+        markers: [11, 15, 30, 60, 120],
+        stickToMarkers: false,
         restartNeeded: false,
         onChange: state.onRotationSettingsChange
     },
