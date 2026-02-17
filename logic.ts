@@ -18,7 +18,7 @@ import { findStoreLazy } from "@webpack";
 const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
-import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
+import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage, requestGuildMembers } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
 import { BotResponse, BotResponseType } from "./utils/BotResponse";
@@ -496,9 +496,26 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
 }
 
 
-export function getFriendsOnGuild(guildId: string): string {
+export async function getFriendsOnGuild(guildId: string): Promise<string> {
     const friendIds = RelationshipStore.getFriendIDs();
-    const friendOnGuild = friendIds.filter(id => GuildMemberStore.isMember(guildId, id));
+
+    const allVoiceStates = VoiceStateStore.getAllVoiceStates();
+    const voiceStates: Record<string, any> = {};
+    for (const gid in allVoiceStates) {
+        if (gid === guildId) {
+            Object.assign(voiceStates, allVoiceStates[gid]);
+        }
+    }
+
+    const missing = friendIds.filter(id => !GuildMemberStore.isMember(guildId, id));
+    let syncTriggered = false;
+    if (missing.length > 0) {
+        requestGuildMembers(guildId, missing);
+        syncTriggered = true;
+        await new Promise(r => setTimeout(r, 500));
+    }
+
+    const friendOnGuild = friendIds.filter(id => GuildMemberStore.isMember(guildId, id) || !!voiceStates?.[id]);
 
     if (friendOnGuild.length === 0) return "No friends on this guild.";
 
@@ -521,13 +538,6 @@ export function getFriendsOnGuild(guildId: string): string {
         unknown: "❓"
     };
 
-    const allVoiceStates = VoiceStateStore.getAllVoiceStates();
-    const voiceStates: Record<string, any> = {};
-    for (const gid in allVoiceStates) {
-        if (gid === guildId) {
-            Object.assign(voiceStates, allVoiceStates[gid]);
-        }
-    }
     const friendInfo = friendOnGuild.map(id => {
         const user = UserStore.getUser(id);
         const status = PresenceStore.getStatus(id) || "offline";
@@ -550,7 +560,9 @@ export function getFriendsOnGuild(guildId: string): string {
         return `${emoji} <@${f.id}>${channel}`;
     });
 
-    return `### Mutual Friends on Guild\n${lines.join("\n")}`;
+    let output = `### Mutual Friends on Guild\n${lines.join("\n")}`;
+    if (syncTriggered) output += "\n\n*Note: Some friends may still be syncing. Try running again if anyone is missing.*";
+    return output;
 }
 
 // Re-export rotation and voteban

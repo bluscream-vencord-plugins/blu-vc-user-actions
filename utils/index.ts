@@ -8,3 +8,4 @@ export * from "./channels";
 export * from "./rotation";
 export * from "./voteban";
 export * from "./BotResponse";
+export * from "./members";

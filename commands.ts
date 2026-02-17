@@ -300,7 +300,7 @@ export const commands = [
                     sendBotMessage(ctx.channel.id, { content: "✅ Settings reset to defaults (excluding 'enabled')." });
                     break;
                 case "friends": {
-                    const friendsList = getFriendsOnGuild(settings.store.guildId);
+                    const friendsList = await getFriendsOnGuild(settings.store.guildId);
                     sendBotMessage(ctx.channel.id, { content: friendsList });
                     break;
                 }
