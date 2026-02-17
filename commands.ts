@@ -7,7 +7,6 @@ import { getKickList } from "./logic/blacklist/utils";
 import { getRotateNames } from "./logic/channelName/formatting";
 import { rotateChannelName, startRotation, stopRotation } from "./logic/channelName";
 import { checkChannelOwner, requestChannelInfo, getMemberInfoForChannel } from "./logic/channelClaim";
-import { getFriendsOnGuild } from "./logic/core/friends";
 
 export const commands = [
     {
@@ -48,7 +47,6 @@ export const commands = [
             { name: "bans-share", description: "Share the sync list in chat", type: ApplicationCommandOptionType.SUB_COMMAND },
             { name: "reset-state", description: "Reset internal state (channel owners, etc.)", type: ApplicationCommandOptionType.SUB_COMMAND },
             { name: "reset-settings", description: "Reset all settings to defaults", type: ApplicationCommandOptionType.SUB_COMMAND },
-            { name: "friends", description: "List mutual friends and their channels", type: ApplicationCommandOptionType.SUB_COMMAND }
         ],
         execute: async (args, ctx) => {
             const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
@@ -301,11 +299,6 @@ export const commands = [
                     }
                     sendBotMessage(ctx.channel.id, { content: "✅ Settings reset to defaults (excluding 'enabled')." });
                     break;
-                case "friends": {
-                    const friendsList = await getFriendsOnGuild(settings.store.guildId);
-                    sendBotMessage(ctx.channel.id, { content: friendsList });
-                    break;
-                }
 
                 default:
                     sendBotMessage(ctx.channel.id, { content: `❌ Unknown action: ${action}` });
