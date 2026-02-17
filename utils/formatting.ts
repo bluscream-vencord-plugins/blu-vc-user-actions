@@ -1,6 +1,6 @@
 import { UserStore, ChannelStore, GuildStore } from "@webpack/common";
 import { settings } from "../settings";
-import { getOwnerForChannel } from "./ownership";
+import { channelOwners } from "../state";
 
 export function getRotateNames(): string[] {
     return settings.store.rotateChannelNames
@@ -77,7 +77,8 @@ export function formatclaimCommand(channelId: string, formerOwnerId?: string): s
 }
 
 export function formatsetChannelNameCommand(channelId: string, name: string): string {
-    const ownerInfo = getOwnerForChannel(channelId);
+    const ownership = channelOwners.get(channelId);
+    const ownerInfo = ownership?.claimant || ownership?.creator;
     return formatCommand(settings.store.setChannelNameCommand, channelId, {
         userId: ownerInfo?.userId,
         newChannelName: name,

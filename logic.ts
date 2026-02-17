@@ -10,12 +10,15 @@ import {
     showToast,
     SelectedChannelStore,
     VoiceStateStore,
+    RelationshipStore,
+    PresenceStore,
+    GuildMemberStore,
 } from "@webpack/common";
 import { findStoreLazy } from "@webpack";
 const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 import { settings } from "./settings";
 import { actionQueue, processedUsers, state, setMemberInfo, memberInfos, ActionType, OwnerEntry, MemberChannelInfo, channelOwners } from "./state";
-import { formatMessageCommon, updateOwner, getOwnerForChannel, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
+import { formatMessageCommon, updateOwner, formatclaimCommand, navigateTo, jumpToFirstMessage, formatWhitelistSkipMessage } from "./utils";
 import { getKickList, setKickList, isWhitelisted } from "./utils/kicklist";
 import { startRotation, stopRotation } from "./utils/rotation";
 import { BotResponse, BotResponseType } from "./utils/BotResponse";
@@ -83,10 +86,34 @@ export async function processQueue() {
         let activeType = type;
 
         if (activeType === ActionType.BAN) {
-            const ownerInfo = getOwnerForChannel(channelId);
-            if (ownerInfo?.reason?.toLowerCase().includes("claim")) {
-                log(`Downgrading BAN to KICK for ${userId} in ${channelId} (Ownership Reason: ${ownerInfo.reason})`);
+            const ownership = channelOwners.get(channelId);
+            const isClaim = (ownership?.claimant?.reason?.toLowerCase().includes("claim")) || (ownership?.creator?.reason?.toLowerCase().includes("claim"));
+            if (isClaim) {
+                log(`Downgrading BAN to KICK for ${userId} in ${channelId} (Ownership Reason: ${ownership?.claimant?.reason || ownership?.creator?.reason})`);
                 activeType = ActionType.KICK;
+            } else if (!item.rotationTriggered) {
+                // Check for ban limit rotation
+                const ownerId = ownership?.claimant?.userId || ownership?.creator?.userId;
+                if (ownerId) {
+                    const info = memberInfos.get(ownerId);
+                    if (info && info.banned && info.banned.length >= settings.store.banLimit) {
+                        const userToUnban = info.banned[0];
+                        log(`Ban limit reached for owner ${ownerId}. Rotating ban: unbanning ${userToUnban} to make room for ${userId}`);
+
+                        // Re-queue the current BAN with the trigger flag
+                        actionQueue.unshift({ ...item, rotationTriggered: true });
+
+                        // Prepend the UNBAN action
+                        actionQueue.unshift({
+                            type: ActionType.UNBAN,
+                            userId: userToUnban,
+                            channelId: channelId,
+                            guildId: guildId
+                        });
+
+                        continue; // Process the new unshift(s) next
+                    }
+                }
             }
         }
 
@@ -150,13 +177,19 @@ export async function processQueue() {
 export function notifyOwnership(channelId: string) {
     const { sendBotMessage } = require("@api/Commands");
     if (!settings.store.enabled) return;
-    const ownerInfo = getOwnerForChannel(channelId);
-    if (!ownerInfo || !ownerInfo.userId) return;
+
+    const ownership = channelOwners.get(channelId);
+    if (!ownership) return;
 
     const channel = ChannelStore.getChannel(channelId);
     if (channel?.parent_id !== settings.store.categoryId) return;
 
     const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
+
+    // Notify about claimant if it exists, otherwise creator.
+    const ownerInfo = ownership.claimant || ownership.creator;
+    if (!ownerInfo) return;
+
     const owner = UserStore.getUser(ownerInfo.userId);
     const ownerName = owner?.globalName || owner?.username || ownerInfo.userId;
     const formatted = settings.store.ownershipChangeMessage
@@ -363,17 +396,26 @@ export function requestChannelInfo(channelId: string) {
 }
 
 export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | undefined {
-    const owner = getOwnerForChannel(channelId);
-    if (!owner) return undefined;
-    return memberInfos.get(owner.userId);
+    const ownership = channelOwners.get(channelId);
+    if (!ownership) return undefined;
+
+    // Claimant takes precedence for settings retrieval
+    if (ownership.claimant) {
+        const info = memberInfos.get(ownership.claimant.userId);
+        if (info) return info;
+    }
+    if (ownership.creator) {
+        return memberInfos.get(ownership.creator.userId);
+    }
+    return undefined;
 }
 
 export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
     let targetOwnerId = info.ownerId;
 
     if (!targetOwnerId) {
-        const owner = getOwnerForChannel(channelId);
-        targetOwnerId = owner?.userId;
+        const ownership = channelOwners.get(channelId);
+        targetOwnerId = ownership?.claimant?.userId || ownership?.creator?.userId;
     }
 
     if (targetOwnerId) {
@@ -453,42 +495,62 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
     return count;
 }
 
-export async function claimAllDisbandedChannels(guildId: string) {
-    if (!settings.store.enabled) return;
-    const channels = GuildChannelStore.getChannels(guildId).VOCAL;
-    if (!channels || channels.length === 0) return;
 
-    let count = 0;
-    const me = UserStore.getCurrentUser();
-    if (!me) return;
+export function getFriendsOnGuild(guildId: string): string {
+    const friendIds = RelationshipStore.getFriendIDs();
+    const friendOnGuild = friendIds.filter(id => GuildMemberStore.isMember(guildId, id));
 
-    for (const item of channels) {
-        const channel = item.channel;
-        if (channel.parent_id !== settings.store.categoryId) continue;
+    if (friendOnGuild.length === 0) return "No friends on this guild.";
 
-        const ownerInfo = getOwnerForChannel(channel.id);
-        const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+    const statusMap: Record<string, number> = {
+        online: 0,
+        streaming: 1,
+        idle: 2,
+        dnd: 3,
+        offline: 4,
+        invisible: 5,
+        unknown: 6
+    };
 
-        let shouldClaim = false;
-        if (ownerInfo?.userId) {
-            if (ownerInfo.userId === me.id) continue;
-            if (!voiceStates || !voiceStates[ownerInfo.userId]) shouldClaim = true;
-        } else {
-            shouldClaim = true;
-        }
+    const statusEmojis: Record<string, string> = {
+        online: "🟢",
+        idle: "🟡",
+        dnd: "🔴",
+        offline: "⚪",
+        invisible: "⚪",
+        unknown: "❓"
+    };
 
-        if (shouldClaim) {
-            actionQueue.push({
-                type: ActionType.CLAIM,
-                userId: me.id,
-                channelId: channel.id,
-                guildId: guildId
-            });
-            count++;
+    const allVoiceStates = VoiceStateStore.getAllVoiceStates();
+    const voiceStates: Record<string, any> = {};
+    for (const gid in allVoiceStates) {
+        if (gid === guildId) {
+            Object.assign(voiceStates, allVoiceStates[gid]);
         }
     }
+    const friendInfo = friendOnGuild.map(id => {
+        const user = UserStore.getUser(id);
+        const status = PresenceStore.getStatus(id) || "offline";
+        const channelId = voiceStates?.[id]?.channelId;
+        const name = user?.globalName || user?.username || id;
+        return { id, name, status, channelId };
+    });
 
-    if (count > 0) processQueue();
+    // Sort by status priority then name
+    friendInfo.sort((a, b) => {
+        const statusA = statusMap[a.status] ?? 6;
+        const statusB = statusMap[b.status] ?? 6;
+        if (statusA !== statusB) return statusA - statusB;
+        return a.name.localeCompare(b.name);
+    });
+
+    const lines = friendInfo.map(f => {
+        const emoji = statusEmojis[f.status] || "❓";
+        const channel = f.channelId ? `: <#${f.channelId}>` : "";
+        return `${emoji} <@${f.id}>${channel}`;
+    });
+
+    return `### Mutual Friends on Guild\n${lines.join("\n")}`;
 }
 
 // Re-export rotation and voteban

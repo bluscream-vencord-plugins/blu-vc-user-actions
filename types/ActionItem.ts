@@ -6,4 +6,5 @@ export interface ActionItem {
     channelId: string;
     guildId?: string;
     ephemeralMessage?: string;
+    rotationTriggered?: boolean;
 }

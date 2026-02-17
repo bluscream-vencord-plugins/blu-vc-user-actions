@@ -3,8 +3,8 @@ import { UserStore, SelectedChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { settings } from "./settings";
 import { state, channelOwners, actionQueue, processedUsers, memberInfos, resetState, MemberChannelInfo } from "./state";
-import { getOwnerForChannel, getKickList, getRotateNames } from "./utils";
-import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, requestChannelInfo, getMemberInfoForChannel } from "./logic";
+import { getKickList, getRotateNames } from "./utils";
+import { rotateChannelName, startRotation, checkChannelOwner, stopRotation, requestChannelInfo, getMemberInfoForChannel, getFriendsOnGuild } from "./logic";
 
 export const commands = [
     {
@@ -44,7 +44,8 @@ export const commands = [
             { name: "bans-list", description: "Show merged ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "Specific user to check", type: ApplicationCommandOptionType.USER, required: false }] },
             { name: "bans-share", description: "Share the sync list in chat", type: ApplicationCommandOptionType.SUB_COMMAND },
             { name: "reset-state", description: "Reset internal state (channel owners, etc.)", type: ApplicationCommandOptionType.SUB_COMMAND },
-            { name: "reset-settings", description: "Reset all settings to defaults", type: ApplicationCommandOptionType.SUB_COMMAND }
+            { name: "reset-settings", description: "Reset all settings to defaults", type: ApplicationCommandOptionType.SUB_COMMAND },
+            { name: "friends", description: "List mutual friends and their channels", type: ApplicationCommandOptionType.SUB_COMMAND }
         ],
         execute: async (args, ctx) => {
             const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
@@ -223,9 +224,10 @@ export const commands = [
                         const user = UserStore.getUser(targetUserId);
                         contextName = user?.globalName || user?.username || targetUserId;
                     } else {
-                        const owner = getOwnerForChannel(channelId);
-                        if (owner) {
-                            targetUserId = owner.userId;
+                        const ownership = channelOwners.get(channelId);
+                        const ownerId = ownership?.claimant?.userId || ownership?.creator?.userId;
+                        if (ownerId) {
+                            targetUserId = ownerId;
                             info = memberInfos.get(targetUserId);
                             const user = UserStore.getUser(targetUserId);
                             contextName = user?.globalName || user?.username || targetUserId;
@@ -297,6 +299,11 @@ export const commands = [
                     }
                     sendBotMessage(ctx.channel.id, { content: "✅ Settings reset to defaults (excluding 'enabled')." });
                     break;
+                case "friends": {
+                    const friendsList = getFriendsOnGuild(settings.store.guildId);
+                    sendBotMessage(ctx.channel.id, { content: friendsList });
+                    break;
+                }
 
                 default:
                     sendBotMessage(ctx.channel.id, { content: `❌ Unknown action: ${action}` });

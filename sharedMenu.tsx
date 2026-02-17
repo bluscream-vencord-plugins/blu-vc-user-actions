@@ -1,6 +1,6 @@
 import { ActionType, actionQueue, channelOwners } from "./state";
-import { getKickList, getOwnerForChannel, navigateTo, jumpToFirstMessage } from "./utils";
-import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, claimAllDisbandedChannels, fetchAllOwners } from "./logic";
+import { getKickList, navigateTo, jumpToFirstMessage } from "./utils";
+import { checkChannelOwner, handleOwnerUpdate, processQueue, requestChannelInfo, fetchAllOwners } from "./logic";
 import { settings } from "./settings";
 import { pluginInfo } from "./index";
 import { ChannelStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelActions, Menu, UserStore, React } from "@webpack/common";
@@ -74,11 +74,6 @@ export const getSharedMenuItems = () => {
                     showToast("No Create Channel ID configured in settings.");
                 }
             }}
-        />,
-        <Menu.MenuItem
-            id="socialize-guild-claim-disbanded"
-            label="Claim Disbanded Channels"
-            action={() => claimAllDisbandedChannels(settings.store.guildId)}
         />,
         <Menu.MenuItem
             id="blu-vc-user-actions-fetch-all-owners"

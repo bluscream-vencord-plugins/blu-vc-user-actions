@@ -14,8 +14,8 @@ import {
     ChannelActions
 } from "@webpack/common";
 import { settings } from "./settings";
-import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners, loadState } from "./state";
-import { log, getKickList, getOwnerForChannel, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
+import { ActionType, state, actionQueue, processedUsers, memberInfos, channelOwners, loadState, saveState } from "./state";
+import { log, getKickList, formatBanCommand, formatUnbanCommand, formatBanRotationMessage, navigateTo, jumpToFirstMessage } from "./utils";
 import {
     processQueue,
     checkChannelOwner,
@@ -140,6 +140,16 @@ export default definePlugin({
                     const ownership = channelOwners.get(s.oldChannelId);
                     if (!ownership) continue;
 
+                    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(s.oldChannelId);
+                    const occupantCount = voiceStates ? Object.keys(voiceStates).length : 0;
+
+                    if (occupantCount === 0) {
+                        log(`Channel ${s.oldChannelId} is now empty. Clearing ownership.`);
+                        channelOwners.delete(s.oldChannelId);
+                        saveState();
+                        continue;
+                    }
+
                     // Check if the person who left was either the creator or the claimant
                     const isCreator = ownership.creator?.userId === s.userId;
                     const isClaimant = ownership.claimant?.userId === s.userId;
@@ -154,12 +164,15 @@ export default definePlugin({
                         // So if claimant leaves, we should probably try to claim if we want it.
 
                             // Check if there is still an owner present
-                            const voiceStates = VoiceStateStore.getVoiceStatesForChannel(s.oldChannelId);
-                            const currentOwner = getOwnerForChannel(s.oldChannelId);
+                            const creatorId = ownership.creator?.userId;
+                            const claimantId = ownership.claimant?.userId;
 
-                            if (currentOwner && !voiceStates[currentOwner.userId]) {
-                                log(`Channel ${s.oldChannelId} is disbanded (Owner ${currentOwner.userId} left), auto-claiming...`);
-                                claimChannel(s.oldChannelId, currentOwner.userId);
+                            const isCreatorPresent = creatorId && voiceStates && voiceStates[creatorId];
+                            const isClaimantPresent = claimantId && voiceStates && voiceStates[claimantId];
+
+                            if (!isCreatorPresent && !isClaimantPresent) {
+                                log(`Channel ${s.oldChannelId} is disbanded (All owners left), auto-claiming...`);
+                                claimChannel(s.oldChannelId, s.userId);
                             }
                         }
                     }
@@ -170,11 +183,8 @@ export default definePlugin({
             if (!myChannelId) return;
 
             // Cache ownership once for the handler
-            let ownerInfo = getOwnerForChannel(myChannelId);
-            if (!ownerInfo || ownerInfo.userId === "") {
-                ownerInfo = await checkChannelOwner(myChannelId, settings.store.botId);
-            }
-            const isOwner = ownerInfo?.userId === me.id;
+            const ownership = channelOwners.get(myChannelId);
+            const isOwner = ownership && (ownership.creator?.userId === me.id || ownership.claimant?.userId === me.id);
 
             // Kick Not In Role Logic
             if (settings.store.kickNotInRole && isOwner) {

@@ -1,12 +1,5 @@
 import { channelOwners, ChannelOwnership, OwnerEntry, saveState, ChannelCreator, ChannelClaimant } from "../state";
 
-export function getOwnerForChannel(channelId: string): OwnerEntry | undefined {
-    const ownership = channelOwners.get(channelId);
-    if (!ownership) return undefined;
-
-    // Claimant takes precedence if it exists, otherwise use creator.
-    return ownership.claimant || ownership.creator;
-}
 
 export function updateOwner(channelId: string, owner: OwnerEntry): boolean {
     let ownership = channelOwners.get(channelId);
