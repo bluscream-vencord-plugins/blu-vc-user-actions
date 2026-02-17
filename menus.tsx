@@ -131,6 +131,44 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
         );
     }
 
+    if (myChannelId) {
+        const { permitted = [] } = getMemberInfoForChannel(myChannelId) || {};
+        const isPermitted = permitted.includes(user.id);
+
+        submenuItems.push(
+            <Menu.MenuItem
+                id="socialize-guild-permit-vc"
+                label={isPermitted ? "Unpermit" : "Permit"}
+                color={isPermitted ? "danger" : "success"}
+                action={async () => {
+                    const me = UserStore.getCurrentUser();
+                    let ownership = channelOwners.get(myChannelId);
+                    const isCached = ownership && (ownership.creator || ownership.claimant);
+
+                    if (!isCached) {
+                        await checkChannelOwner(myChannelId, settings.store.botId);
+                        ownership = channelOwners.get(myChannelId);
+                    }
+
+                    const isCreator = ownership?.creator?.userId === me.id;
+                    const isClaimant = ownership?.claimant?.userId === me.id;
+
+                    if (isCreator || isClaimant) {
+                        actionQueue.push({
+                            type: isPermitted ? ActionType.UNPERMIT : ActionType.PERMIT,
+                            userId: user.id,
+                            channelId: myChannelId,
+                            guildId: chatChannel?.guild_id
+                        });
+                        processQueue();
+                    } else {
+                        showToast("Not owner of channel.");
+                    }
+                }}
+            />
+        );
+    }
+
     submenuItems.push(
         <Menu.MenuItem
             id="vc-blu-vc-user-whitelist"

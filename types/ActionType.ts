@@ -3,5 +3,7 @@ export enum ActionType {
     BAN = 'BAN',
     UNBAN = 'UNBAN',
     CLAIM = 'CLAIM',
-    INFO = 'INFO'
+    INFO = 'INFO',
+    PERMIT = 'PERMIT',
+    UNPERMIT = 'UNPERMIT'
 }

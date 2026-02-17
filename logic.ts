@@ -130,6 +130,12 @@ export async function processQueue() {
             case ActionType.INFO:
                 template = settings.store.infoCommand;
                 break;
+            case ActionType.PERMIT:
+                template = settings.store.permitCommand;
+                break;
+            case ActionType.UNPERMIT:
+                template = settings.store.unpermitCommand;
+                break;
             default:
                 console.error(`Unknown action type: ${activeType}`);
                 continue;

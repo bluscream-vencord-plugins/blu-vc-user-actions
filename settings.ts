@@ -162,6 +162,18 @@ export const settings = definePluginSettings({
         default: "!v unban {user_id}",
         restartNeeded: false,
     },
+    permitCommand: {
+        type: OptionType.STRING,
+        description: "Message to send to permit a user",
+        default: "!v permit {user_id}",
+        restartNeeded: false,
+    },
+    unpermitCommand: {
+        type: OptionType.STRING,
+        description: "Message to revert permitting a user",
+        default: "!v unpermit {user_id}",
+        restartNeeded: false,
+    },
     setChannelNameCommand: {
         type: OptionType.STRING,
         description: "Message to send to set a channel name",
