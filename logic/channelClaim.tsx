@@ -752,7 +752,14 @@ export const ChannelClaimModule: PluginModule = {
                     if (newChannelId) {
                         const channel = ChannelStore.getChannel(newChannelId);
                         if (channel?.guild_id === settings.store.guildId && channel.parent_id === settings.store.categoryId) {
+                            log(`Opening text chat of voice channel ${newChannelId}`);
+                            ChannelActions.selectChannel(newChannelId);
+
+                            const { jumpToFirstMessage } = require("../utils");
                             setTimeout(() => {
+                                log(`Scrolling to start of ${newChannelId}`);
+                                jumpToFirstMessage(newChannelId, channel.guild_id);
+
                                 checkChannelOwner(newChannelId, settings.store.botId).then(owner => {
                                     if (owner) {
                                         handleOwnerUpdate(newChannelId, owner.userId, owner.timestamp, owner.type);
