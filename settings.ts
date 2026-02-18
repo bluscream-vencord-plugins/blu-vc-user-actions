@@ -1,13 +1,13 @@
 import { definePluginSettings } from "@api/Settings";
-import { blacklistSettings } from "./logic/blacklist/settings";
-import { whitelistSettings } from "./logic/whitelist/settings";
-import { permitSettings } from "./logic/permit/settings";
-import { kickNotInRoleSettings } from "./logic/kickNotInRole/settings";
-import { channelNameSettings } from "./logic/channelName/settings";
-import { channelClaimSettings } from "./logic/channelClaim/settings";
-import { votebanSettings } from "./logic/voteban/settings";
-import { queueSettings } from "./logic/queue/settings";
-import { coreSettings } from "./logic/core/settings";
+import { blacklistSettings } from "./logic/blacklist";
+import { whitelistSettings } from "./logic/whitelist";
+import { permitSettings } from "./logic/permit";
+import { kickNotInRoleSettings } from "./logic/kickNotInRole";
+import { channelNameSettings } from "./logic/channelName";
+import { channelClaimSettings } from "./logic/channelClaim";
+import { votebanSettings } from "./logic/voteban";
+import { queueSettings } from "./logic/queue";
+import { coreSettings } from "./logic/core";
 
 export const settings = definePluginSettings({
     ...blacklistSettings,

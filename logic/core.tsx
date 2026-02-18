@@ -1,7 +1,11 @@
-import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
-import { settings } from "../../settings";
+import { Menu, showToast } from "@webpack/common";
+import { openPluginModal } from "@components/settings/tabs";
+import { plugins } from "@api/PluginManager";
+import { pluginInfo } from "../info";
+import { PluginModule } from "../types/PluginModule";
 
+// #region Settings
 export const coreSettings = {
     guildId: {
         type: OptionType.STRING as const,
@@ -54,8 +58,67 @@ export const coreSettings = {
         readonly: true,
         multiline: true,
         onChange(_) {
+            const { settings } = require("../settings");
             settings.store.messageReference = settings.def.messageReference.default;
         },
         restartNeeded: false,
     },
 };
+// #endregion
+
+export const CoreMenuItems = {
+    getResetStateItem: () => (
+        <Menu.MenuItem
+            id="socialize-guild-reset-state"
+            label="Reset Plugin State"
+            action={() => {
+                const { resetState } = require("../state");
+                resetState();
+                showToast("Plugin state has been reset.", { type: "success" } as any);
+            }}
+            color="danger"
+        />
+    ),
+
+    getResetSettingsItem: () => (
+        <Menu.MenuItem
+            id="socialize-guild-reset-settings"
+            label="Reset Settings"
+            action={() => {
+                const { settings } = require("../settings");
+                for (const key in settings.def) {
+                    if (key === "enabled" || (settings.def as any)[key].readonly) continue;
+                    try {
+                        (settings.store as any)[key] = (settings.def as any)[key].default;
+                    } catch (e) { }
+                }
+                showToast("Settings have been reset to defaults.", { type: "success" } as any);
+            }}
+            color="danger"
+        />
+    ),
+
+    getEditSettingsItem: () => (
+        <Menu.MenuItem
+            id="blu-vc-user-actions-settings"
+            label="Edit Settings"
+            action={() => openPluginModal(plugins[pluginInfo.name])}
+        />
+    )
+};
+
+export const CoreModule: PluginModule = {
+    id: "core",
+    name: "General",
+    settings: coreSettings,
+    getGuildMenuItems: () => [
+        CoreMenuItems.getEditSettingsItem(),
+        CoreMenuItems.getResetStateItem(),
+        CoreMenuItems.getResetSettingsItem()
+    ],
+    getToolboxMenuItems: () => [
+        CoreMenuItems.getEditSettingsItem()
+    ]
+};
+
+// #endregion

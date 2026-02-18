@@ -5,36 +5,31 @@ import {
     VoiceStateStore,
     Menu,
 } from "@webpack/common";
-import { type User } from "@vencord/discord-types";
+import { type User, type Channel, type Guild } from "@vencord/discord-types";
 import { settings } from "./settings";
 import { pluginInfo } from "./info";
 import { isVoiceChannel } from "./utils";
-import { getSharedMenuItems } from "./sharedMenu";
+import { ChannelType } from "@vencord/discord-types/enums";
 
-// Modular Menu Imports
-import {
-    getClaimChannelItem,
-    getLockChannelItem,
-    getUnlockChannelItem,
-    getResetChannelItem,
-    getInfoCommandItem,
-    getSetSizeSubmenu
-} from "./logic/channelClaim/menus/channel";
-import { getRenameChannelItem } from "./logic/channelName/menus/channel";
-import {
-    getBanAllItem,
-    getUnbanAllItem,
-    getKickBannedUsersItem
-} from "./logic/blacklist/menus/channel";
-import {
-    getBlacklistUserItem,
-    getKickUserItem
-} from "./logic/blacklist/menus/user";
-import { getWhitelistUserItem } from "./logic/whitelist/menus/user";
-import {
-    getResetStateItem,
-    getResetSettingsItem
-} from "./logic/core/menus/guild";
+import { Modules } from "./ModuleRegistry";
+
+export function getChannelContextMenuItems(channel: Channel) {
+    if (channel.type !== ChannelType.GUILD_VOICE) return null;
+    if (channel.guild_id !== settings.store.guildId) return null;
+
+    const items = Modules.flatMap(m => m.getChannelMenuItems?.(channel) || []);
+    return items.length > 0 ? items : null;
+}
+
+export function getUserContextMenuItems(user: User, channelId?: string, guildId?: string) {
+    const items = Modules.flatMap(m => m.getUserMenuItems?.(user, channelId, guildId) || []);
+    return items.length > 0 ? items : null;
+}
+
+export function getGuildContextMenuItems(guild: Guild) {
+    const items = Modules.flatMap(m => m.getGuildMenuItems?.(guild) || []);
+    return items.length > 0 ? items : null;
+}
 
 export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
     const chatChannelId = SelectedChannelStore.getChannelId();
@@ -43,20 +38,9 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
     if (!user) return;
 
     const myChannelId = SelectedChannelStore.getVoiceChannelId();
-    const isTargetInMyChannel = myChannelId && VoiceStateStore.getVoiceStatesForChannel(myChannelId)?.[user.id];
+    const submenuItems = getUserContextMenuItems(user, myChannelId || undefined, chatChannel?.guild_id);
 
-    const submenuItems = [
-        getBlacklistUserItem(user, myChannelId || undefined, chatChannel?.guild_id)
-    ];
-
-    if (isTargetInMyChannel) {
-        const kickItem = getKickUserItem(user, myChannelId || undefined);
-        if (kickItem) submenuItems.push(kickItem);
-    }
-
-    submenuItems.push(
-        getWhitelistUserItem(user, myChannelId || undefined, chatChannel?.guild_id)
-    );
+    if (!submenuItems || submenuItems.length === 0) return;
 
     const submenu = (
         <Menu.MenuItem
@@ -72,18 +56,13 @@ export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { us
 
 export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
     if (guild?.id !== settings.store.guildId) return;
-    const sharedItems = getSharedMenuItems(); // Assuming sharedMenu returns array
+    const items = getGuildContextMenuItems(guild);
 
-    // We can't easily merge arrays inside JSX children unless we map or use fragment, but MenuItem accepts children as array.
-    // getSharedMenuItems returns JSX.Element[].
+    if (!items || items.length === 0) return;
 
     children.push(
         <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginInfo.name}>
-            {sharedItems}
-            <Menu.MenuGroup>
-                {getResetStateItem()}
-                {getResetSettingsItem()}
-            </Menu.MenuGroup>
+            {items}
         </Menu.MenuItem>
     );
 };
@@ -92,18 +71,12 @@ export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, {
     if (channel?.guild_id !== settings.store.guildId) return;
     if (!isVoiceChannel(channel)) return;
 
+    const items = getChannelContextMenuItems(channel);
+    if (!items || items.length === 0) return;
+
     children.push(
         <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginInfo.name}>
-            {getClaimChannelItem(channel)}
-            {getRenameChannelItem(channel)}
-            {getLockChannelItem(channel)}
-            {getUnlockChannelItem(channel)}
-            {getResetChannelItem(channel)}
-            {getInfoCommandItem(channel)}
-            {getSetSizeSubmenu(channel)}
-            {getBanAllItem(channel)}
-            {getUnbanAllItem(channel)}
-            {getKickBannedUsersItem(channel)}
+            {items}
         </Menu.MenuItem>
     );
 };

@@ -12,3 +12,4 @@ export enum ActionType {
     UNLOCK = 'UNLOCK',
     RESET = 'RESET'
 }
+

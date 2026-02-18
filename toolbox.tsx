@@ -1,5 +1,5 @@
-import { getSharedMenuItems } from "./sharedMenu";
+import { Modules } from "./ModuleRegistry";
 
-export const getToolboxActions = () => {
-    return getSharedMenuItems();
+export const getToolboxActions = (channelId?: string) => {
+    return Modules.flatMap(m => m.getToolboxMenuItems?.(channelId) || []);
 };

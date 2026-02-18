@@ -1,16 +1,38 @@
-import { settings } from "../../settings";
-import { state, actionQueue, ActionType } from "../../state";
-import { ActionItem } from "../../types/ActionItem";
-import { log } from "../../utils/logging";
+import { OptionType } from "@utils/types";
 import { sendMessage } from "@utils/discord";
 import { sendBotMessage } from "@api/Commands";
+import { state, actionQueue, ActionType } from "../state"; import { ActionItem } from "../types/ActionItem";
+import { log } from "../utils/logging";
+import { PluginModule } from "../types/PluginModule";
 
+// #region Settings
+export const queueSettings = {
+    queueTime: {
+        type: OptionType.SLIDER as const,
+        description: "Time in ms to wait between actions",
+        default: 1000,
+        min: 500,
+        max: 5000,
+        markers: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
+        stickToMarkers: false,
+        restartNeeded: false,
+    },
+};
+// #endregion
+
+export const QueueModule: PluginModule = {
+    id: "queue",
+    name: "Action Queue",
+    settings: queueSettings
+};
+
+
+// #region Logic
 export function queueAction(options: {
     type: ActionType;
-    channelId: string; // Needed for processQueue validation? No, processQueue uses state.myLastChannelId. But queueAction might log it.
+    channelId: string;
     ephemeral?: string;
     external?: string;
-    // Context for logging/debugging if needed
     userId?: string;
     guildId?: string;
 }) {
@@ -35,8 +57,6 @@ export function queueAction(options: {
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
 
-    // We get channelId from state to ensure we are sending to the active channel?
-    // logic.ts used state.myLastVoiceChannelId.
     const channelId = state.myLastVoiceChannelId;
     if (!channelId) {
         log("No active channel, clearing queue.");
@@ -56,6 +76,7 @@ export async function processQueue() {
         }
 
         if (item.external) {
+            const { settings } = require("../settings");
             log(`Sending command/message to ${channelId}: ${item.external}`);
             sendMessage(channelId, { content: item.external });
             if (settings.store.queueTime > 0) {
@@ -66,3 +87,4 @@ export async function processQueue() {
 
     state.isProcessing = false;
 }
+// #endregion
