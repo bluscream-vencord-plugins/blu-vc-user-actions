@@ -6,7 +6,7 @@ export interface PluginModule {
     id: string;
     name: string;
     description?: string;
-    settings?: Record<string, object>;
+    settings?: any;
 
     // Context Menu Items (Grouped)
     getChannelMenuItems?: (channel: Channel) => React.ReactElement | React.ReactElement[] | null;

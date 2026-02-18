@@ -4,30 +4,6 @@ import { formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { PluginModule } from "../types/PluginModule";
 
-// #region Settings
-export const permitSettings = {
-    permitCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to permit a user",
-        default: "!v permit {user_id}",
-        restartNeeded: false,
-    },
-    unpermitCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to unpermit a user",
-        default: "!v unpermit {user_id}",
-        restartNeeded: false,
-    },
-    permitRotationEnabled: {
-        type: OptionType.BOOLEAN as const,
-        description: "Automatically cycle permits when limit reached",
-        default: false,
-        restartNeeded: false,
-    },
-};
-// #endregion
-
-// #region Utils / Formatting
 export function formatPermitCommand(channelId: string, userId: string): string {
     const { settings } = require("../settings");
     return formatCommand(settings.store.permitCommand, channelId, { userId });
@@ -37,12 +13,30 @@ export function formatUnpermitCommand(channelId: string, userId: string): string
     const { settings } = require("../settings");
     return formatCommand(settings.store.unpermitCommand, channelId, { userId });
 }
-// #endregion
 
 export const PermitModule: PluginModule = {
     id: "permit",
     name: "Permit Management",
-    settings: permitSettings
+    settings: {
+        permitCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to permit a user",
+            default: "!v permit {user_id}",
+            restartNeeded: false,
+        },
+        unpermitCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to unpermit a user",
+            default: "!v unpermit {user_id}",
+            restartNeeded: false,
+        },
+        permitRotationEnabled: {
+            type: OptionType.BOOLEAN as const,
+            description: "Automatically cycle permits when limit reached",
+            default: false,
+            restartNeeded: false,
+        },
+    }
 };
 
 // #region Logic

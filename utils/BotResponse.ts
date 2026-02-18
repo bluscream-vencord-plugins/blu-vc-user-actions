@@ -1,6 +1,7 @@
 import { Message } from "@vencord/discord-types";
 import { MessageStore } from "@webpack/common";
 import { findStoreLazy } from "@webpack";
+
 const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore");
 
 export enum BotResponseType {
@@ -17,17 +18,30 @@ export enum BotResponseType {
     UNKNOWN = "Unknown"
 }
 
+interface EmbedAuthor {
+    name?: string;
+    icon_url?: string;
+    iconURL?: string;
+}
+
+interface Embed {
+    title?: string;
+    description?: string;
+    rawDescription?: string;
+    author?: EmbedAuthor;
+}
+
 export class BotResponse {
     public type: BotResponseType = BotResponseType.UNKNOWN;
     public initiatorId?: string;
     public channelId: string;
     public timestamp: number;
-    public embed: any;
+    public embed: Embed | undefined;
 
     constructor(private msg: Message, private botId: string) {
         this.channelId = msg.channel_id;
         this.timestamp = msg.timestamp ? new Date(msg.timestamp as any).getTime() : Date.now();
-        this.embed = msg.embeds?.[0];
+        this.embed = msg.embeds?.[0] as Embed | undefined;
 
         if (msg.author.id === botId && this.embed) {
             this.parseType();
@@ -36,6 +50,8 @@ export class BotResponse {
     }
 
     private parseType() {
+        if (!this.embed) return;
+
         const authorName = this.embed.author?.name?.toLowerCase() || "";
         const title = this.embed.title?.toLowerCase() || "";
         const description = this.getRawDescription().toLowerCase();
@@ -71,21 +87,24 @@ export class BotResponse {
         }
 
         // 2. Icon URL (Claimed/Info)
-        const iconURL = this.embed.author?.iconURL || this.embed.author?.icon_url;
+        const iconURL = this.embed?.author?.icon_url || this.embed?.author?.iconURL;
         if (iconURL) {
             const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
             if (userIdFromUrl) return userIdFromUrl;
         }
 
         // 3. Message Reference / Reply (ValidReply best practice)
-        if ((this.msg as any).referenced_message) {
-            return (this.msg as any).referenced_message.author?.id;
+        const refMessage = (this.msg as any).referenced_message;
+        if (refMessage) {
+            return refMessage.author?.id;
         }
 
         const ref = (this.msg as any).message_reference || (this.msg as any).messageReference;
         if (ref && ref.message_id) {
-            const refData = (ReferencedMessageStore as any)?.getMessageByReference?.(ref);
-            if (refData?.message) return refData.message.author?.id;
+            try {
+                const refData = (ReferencedMessageStore as any)?.getMessageByReference?.(ref);
+                if (refData?.message) return refData.message.author?.id;
+            } catch (e) { /* ignore */ }
 
             const cachedRef = MessageStore.getMessage(ref.channel_id || this.msg.channel_id, ref.message_id);
             if (cachedRef) return cachedRef.author?.id;
@@ -99,6 +118,6 @@ export class BotResponse {
     }
 
     public getRawDescription(): string {
-        return (this.embed as any)?.rawDescription || (this.embed as any)?.description || "";
+        return this.embed?.rawDescription || this.embed?.description || "";
     }
 }

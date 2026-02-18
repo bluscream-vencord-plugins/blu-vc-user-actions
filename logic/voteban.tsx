@@ -1,5 +1,6 @@
 import { OptionType } from "@utils/types";
-import { ActionType, channelOwners } from "../state"; import { log } from "../utils/logging";
+import { ActionType, channelOwners } from "../state";
+import { log, error } from "../utils/logging";
 import { queueAction } from "./queue";
 import { formatBanCommand } from "../utils/formatting";
 import { PluginModule } from "../types/PluginModule";
@@ -8,51 +9,16 @@ import { sendBotMessage } from "@api/Commands";
 import { VoiceStateStore } from "@webpack/common";
 
 // #region Settings
-export const votebanSettings = {
-    voteBanEnabled: {
-        type: OptionType.BOOLEAN as const,
-        description: "Enable vote ban system",
-        default: false,
-        restartNeeded: false,
-    },
-    voteBanPercentage: {
-        type: OptionType.NUMBER as const,
-        description: "Percentage of channel occupants required to ban",
-        default: 51,
-        min: 1,
-        max: 100,
-        restartNeeded: false,
-    },
-    voteBanExpireTime: {
-        type: OptionType.NUMBER as const,
-        description: "Time in minutes before a vote expires",
-        default: 5,
-        restartNeeded: false,
-    },
-    voteBanSubmitMessage: {
-        type: OptionType.STRING as const,
-        description: "Message to send when a vote is submitted",
-        default: "🗳️ <@{voter_id}> voted to ban <@{target_id}>. (Expires in {expire_time}m)",
-        restartNeeded: false,
-    },
-    voteBanRegex: {
-        type: OptionType.STRING as const,
-        description: "Regex to detect vote ban commands",
-        default: "^vk\\s+<@!?(\\d+)>",
-        restartNeeded: false,
-    },
-};
 // #endregion
 
-// #region Utils / Formatting
 export function formatVoteSubmitted(voterId: string, targetId: string, expireTime: number): string {
     const { settings } = require("../settings");
-    return settings.store.voteBanSubmitMessage
+    const msg = settings.store.voteBanSubmitMessage as string;
+    return msg
         .replace(/{voter_id}/g, voterId)
         .replace(/{target_id}/g, targetId)
         .replace(/{expire_time}/g, expireTime.toString());
 }
-// #endregion
 
 // #region Logic
 const activeVotes = new Map<string, Set<string>>(); // targetId -> Set<voterId>
@@ -61,7 +27,7 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
     const { settings } = require("../settings");
     if (!settings.store.voteBanEnabled) return;
 
-    const regex = new RegExp(settings.store.voteBanRegex, "i");
+    const regex = new RegExp(settings.store.voteBanRegex as string, "i");
     const match = message.content.match(regex);
     if (!match) return;
 
@@ -69,7 +35,7 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
     const voterId = message.author.id;
 
     const ownership = channelOwners.get(channelId);
-    const isOwner = ownership && (ownership.creator?.userId === voterId || ownership.claimant?.userId === voterId);
+    const isOwner = ownership?.creator?.userId === voterId || ownership?.claimant?.userId === voterId;
 
     if (isOwner) {
         log(`Owner ${voterId} used vote ban command, bypassing threshold.`);
@@ -97,14 +63,16 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
     if (!votes) {
         votes = new Set();
         activeVotes.set(targetId, votes);
-        setTimeout(() => activeVotes.delete(targetId), settings.store.voteBanExpireTime * 60 * 1000);
+        const expireTime = (settings.store.voteBanExpireTime as number) * 60 * 1000;
+        setTimeout(() => activeVotes.delete(targetId), expireTime);
     }
 
     if (votes.has(voterId)) return;
     votes.add(voterId);
 
     const occupantCount = Object.keys(voiceStates).length;
-    const requiredVotes = Math.ceil((occupantCount * settings.store.voteBanPercentage) / 100);
+    const percentage = settings.store.voteBanPercentage as number;
+    const requiredVotes = Math.ceil((occupantCount * percentage) / 100);
 
     log(`Vote ban for ${targetId} in ${channelId}: ${votes.size}/${requiredVotes} (Occupants: ${occupantCount})`);
 
@@ -119,19 +87,51 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
         });
         activeVotes.delete(targetId);
     } else {
-        const { settings } = require("../settings");
-        sendBotMessage(channelId, { content: formatVoteSubmitted(voterId, targetId, settings.store.voteBanExpireTime) });
+        const expireTime = settings.store.voteBanExpireTime as number;
+        sendBotMessage(channelId, { content: formatVoteSubmitted(voterId, targetId, expireTime) });
     }
 }
 
 export const VotebanModule: PluginModule = {
     id: "voteban",
     name: "Vote Banning",
-    settings: votebanSettings,
+    settings: {
+        voteBanEnabled: {
+            type: OptionType.BOOLEAN as const,
+            description: "Enable vote ban system",
+            default: false,
+            restartNeeded: false,
+        },
+        voteBanPercentage: {
+            type: OptionType.NUMBER as const,
+            description: "Percentage of channel occupants required to ban",
+            default: 51,
+            min: 1,
+            max: 100,
+            restartNeeded: false,
+        },
+        voteBanExpireTime: {
+            type: OptionType.NUMBER as const,
+            description: "Time in minutes before a vote expires",
+            default: 5,
+            restartNeeded: false,
+        },
+        voteBanSubmitMessage: {
+            type: OptionType.STRING as const,
+            description: "Message to send when a vote is submitted",
+            default: "🗳️ <@{voter_id}> voted to ban <@{target_id}>. (Expires in {expire_time}m)",
+            restartNeeded: false,
+        },
+        voteBanRegex: {
+            type: OptionType.STRING as const,
+            description: "Regex to detect vote ban commands",
+            default: "^vk\\s+<@!?(\\d+)>",
+            restartNeeded: false,
+        },
+    },
     onMessageCreate: (message, channelId, guildId) => {
         if (channelId) {
             handleVoteBan(message, channelId, guildId || "");
         }
     }
 };
-// #endregion

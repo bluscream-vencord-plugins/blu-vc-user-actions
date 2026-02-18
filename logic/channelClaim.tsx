@@ -4,7 +4,7 @@ import {
     Menu, showToast, UserStore, ChannelStore, SelectedChannelStore, ChannelActions, GuildStore, GuildChannelStore, MessageStore, RestAPI, Constants, VoiceStateStore
 } from "@webpack/common";
 import { type Channel } from "@vencord/discord-types";
-import { ActionType, channelOwners, memberInfos, setMemberInfo, OwnerEntry, ChannelCreator, ChannelClaimant, saveState, MemberChannelInfo, state } from "../state"; import { log } from "../utils/logging";
+import { ActionType, channelOwners, memberInfos, setMemberInfo, OwnerEntry, ChannelCreator, ChannelClaimant, saveState, MemberChannelInfo, state } from "../state"; import { log, warn, error } from "../utils/logging";
 import { formatCommand, formatMessageCommon, formatclaimCommand, formatLockCommand, formatUnlockCommand, formatResetCommand, formatInfoCommand, formatLimitCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { BotResponse, BotResponseType } from "../utils/BotResponse";
@@ -13,80 +13,7 @@ import { jumpToFirstMessage } from "../utils/navigation";
 import { PluginModule } from "../types/PluginModule";
 import { Modules } from "../ModuleRegistry";
 // #region Settings
-export const channelClaimSettings = {
-    ownershipChangeNotificationAny: {
-        type: OptionType.BOOLEAN as const,
-        description: "Show notification for any channel ownership change",
-        default: false,
-        restartNeeded: false,
-    },
-    autoClaimDisbanded: {
-        type: OptionType.BOOLEAN as const,
-        description: "Automatically claim the channel you're in when its owner leaves",
-        default: false,
-        restartNeeded: false,
-    },
-    autoNavigateToOwnedChannel: {
-        type: OptionType.BOOLEAN as const,
-        description: "Automatically navigate to the channel you own",
-        default: true,
-        restartNeeded: false,
-    },
-    fetchOwnersOnStartup: {
-        type: OptionType.BOOLEAN as const,
-        description: "Fetch all owners in the category on startup",
-        default: false,
-        restartNeeded: false,
-    },
-    showChannelInfoChangeMessage: {
-        type: OptionType.BOOLEAN as const,
-        description: "Causes a message to be sent to the channel when the channel info changes",
-        default: false,
-        restartNeeded: false,
-    },
-    ownershipChangeMessage: {
-        type: OptionType.STRING as const,
-        description: "Message to show when ownership is detected",
-        default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
-        restartNeeded: false,
-    },
-    claimCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to claim a channel",
-        default: "!v claim",
-        restartNeeded: false,
-    },
-    infoCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to get channel info",
-        default: "!v info",
-        restartNeeded: false,
-    },
-    setChannelUserLimitCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to set a channel limit",
-        default: "!v size {channel_limit}",
-        restartNeeded: false,
-    },
-    lockCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to lock a channel",
-        default: "!v lock",
-        restartNeeded: false,
-    },
-    unlockCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to unlock a channel",
-        default: "!v unlock",
-        restartNeeded: false,
-    },
-    resetCommand: {
-        type: OptionType.STRING as const,
-        description: "Message to send to reset channel settings",
-        default: "!v reset",
-        restartNeeded: false,
-    },
-};
+// #endregion
 // #endregion
 
 // #region Menus
@@ -386,18 +313,15 @@ export function notifyOwnership(channelId: string) {
     });
 }
 
-export async function checkChannelOwner(channelId: string, botId: string): Promise<{ userId: string, timestamp: number, type: 'creator' | 'claimant' } | undefined> {
+export async function checkChannelOwner(channelId: string, botId: string): Promise<(OwnerEntry & { type: 'creator' | 'claimant' }) | undefined> {
     const cached = MessageStore.getMessages(channelId);
 
-    const msgsArray = cached ? (cached.toArray ? cached.toArray() : cached) : [];
+    const msgsArray: Message[] = cached ? (cached.toArray ? cached.toArray() : cached) : [];
 
-    for (let i = 0; i < msgsArray.length; i++) {
-        const msg = msgsArray[i];
+    for (const msg of msgsArray) {
         const response = new BotResponse(msg, botId);
-        const isOwnership = response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED);
-
-        if (isOwnership) {
-            updateOwner(channelId, response.initiatorId!, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
+        if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
+            updateOwner(channelId, response.initiatorId, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
         }
     }
 
@@ -405,12 +329,12 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
     if (!currentOwnership?.creator) {
         const BATCH_LIMIT = 100;
         const MAX_BATCHES = 5;
-        let collectedBatches: any[][] = [];
+        let collectedBatches: Message[][] = [];
         let beforeId: string | undefined;
 
         for (let batch = 0; batch < MAX_BATCHES; batch++) {
             try {
-                const query: any = { limit: BATCH_LIMIT };
+                const query: Record<string, string | number> = { limit: BATCH_LIMIT };
                 if (beforeId) query.before = beforeId;
 
                 const res = await RestAPI.get({
@@ -420,7 +344,7 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
 
                 if (!res.body || !Array.isArray(res.body) || res.body.length === 0) break;
 
-                const messages = res.body;
+                const messages = res.body as Message[];
                 collectedBatches.push(messages);
 
                 let foundCreation = false;
@@ -436,7 +360,7 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
 
                 beforeId = messages[messages.length - 1].id;
             } catch (e) {
-                log(`[OwnershipCheck] Error fetching batch ${batch + 1}:`, e);
+                error(`[OwnershipCheck] Error fetching batch ${batch + 1}:`, e);
                 break;
             }
         }
@@ -446,10 +370,8 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
             for (let i = batch.length - 1; i >= 0; i--) {
                 const msg = batch[i];
                 const response = new BotResponse(msg, botId);
-                const isOwnership = response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED);
-
-                if (isOwnership) {
-                    updateOwner(channelId, response.initiatorId!, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
+                if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
+                    updateOwner(channelId, response.initiatorId, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
                 }
             }
         }
@@ -461,8 +383,7 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
     const entry = ownership.claimant || ownership.creator;
     if (!entry) return undefined;
 
-    // We need to extend the entry with 'type' field dynamically or return a wrapper
-    return { ...entry, type: isClaimant ? 'claimant' : 'creator' } as any;
+    return { ...entry, type: isClaimant ? 'claimant' : 'creator' };
 }
 
 export async function fetchAllOwners() {
@@ -675,7 +596,80 @@ export function handleOwnerUpdate(channelId: string, userId: string, timestamp: 
 export const ChannelClaimModule: PluginModule = {
     id: "channel-claim",
     name: "Channel Management",
-    settings: channelClaimSettings,
+    settings: {
+        ownershipChangeNotificationAny: {
+            type: OptionType.BOOLEAN as const,
+            description: "Show notification for any channel ownership change",
+            default: false,
+            restartNeeded: false,
+        },
+        autoClaimDisbanded: {
+            type: OptionType.BOOLEAN as const,
+            description: "Automatically claim the channel you're in when its owner leaves",
+            default: false,
+            restartNeeded: false,
+        },
+        autoNavigateToOwnedChannel: {
+            type: OptionType.BOOLEAN as const,
+            description: "Automatically navigate to the channel you own",
+            default: true,
+            restartNeeded: false,
+        },
+        fetchOwnersOnStartup: {
+            type: OptionType.BOOLEAN as const,
+            description: "Fetch all owners in the category on startup",
+            default: false,
+            restartNeeded: false,
+        },
+        showChannelInfoChangeMessage: {
+            type: OptionType.BOOLEAN as const,
+            description: "Causes a message to be sent to the channel when the channel info changes",
+            default: false,
+            restartNeeded: false,
+        },
+        ownershipChangeMessage: {
+            type: OptionType.STRING as const,
+            description: "Message to show when ownership is detected",
+            default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})",
+            restartNeeded: false,
+        },
+        claimCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to claim a channel",
+            default: "!v claim",
+            restartNeeded: false,
+        },
+        infoCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to get channel info",
+            default: "!v info",
+            restartNeeded: false,
+        },
+        setChannelUserLimitCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to set a channel limit",
+            default: "!v size {channel_limit}",
+            restartNeeded: false,
+        },
+        lockCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to lock a channel",
+            default: "!v lock",
+            restartNeeded: false,
+        },
+        unlockCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to unlock a channel",
+            default: "!v unlock",
+            restartNeeded: false,
+        },
+        resetCommand: {
+            type: OptionType.STRING as const,
+            description: "Message to send to reset channel settings",
+            default: "!v reset",
+            restartNeeded: false,
+        },
+    },
     getChannelMenuItems: (channel) => ([
         ChannelMenuItems.getClaimChannelItem(channel),
         ChannelMenuItems.getLockChannelItem(channel),

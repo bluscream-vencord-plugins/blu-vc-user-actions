@@ -6,24 +6,24 @@ import { log } from "../utils/logging";
 import { PluginModule } from "../types/PluginModule";
 
 // #region Settings
-export const queueSettings = {
-    queueTime: {
-        type: OptionType.SLIDER as const,
-        description: "Time in ms to wait between actions",
-        default: 1000,
-        min: 500,
-        max: 5000,
-        markers: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
-        stickToMarkers: false,
-        restartNeeded: false,
-    },
-};
+// #endregion
 // #endregion
 
 export const QueueModule: PluginModule = {
     id: "queue",
     name: "Action Queue",
-    settings: queueSettings
+    settings: {
+        queueTime: {
+            type: OptionType.SLIDER as const,
+            description: "Time in ms to wait between actions",
+            default: 1000,
+            min: 500,
+            max: 5000,
+            markers: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
+            stickToMarkers: false,
+            restartNeeded: false,
+        },
+    }
 };
 
 
@@ -57,6 +57,7 @@ export function queueAction(options: {
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
 
+    const { settings } = require("../settings");
     const channelId = state.myLastVoiceChannelId;
     if (!channelId) {
         log("No active channel, clearing queue.");
@@ -76,7 +77,6 @@ export async function processQueue() {
         }
 
         if (item.external) {
-            const { settings } = require("../settings");
             log(`Sending command/message to ${channelId}: ${item.external}`);
             sendMessage(channelId, { content: item.external });
             if (settings.store.queueTime > 0) {

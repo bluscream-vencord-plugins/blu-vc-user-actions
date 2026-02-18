@@ -1,22 +1,22 @@
 import { definePluginSettings } from "@api/Settings";
-import { blacklistSettings } from "./logic/blacklist";
-import { whitelistSettings } from "./logic/whitelist";
-import { permitSettings } from "./logic/permit";
-import { kickNotInRoleSettings } from "./logic/kickNotInRole";
-import { channelNameSettings } from "./logic/channelName";
-import { channelClaimSettings } from "./logic/channelClaim";
-import { votebanSettings } from "./logic/voteban";
-import { queueSettings } from "./logic/queue";
-import { coreSettings } from "./logic/core";
+import { BlacklistModule } from "./logic/blacklist";
+import { WhitelistModule } from "./logic/whitelist";
+import { PermitModule } from "./logic/permit";
+import { KickNotInRoleModule } from "./logic/kickNotInRole";
+import { ChannelNameModule } from "./logic/channelName";
+import { ChannelClaimModule } from "./logic/channelClaim";
+import { VotebanModule } from "./logic/voteban";
+import { QueueModule } from "./logic/queue";
+import { CoreModule } from "./logic/core";
 
 export const settings = definePluginSettings({
-    ...blacklistSettings,
-    ...whitelistSettings,
-    ...permitSettings,
-    ...kickNotInRoleSettings,
-    ...channelNameSettings,
-    ...channelClaimSettings,
-    ...votebanSettings,
-    ...queueSettings,
-    ...coreSettings,
+    ...BlacklistModule.settings,
+    ...WhitelistModule.settings,
+    ...PermitModule.settings,
+    ...KickNotInRoleModule.settings,
+    ...ChannelNameModule.settings,
+    ...ChannelClaimModule.settings,
+    ...VotebanModule.settings,
+    ...QueueModule.settings,
+    ...CoreModule.settings,
 });

@@ -1,5 +1,7 @@
 import * as DataStore from "@api/DataStore";
 import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant } from "./types";
+import { log, error } from "./utils/logging";
+
 export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant };
 
 // Persistence Keys
@@ -8,6 +10,24 @@ const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v1";
 
 export const channelOwners = new Map<string, ChannelOwnership>();
 export const memberInfos = new Map<string, MemberChannelInfo>(); // Map<ownerId, MemberChannelInfo>
+
+let saveTimeout: NodeJS.Timeout | null = null;
+
+export async function saveState() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+
+    saveTimeout = setTimeout(async () => {
+        try {
+            await DataStore.set(STORAGE_KEY_OWNERS, Object.fromEntries(channelOwners));
+            await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
+            // log("[State] Automatically saved to DataStore");
+        } catch (e) {
+            error("[State] Failed to save state:", e);
+        } finally {
+            saveTimeout = null;
+        }
+    }, 2000); // 2 second debounce
+}
 
 export async function loadState() {
     try {
@@ -23,9 +43,9 @@ export async function loadState() {
                 memberInfos.set(k, v as MemberChannelInfo);
             }
         }
-        console.log(`[SocializeGuild] State loaded: ${channelOwners.size} owners, ${memberInfos.size} members`);
+        log(`[State] Loaded: ${channelOwners.size} owners, ${memberInfos.size} members`);
     } catch (e) {
-        console.error("[SocializeGuild] Failed to load state from DataStore:", e);
+        error("[State] Failed to load state:", e);
     }
 }
 
@@ -35,7 +55,7 @@ export const state = {
     isProcessing: false,
     myLastVoiceChannelId: undefined as string | null | undefined,
     rotationIndex: new Map<string, number>(),
-    rotationIntervals: new Map<string, any>(),
+    rotationIntervals: new Map<string, NodeJS.Timeout>(),
     lastRotationTime: new Map<string, number>(),
     roleKickedUsers: new Set<string>(),
     onRotationSettingsChange: () => {
@@ -44,15 +64,6 @@ export const state = {
     },
     requestedInfo: new Map<string, number>(),
 };
-
-export async function saveState() {
-    try {
-        await DataStore.set(STORAGE_KEY_OWNERS, Object.fromEntries(channelOwners));
-        await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
-    } catch (e) {
-        console.error("[SocializeGuild] Failed to save state to DataStore:", e);
-    }
-}
 
 export function setMemberInfo(ownerId: string, info: MemberChannelInfo) {
     memberInfos.set(ownerId, info);

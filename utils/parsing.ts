@@ -1,6 +1,19 @@
 import { MemberChannelInfo } from "../state";
-import { log } from "./logging";
+import { log, error } from "./logging";
 import { BotResponse, BotResponseType } from "./BotResponse";
+
+const Patterns = {
+    CHANNEL_ID: [
+        /<#(\d+)>/,
+        /\*\*Channel ID:\*\* `(\d+)`/,
+    ],
+    NAME: /\*\*Name:\*\* (.*)/,
+    LIMIT: /\*\*Limit:\*\* (\d+)/,
+    STATUS: /\*\*Status:\*\* (.*)/,
+    PERMITTED_HEADER: /\*\*Permitted\*\*/,
+    BANNED_HEADER: /\*\*Banned\*\*/,
+    USER_MENTION: /<@!?(\d+)>/
+};
 
 export function parseBotInfoMessage(response: BotResponse): { info: MemberChannelInfo, channelId: string } | null {
     if (!response.embed) return null;
@@ -11,60 +24,57 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
         banned: [],
         timestamp: response.timestamp,
         updated: Date.now(),
-        // ownerId should NOT come from initiatorId for INFO responses
         ownerId: (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED) ? response.initiatorId : undefined
     };
 
     let targetChannelId = response.channelId;
 
     try {
-        // Parse Channel ID from Description or Title
-        const channelMatch = rawDescription.match(/<#(\d+)>/) ||
-            rawDescription.match(/\*\*Channel ID:\*\* `(\d+)`/) ||
-            ((response.embed as any).title || "").match(/<#(\d+)>/);
-        if (channelMatch) targetChannelId = channelMatch[1];
+        // Parse Channel ID
+        for (const pattern of Patterns.CHANNEL_ID) {
+            const match = rawDescription.match(pattern) || (response.embed.title || "").match(pattern);
+            if (match) {
+                targetChannelId = match[1];
+                break;
+            }
+        }
 
-        // Parse Name
-        const nameMatch = rawDescription.match(/\*\*Name:\*\* (.*)/);
+        // Parse fields
+        const nameMatch = rawDescription.match(Patterns.NAME);
         if (nameMatch) info.name = nameMatch[1].trim();
 
-        // Parse Limit
-        const limitMatch = rawDescription.match(/\*\*Limit:\*\* (\d+)/);
+        const limitMatch = rawDescription.match(Patterns.LIMIT);
         if (limitMatch) info.limit = parseInt(limitMatch[1]);
 
-        // Parse Status
-        const statusMatch = rawDescription.match(/\*\*Status:\*\* (.*)/);
+        const statusMatch = rawDescription.match(Patterns.STATUS);
         if (statusMatch) info.status = statusMatch[1].trim();
 
-        // Parse Permitted and Banned users
+        // Parse lists (Permitted / Banned)
         const lines = rawDescription.split("\n");
         let currentSection: "permitted" | "banned" | null = null;
 
         for (let line of lines) {
             line = line.trim();
-            if (line.includes("**Permitted**")) {
+            if (Patterns.PERMITTED_HEADER.test(line)) {
                 currentSection = "permitted";
                 continue;
-            } else if (line.includes("**Banned**")) {
+            } else if (Patterns.BANNED_HEADER.test(line)) {
                 currentSection = "banned";
                 continue;
             }
 
-            if (currentSection && line.startsWith("> <@")) {
-                const idMatch = line.match(/<@!?(\d+)>/);
+            if (currentSection && line.startsWith(">")) {
+                const idMatch = line.match(Patterns.USER_MENTION);
                 if (idMatch) {
-                    if (currentSection === "permitted") {
-                        info.permitted.push(idMatch[1]);
-                    } else {
-                        info.banned.push(idMatch[1]);
-                    }
+                    if (currentSection === "permitted") info.permitted.push(idMatch[1]);
+                    else info.banned.push(idMatch[1]);
                 }
             }
         }
 
         return { info, channelId: targetChannelId };
     } catch (e) {
-        log("Error parsing channel info embed:", e);
+        error("[Parsing] Error extracting info from embed:", e);
         return null;
     }
 }
