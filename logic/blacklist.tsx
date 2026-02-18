@@ -4,24 +4,24 @@ import { sendMessage } from "@utils/discord";
 import { type Channel, type User } from "@vencord/discord-types";
 import { ActionType, channelOwners } from "../state";
 import { log, warn, error } from "../utils/logging";
-import { formatMessageCommon, formatKickCommand, formatUnbanCommand } from "../utils/formatting";
+import { formatMessageCommon, formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { checkChannelOwner, getMemberInfoForChannel } from "./channelClaim";
 import { PluginModule } from "../types/PluginModule";
 import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 
 export function getKickList(): string[] {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return (settings.store.localUserBlacklist as string).split(/\r?\n/).map(s => s.trim()).filter(id => /^\d{17,19}$/.test(id));
 }
 
 export function setKickList(newList: string[]) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     settings.store.localUserBlacklist = newList.join("\n");
 }
 
 export function formatBanRotationMessage(channelId: string, oldUserId: string, newUserId: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const oldUser = UserStore.getUser(oldUserId);
     const newUser = UserStore.getUser(newUserId);
     const msg = settings.store.banRotationMessage
@@ -85,7 +85,8 @@ export const BlacklistMenuItems = {
                 let count = 0;
                 for (const uid in voiceStates) {
                     if (kickList.includes(uid)) {
-                        const cmd = formatKickCommand(channel.id, uid);
+                        const { settings } = require("..");
+                        const cmd = formatCommand(settings.store.kickCommand, channel.id, { userId: uid });
                         queueAction({
                             type: ActionType.KICK,
                             userId: uid,
@@ -126,7 +127,7 @@ export const BlacklistMenuItems = {
 
                     let ownership = channelOwners.get(myChannelId);
                     if (!ownership?.creator && !ownership?.claimant) {
-                        const { settings } = require("../settings");
+                        const { settings } = require("..");
                         await checkChannelOwner(myChannelId, settings.store.botId);
                         ownership = channelOwners.get(myChannelId);
                     }
@@ -177,7 +178,7 @@ export const BlacklistMenuItems = {
                 action={async () => {
                     let ownership = channelOwners.get(myChannelId);
                     if (!ownership?.creator && !ownership?.claimant) {
-                        const { settings } = require("../settings");
+                        const { settings } = require("..");
                         await checkChannelOwner(myChannelId, settings.store.botId);
                         ownership = channelOwners.get(myChannelId);
                     }
@@ -281,7 +282,8 @@ export const BlacklistModule: PluginModule = {
                 let count = 0;
                 for (const uid in voiceStates) {
                     if (kickList.includes(uid)) {
-                        const cmd = formatKickCommand(channelId, uid);
+                        const { settings } = require("..");
+                        const cmd = formatCommand(settings.store.kickCommand, channelId, { userId: uid });
                         queueAction({ type: ActionType.KICK, userId: uid, channelId, guildId: ctx.channel.guild_id, external: cmd });
                         count++;
                     }
@@ -299,7 +301,7 @@ export const BlacklistModule: PluginModule = {
         {
             name: "bans-list", description: "Show merged ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "Specific user to check", type: ApplicationCommandOptionType.USER, required: false }], execute: (args: any, ctx: any) => {
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 const { memberInfos, state, channelOwners } = require("../state");
                 const me = UserStore.getCurrentUser();
                 let targetUserId = findOption(args, "user", "") as string;
@@ -397,7 +399,7 @@ export const BlacklistModule: PluginModule = {
         ].filter(Boolean) as React.ReactElement[]);
     },
     onVoiceStateUpdate: (voiceStates) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (!settings.store.banRotateEnabled) return;
 
         const me = UserStore.getCurrentUser();
@@ -416,7 +418,7 @@ export const BlacklistModule: PluginModule = {
         }
     },
     onUserJoined: (channelId, userId) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         const me = UserStore.getCurrentUser();
         const ownership = channelOwners.get(channelId);
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
@@ -434,7 +436,8 @@ export function checkBlacklistEnforcement(userId: string, channelId: string, gui
     const kickList = getKickList();
     if (!kickList.includes(userId)) return;
 
-    const cmd = formatKickCommand(channelId, userId);
+    const { settings } = require("..");
+    const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
     log(`Enforcing blacklist: kicking ${userId} from ${channelId}`);
     queueAction({
         type: ActionType.KICK,
@@ -453,7 +456,8 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
             kickList.push(userId);
             count++;
         }
-        const cmd = formatKickCommand(channelId, userId);
+        const { settings } = require("..");
+        const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
         queueAction({
             type: ActionType.KICK,
             userId: userId,
@@ -473,7 +477,8 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
     setKickList(newList);
 
     for (const userId of userIds) {
-        const cmd = formatUnbanCommand(channelId, userId);
+        const { settings } = require("..");
+        const cmd = formatCommand(settings.store.unbanCommand, channelId, { userId });
         queueAction({
             type: ActionType.UNBAN,
             userId: userId,

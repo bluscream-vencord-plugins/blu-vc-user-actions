@@ -1,4 +1,7 @@
-import { OwnerEntry } from "./OwnerEntry";
+export interface OwnerEntry {
+    userId: string;
+    timestamp: number;
+}
 
 export class ChannelOwner implements OwnerEntry {
     constructor(

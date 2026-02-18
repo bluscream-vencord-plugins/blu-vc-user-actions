@@ -8,17 +8,17 @@ import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 import { sendMessage } from "@utils/discord";
 
 export function getWhitelist(): string[] {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return (settings.store.localUserWhitelist as string).split(/\r?\n/).map(s => s.trim()).filter(id => /^\d{17,19}$/.test(id));
 }
 
 export function setWhitelist(newList: string[]) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     settings.store.localUserWhitelist = newList.join("\n");
 }
 
 export function formatWhitelistSkipMessage(channelId: string, userId: string, action: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const user = UserStore.getUser(userId);
     const msg = settings.store.whitelistSkipMessage
         .replace(/{user_id}/g, userId)

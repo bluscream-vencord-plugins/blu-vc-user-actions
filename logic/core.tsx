@@ -30,7 +30,7 @@ export const CoreMenuItems = {
             id="socialize-guild-reset-settings"
             label="Reset Settings"
             action={() => {
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 for (const key in settings.def) {
                     const opt = (settings.def as any)[key];
                     if (key === "enabled" || opt.readonly) continue;
@@ -110,7 +110,7 @@ export const CoreModule: PluginModule = {
             readonly: true,
             multiline: true,
             onChange(_) {
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 settings.store.messageReference = settings.def.messageReference.default;
             },
             restartNeeded: false,
@@ -137,7 +137,7 @@ export const CoreModule: PluginModule = {
                     fields: [
                         { name: "👑 Owned Channels", value: channelOwners.size.toString(), inline: true },
                         { name: "👤 Member Infos", value: memberInfos.size.toString(), inline: true },
-                        { name: "Modules", value: require("../ModuleRegistry").Modules.length.toString(), inline: true }
+                        { name: "Modules", value: require("..").Modules.length.toString(), inline: true }
                     ]
                 };
                 sendBotMessage(ctx.channel.id, { embeds: [embed] });
@@ -154,7 +154,7 @@ export const CoreModule: PluginModule = {
         {
             name: "reset-settings", description: "Reset plugin settings", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 for (const key in settings.def) {
                     const opt = (settings.def as any)[key];
                     if (key === "enabled" || opt.readonly) continue;

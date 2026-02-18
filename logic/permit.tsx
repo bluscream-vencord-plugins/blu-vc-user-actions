@@ -7,12 +7,12 @@ import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 import { SelectedChannelStore } from "@webpack/common";
 
 export function formatPermitCommand(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return formatCommand(settings.store.permitCommand, channelId, { userId });
 }
 
 export function formatUnpermitCommand(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return formatCommand(settings.store.unpermitCommand, channelId, { userId });
 }
 

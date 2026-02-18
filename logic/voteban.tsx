@@ -2,7 +2,7 @@ import { OptionType } from "@utils/types";
 import { ActionType, channelOwners } from "../state";
 import { log, error } from "../utils/logging";
 import { queueAction } from "./queue";
-import { formatBanCommand } from "../utils/formatting";
+import { formatCommand } from "../utils/formatting";
 import { PluginModule } from "../types/PluginModule";
 import { type Message } from "@vencord/discord-types";
 import { sendBotMessage, ApplicationCommandOptionType, findOption } from "@api/Commands";
@@ -12,7 +12,7 @@ import { VoiceStateStore, SelectedChannelStore } from "@webpack/common";
 // #endregion
 
 export function formatVoteSubmitted(voterId: string, targetId: string, expireTime: number): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const msg = settings.store.voteBanSubmitMessage as string;
     return msg
         .replace(/{voter_id}/g, voterId)
@@ -24,7 +24,7 @@ export function formatVoteSubmitted(voterId: string, targetId: string, expireTim
 const activeVotes = new Map<string, Set<string>>(); // targetId -> Set<voterId>
 
 export function handleVoteBan(message: Message, channelId: string, guildId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     if (!settings.store.voteBanEnabled) return;
 
     const regex = new RegExp(settings.store.voteBanRegex as string, "i");
@@ -39,12 +39,13 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
 
     if (isOwner) {
         log(`Owner ${voterId} used vote ban command, bypassing threshold.`);
+        const { settings } = require("..");
         queueAction({
             type: ActionType.BAN,
             userId: targetId,
             channelId: channelId,
             guildId: guildId,
-            external: formatBanCommand(channelId, targetId)
+            external: formatCommand(settings.store.banCommand, channelId, { userId: targetId })
         });
         return;
     }
@@ -78,12 +79,13 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
 
     if (votes.size >= requiredVotes) {
         sendBotMessage(channelId, { content: `✅ Vote threshold met! Banning <@${targetId}>.` });
+        const { settings } = require("..");
         queueAction({
             type: ActionType.BAN,
             userId: targetId,
             channelId: channelId,
             guildId: guildId,
-            external: formatBanCommand(channelId, targetId)
+            external: formatCommand(settings.store.banCommand, channelId, { userId: targetId })
         });
         activeVotes.delete(targetId);
     } else {

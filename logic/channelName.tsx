@@ -16,7 +16,7 @@ import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 // #endregion
 
 export function getRotateNames(): string[] {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return settings.store.rotateChannelNames.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
 }
 // #endregion
@@ -127,7 +127,7 @@ export const ChannelNameModule: PluginModule = {
         {
             name: "name-check", description: "Check names for duplicates/invalid length", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 const names = getRotateNames();
                 const invalid = names.filter(n => n.length === 0 || n.length > 15 || n.trim() === "");
                 const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
@@ -148,7 +148,7 @@ export const ChannelNameModule: PluginModule = {
         {
             name: "name-add", description: "Add a name to the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to add", type: ApplicationCommandOptionType.STRING, required: true }], execute: (args: any, ctx: any) => {
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 const newName = findOption(args, "name", "") as string;
                 const names = getRotateNames();
                 if (names.includes(newName)) { sendBotMessage(ctx.channel.id, { content: "❌ Name already exists." }); return; }
@@ -160,7 +160,7 @@ export const ChannelNameModule: PluginModule = {
         {
             name: "name-remove", description: "Remove a name from the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to remove", type: ApplicationCommandOptionType.STRING, required: true }], execute: (args: any, ctx: any) => {
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
                 const toRemove = findOption(args, "name", "") as string;
                 const names = getRotateNames();
                 const newList = names.filter(n => n !== toRemove);
@@ -187,7 +187,7 @@ export const ChannelNameModule: PluginModule = {
         ].filter(Boolean) as any);
     },
     onStart: () => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (settings.store.enabled && settings.store.rotateChannelNamesEnabled) {
             const myChannelId = SelectedChannelStore.getVoiceChannelId();
             if (myChannelId) {
@@ -206,7 +206,7 @@ export const ChannelNameModule: PluginModule = {
         }
     },
     onVoiceStateUpdate: (voiceStates) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (!settings.store.rotateChannelNamesEnabled) return;
 
         const me = UserStore.getCurrentUser();
@@ -267,7 +267,7 @@ export function rotateChannelName(channelId: string) {
 }
 
 export function startRotation(channelId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     if (!settings.store.enabled) return;
     if (state.rotationIntervals.has(channelId)) return;
 
@@ -324,7 +324,7 @@ export function stopRotation(channelId: string) {
 }
 
 export function restartAllRotations() {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     log("Settings changed, updating rotations...");
 
     const activeChannels = Array.from(state.rotationIntervals.keys());

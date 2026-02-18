@@ -10,12 +10,12 @@ import { PluginModule } from "../types/PluginModule";
 // #endregion
 
 export function formatkickNotInRoleEphemeral(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return formatCommand(settings.store.kickNotInRoleEphemeral, channelId, { userId });
 }
 
 export function formatkickNotInRoleExternal(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return formatCommand(settings.store.kickNotInRoleExternal, channelId, { userId });
 }
 
@@ -49,7 +49,7 @@ export const KickNotInRoleModule: PluginModule = {
         },
     },
     onVoiceStateUpdate: (voiceStates) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (!settings.store.kickNotInRoleEnabled || !settings.store.kickNotInRole) return;
 
         const me = UserStore.getCurrentUser();
@@ -68,7 +68,7 @@ export const KickNotInRoleModule: PluginModule = {
         }
     },
     onUserJoined: (channelId, userId) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         const me = UserStore.getCurrentUser();
         const ownership = channelOwners.get(channelId);
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
@@ -81,7 +81,7 @@ export const KickNotInRoleModule: PluginModule = {
 };
 
 export function checkKickNotInRole(userId: string, channelId: string, guildId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const member = GuildMemberStore.getMember(guildId, userId);
     if (!member) return;
 

@@ -5,13 +5,12 @@ import {
 } from "@webpack/common";
 import { type Channel } from "@vencord/discord-types";
 import { ActionType, channelOwners, memberInfos, setMemberInfo, OwnerEntry, ChannelCreator, ChannelClaimant, saveState, MemberChannelInfo, state } from "../state"; import { log, warn, error } from "../utils/logging";
-import { formatCommand, formatMessageCommon, formatclaimCommand, formatLockCommand, formatUnlockCommand, formatResetCommand, formatInfoCommand, formatLimitCommand } from "../utils/formatting";
+import { formatCommand, formatMessageCommon, formatLimitCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
-import { BotResponse, BotResponseType } from "../utils/BotResponse";
+import { BotResponse, BotResponseType } from "../types/BotResponse";
 import { startRotation, stopRotation } from "./channelName";
 import { jumpToFirstMessage } from "../utils/navigation";
 import { PluginModule } from "../types/PluginModule";
-import { Modules } from "../ModuleRegistry";
 import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 // #region Settings
 // #endregion
@@ -26,7 +25,8 @@ export const ChannelMenuItems = {
             action={async () => {
                 const me = UserStore.getCurrentUser();
                 if (me) {
-                    const cmd = formatclaimCommand(channel.id);
+                    const { settings } = require("..");
+                    const cmd = formatCommand(settings.store.claimCommand, channel.id);
                     queueAction({
                         type: ActionType.CLAIM,
                         userId: me.id,
@@ -46,7 +46,8 @@ export const ChannelMenuItems = {
             id="socialize-guild-lock-channel"
             label="Lock Channel"
             action={() => {
-                const cmd = formatLockCommand(channel.id);
+                const { settings } = require("..");
+                const cmd = formatCommand(settings.store.lockCommand, channel.id);
                 queueAction({
                     type: ActionType.LOCK,
                     userId: "",
@@ -63,7 +64,8 @@ export const ChannelMenuItems = {
             id="socialize-guild-unlock-channel"
             label="Unlock Channel"
             action={() => {
-                const cmd = formatUnlockCommand(channel.id);
+                const { settings } = require("..");
+                const cmd = formatCommand(settings.store.unlockCommand, channel.id);
                 queueAction({
                     type: ActionType.UNLOCK,
                     userId: "",
@@ -80,7 +82,8 @@ export const ChannelMenuItems = {
             id="socialize-guild-reset-channel"
             label="Reset Channel"
             action={() => {
-                const cmd = formatResetCommand(channel.id);
+                const { settings } = require("..");
+                const cmd = formatCommand(settings.store.resetCommand, channel.id);
                 queueAction({
                     type: ActionType.RESET,
                     userId: "",
@@ -97,7 +100,8 @@ export const ChannelMenuItems = {
             id="socialize-guild-info-command"
             label="Send Info Command"
             action={() => {
-                const cmd = formatInfoCommand(channel.id);
+                const { settings } = require("..");
+                const cmd = formatCommand(settings.store.infoCommand, channel.id);
                 queueAction({
                     type: ActionType.INFO,
                     userId: "",
@@ -137,7 +141,7 @@ export const ChannelMenuItems = {
 
 export const GlobalMenuItems = {
     getCheckOwnershipItem: (channelId?: string) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         return (
             <Menu.MenuItem
                 id="blu-vc-user-actions-check-ownership"
@@ -175,7 +179,7 @@ export const GlobalMenuItems = {
     ),
 
     getOwnerStatusItems: (channelId?: string) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         const { enabled } = settings.use(["enabled"]);
         let creatorStatus = "Creator: None";
         let claimantStatus = "Claimant: None";
@@ -203,7 +207,7 @@ export const GlobalMenuItems = {
                 label={creatorStatus}
                 checked={enabled}
                 action={() => {
-                    const { settings } = require("../settings");
+                    const { settings } = require("..");
                     settings.store.enabled = !enabled;
                 }}
             />,
@@ -213,7 +217,7 @@ export const GlobalMenuItems = {
                 label={claimantStatus}
                 checked={enabled}
                 action={() => {
-                    const { settings } = require("../settings");
+                    const { settings } = require("..");
                     settings.store.enabled = !enabled;
                 }}
             />
@@ -221,7 +225,7 @@ export const GlobalMenuItems = {
     },
 
     getCreateChannelActionItem: () => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         return (
             <Menu.MenuItem
                 id="blu-vc-user-actions-create-channel"
@@ -272,8 +276,10 @@ export function updateOwner(channelId: string, userId: string, timestamp: number
         saveState();
 
         if (type === 'creator') {
+            const { Modules } = require("..");
             Modules.forEach(m => m.onChannelCreatorChanged?.(channelId, oldCreator, ownership!.creator));
         } else {
+            const { Modules } = require("..");
             Modules.forEach(m => m.onChannelClaimantChanged?.(channelId, oldClaimant, ownership!.claimant));
         }
     }
@@ -282,7 +288,7 @@ export function updateOwner(channelId: string, userId: string, timestamp: number
 }
 
 export function notifyOwnership(channelId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const { sendBotMessage } = require("@api/Commands");
     if (!settings.store.enabled) return;
 
@@ -388,7 +394,7 @@ export async function checkChannelOwner(channelId: string, botId: string): Promi
 }
 
 export async function fetchAllOwners() {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const guildId = settings.store.guildId;
     const categoryId = settings.store.categoryId;
     const channels = GuildChannelStore.getChannels(guildId);
@@ -405,13 +411,14 @@ export async function fetchAllOwners() {
 }
 
 export function claimChannel(channelId: string, formerOwnerId?: string) {
-    const formatted = formatclaimCommand(channelId, formerOwnerId);
+    const { settings } = require("..");
+    const formatted = formatCommand(settings.store.claimCommand, channelId, { userId: formerOwnerId });
     log(`Automatically claiming channel ${channelId}: ${formatted}`);
     sendMessage(channelId, { content: formatted });
 }
 
 export function requestChannelInfo(channelId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     if (!state.requestedInfo) state.requestedInfo = new Map();
 
     const now = Date.now();
@@ -423,7 +430,7 @@ export function requestChannelInfo(channelId: string) {
     state.requestedInfo.set(channelId, now);
 
     log(`Queuing channel info request for ${channelId}`);
-    const msg = formatInfoCommand(channelId);
+    const msg = formatCommand(settings.store.infoCommand, channelId);
     queueAction({
         type: ActionType.INFO,
         userId: UserStore.getCurrentUser()?.id || "",
@@ -448,16 +455,11 @@ export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | 
 }
 
 export function handleInfoUpdate(channelId: string, info: MemberChannelInfo) {
-    const { settings } = require("../settings");
-    let targetOwnerId = info.ownerId;
-
-    if (!targetOwnerId) {
-        const ownership = channelOwners.get(channelId);
-        targetOwnerId = ownership?.creator?.userId || ownership?.claimant?.userId;
-    }
+    const { settings } = require("..");
+    const ownership = channelOwners.get(channelId);
+    const targetOwnerId = ownership?.creator?.userId || ownership?.claimant?.userId;
 
     if (targetOwnerId) {
-        if (!info.ownerId) info.ownerId = targetOwnerId;
         setMemberInfo(targetOwnerId, info);
         log(`Updated member info for ${targetOwnerId} (via channel ${channelId})`);
     } else {
@@ -562,7 +564,7 @@ export function handleBotResponse(response: BotResponse) {
 }
 
 export function handleOwnershipChange(channelId: string, ownerId: string) {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const me = UserStore.getCurrentUser();
     const currentVoiceChannelId = SelectedChannelStore.getVoiceChannelId();
 
@@ -731,7 +733,7 @@ export const ChannelClaimModule: PluginModule = {
                 if (info) {
                     embed.fields.push({
                         name: "🔧 Channel Settings",
-                        value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}`,
+                        value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A"}`,
                         inline: false
                     });
                     if (info.permitted.length > 0) embed.fields.push({ name: `Permitted (${info.permitted.length})`, value: info.permitted.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
@@ -750,7 +752,7 @@ export const ChannelClaimModule: PluginModule = {
                         content += `**🔧 Settings:**\n`;
                         content += `- Name: \`${info.name || "N/A"}\`\n`;
                         content += `- Limit: \`${info.limit || "N/A"}\`\n`;
-                        content += `- Owner ID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}\n`;
+                        content += `- Owner ID: ${ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A"}\n`;
                         if (info.permitted.length > 0) content += `- Permitted: ${info.permitted.length} users\n`;
                         if (info.banned.length > 0) content += `- Banned: ${info.banned.length} users\n`;
                     }
@@ -767,7 +769,7 @@ export const ChannelClaimModule: PluginModule = {
             execute: async (args: any, ctx: any) => {
                 const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
                 const { sendBotMessage } = require("@api/Commands");
-                const { settings } = require("../settings");
+                const { settings } = require("..");
 
                 sendBotMessage(ctx.channel.id, { content: "🔄 Checking ownership and channel info..." });
                 await checkChannelOwner(channelId, settings.store.botId);
@@ -800,7 +802,7 @@ export const ChannelClaimModule: PluginModule = {
         GlobalMenuItems.getCreateChannelActionItem()
     ].filter(Boolean) as any),
     onMessageCreate: (message, channelId, guildId) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (guildId !== settings.store.guildId) return;
 
         const response = new BotResponse(message, settings.store.botId);
@@ -820,13 +822,13 @@ export const ChannelClaimModule: PluginModule = {
         }
     },
     onStart: () => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }
     },
     onVoiceStateUpdate: (voiceStates) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         const me = UserStore.getCurrentUser();
         if (!me) return;
 
@@ -881,7 +883,7 @@ export const ChannelClaimModule: PluginModule = {
         }
     },
     onUserLeft: (channelId, userId) => {
-        const { settings } = require("../settings");
+        const { settings } = require("..");
         const { channelOwners, state, saveState } = require("../state");
         const { VoiceStateStore } = require("@webpack/common");
         const { sendMessage } = require("@utils/discord");

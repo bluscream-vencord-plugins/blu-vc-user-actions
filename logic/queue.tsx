@@ -35,7 +35,7 @@ export function queueAction(options: {
 export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
 
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const channelId = state.myLastVoiceChannelId;
     if (!channelId) {
         log("No active channel, clearing queue.");

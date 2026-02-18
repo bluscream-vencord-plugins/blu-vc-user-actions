@@ -6,16 +6,28 @@ import {
     UserStore,
     SelectedChannelStore,
     VoiceStateStore,
-    ChannelActions
+    Menu,
 } from "@webpack/common";
+import { type User, type Channel, type Guild } from "@vencord/discord-types";
+import { ChannelType } from "@vencord/discord-types/enums";
+import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
+import { definePluginSettings } from "@api/Settings";
+import { Logger } from "@utils/Logger";
 
-import { settings } from "./settings";
-import { state, actionQueue, channelOwners, loadState, saveState } from "./state"; // Keeps state management here?
-import { log, jumpToFirstMessage, parseBotInfoMessage } from "./utils"; // Utils exports everything
-import { BotResponse, BotResponseType } from "./utils/BotResponse";
+import { log, isVoiceChannel } from "./utils";
+import { registerSharedContextMenu } from "./utils/menus";
+import { loadState } from "./state";
+import { PluginModule } from "./types/PluginModule";
 
 // Module Registry
-import { registerModule, Modules } from "./ModuleRegistry";
+export const Modules: PluginModule[] = [];
+
+export function registerModule(module: PluginModule) {
+    Modules.push(module);
+}
+
+// Module Imports
 import { CoreModule } from "./logic/core";
 import { ChannelClaimModule } from "./logic/channelClaim";
 import { ChannelNameModule } from "./logic/channelName";
@@ -37,27 +49,121 @@ import { PermitModule } from "./logic/permit";
     PermitModule,
 ].forEach(registerModule);
 
-import { registerSharedContextMenu } from "./utils/menus"; // Assuming menus stays in utils
-import {
-    UserContextMenuPatch,
-    GuildContextMenuPatch,
-    ChannelContextMenuPatch
-} from "./menus"; // Menus stays in root
-import { getToolboxActions } from "./toolbox";
-import { commands } from "./commands";
-import { Logger } from "@utils/Logger";
-
-// endregion Imports
-
-// region PluginInfo
 import { pluginInfo } from "./info";
-export { pluginInfo };
-// endregion PluginInfo
+// endregion Imports
 
 // region Variables
 const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
+// region Settings
+export const settings = definePluginSettings({
+    ...BlacklistModule.settings,
+    ...WhitelistModule.settings,
+    ...PermitModule.settings,
+    ...KickNotInRoleModule.settings,
+    ...ChannelNameModule.settings,
+    ...ChannelClaimModule.settings,
+    ...VotebanModule.settings,
+    ...CoreModule.settings,
+});
+// endregion Settings
+
+// region Commands
+const subCommands = Modules.flatMap(m => m.commands || []);
+
+export const commands = [
+    {
+        name: "channel",
+        description: "Socialize Guild Moderation Commands",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: subCommands,
+        execute: async (args: any, ctx: any) => {
+            const subCommandName = args[0].name;
+            const subCommand = subCommands.find(c => c.name === subCommandName);
+
+            if (subCommand?.execute) {
+                return subCommand.execute(args[0].options, ctx);
+            }
+
+            const { sendBotMessage } = require("@api/Commands");
+            sendBotMessage(ctx.channel.id, { content: `❌ Unknown sub-command: ${subCommandName}` });
+        }
+    }
+];
+// endregion Commands
+
+
+
+// region Context Menus
+function getChannelContextMenuItems(channel: Channel) {
+    if (channel.type !== ChannelType.GUILD_VOICE) return null;
+    if (channel.guild_id !== settings.store.guildId) return null;
+
+    const items = Modules.flatMap(m => m.getChannelMenuItems?.(channel) || []);
+    return items.length > 0 ? items : null;
+}
+
+function getUserContextMenuItems(user: User, channelId?: string, guildId?: string) {
+    const items = Modules.flatMap(m => m.getUserMenuItems?.(user, channelId, guildId) || []);
+    return items.length > 0 ? items : null;
+}
+
+function getGuildContextMenuItems(guild: Guild) {
+    const items = Modules.flatMap(m => m.getGuildMenuItems?.(guild) || []);
+    return items.length > 0 ? items : null;
+}
+
+export const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user: User }) => {
+    const chatChannelId = SelectedChannelStore.getChannelId();
+    const chatChannel = ChannelStore.getChannel(chatChannelId);
+    if (chatChannel?.guild_id !== settings.store.guildId) return;
+    if (!user) return;
+
+    const myChannelId = SelectedChannelStore.getVoiceChannelId();
+    const submenuItems = getUserContextMenuItems(user, myChannelId || undefined, chatChannel?.guild_id);
+
+    if (!submenuItems || submenuItems.length === 0) return;
+
+    const submenu = (
+        <Menu.MenuItem
+            id="socialize-guild-user-actions"
+            label={pluginInfo.name}
+        >
+            {submenuItems}
+        </Menu.MenuItem>
+    );
+
+    children.splice(-1, 0, submenu);
+};
+
+export const GuildContextMenuPatch: NavContextMenuPatchCallback = (children, { guild }) => {
+    if (guild?.id !== settings.store.guildId) return;
+    const items = getGuildContextMenuItems(guild);
+
+    if (!items || items.length === 0) return;
+
+    children.push(
+        <Menu.MenuItem id="socialize-guild-guild-submenu" label={pluginInfo.name}>
+            {items}
+        </Menu.MenuItem>
+    );
+};
+
+export const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, { channel }) => {
+    if (channel?.guild_id !== settings.store.guildId) return;
+    if (!isVoiceChannel(channel)) return;
+
+    const items = getChannelContextMenuItems(channel);
+    if (!items || items.length === 0) return;
+
+    children.push(
+        <Menu.MenuItem id="socialize-guild-channel-submenu" label={pluginInfo.name}>
+            {items}
+        </Menu.MenuItem>
+    );
+};
+// endregion Context Menus
 
 // region Definition
 export default definePlugin({
@@ -66,7 +172,7 @@ export default definePlugin({
     authors: pluginInfo.authors,
     settings,
     commands,
-    toolboxActions: getToolboxActions,
+    toolboxActions: (channelId?: string) => Modules.flatMap(m => m.getToolboxMenuItems?.(channelId) || []),
     contextMenus: {
         "user-context": UserContextMenuPatch,
         "guild-context": GuildContextMenuPatch,
@@ -77,7 +183,6 @@ export default definePlugin({
             if (!settings.store.enabled) return;
             Modules.forEach(m => m.onVoiceStateUpdate?.(voiceStates));
 
-            // Legacy onUserJoined/onUserLeft (still useful for simple modules)
             for (const s of voiceStates) {
                 if (s.channelId) {
                     const newChannel = ChannelStore.getChannel(s.channelId);
@@ -122,3 +227,4 @@ export default definePlugin({
         this.stopCleanup?.();
     }
 });
+// endregion Definition

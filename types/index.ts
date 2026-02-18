@@ -1,4 +1,3 @@
-export * from "./OwnerEntry";
 export * from "./ChannelOwnership";
 export * from "./MemberChannelInfo";
 export * from "./ActionType";

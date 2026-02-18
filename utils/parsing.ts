@@ -1,6 +1,6 @@
 import { MemberChannelInfo } from "../state";
 import { log, error } from "./logging";
-import { BotResponse, BotResponseType } from "./BotResponse";
+import { BotResponse, BotResponseType } from "../types/BotResponse";
 
 const Patterns = {
     CHANNEL_ID: [
@@ -24,7 +24,6 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
         banned: [],
         timestamp: response.timestamp,
         updated: Date.now(),
-        ownerId: (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED) ? response.initiatorId : undefined
     };
 
     let targetChannelId = response.channelId;

@@ -63,60 +63,16 @@ export function formatCommand(
     return formatMessageCommon(formatted);
 }
 
-export function formatclaimCommand(channelId: string, formerOwnerId?: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.claimCommand, channelId, { userId: formerOwnerId });
-}
-
-export function formatLockCommand(channelId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.lockCommand, channelId);
-}
-
-export function formatUnlockCommand(channelId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.unlockCommand, channelId);
-}
-
-export function formatResetCommand(channelId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.resetCommand, channelId);
-}
-
-export function formatInfoCommand(channelId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.infoCommand, channelId);
-}
-
 export function formatLimitCommand(channelId: string, limit: number): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     const template = settings.store.setChannelUserLimitCommand;
     const formatted = template.replace(/{channel_limit}/g, limit.toString());
     return formatCommand(formatted, channelId);
 }
 
 export function formatsetChannelNameCommand(channelId: string, newChannelName: string): string {
-    const { settings } = require("../settings");
+    const { settings } = require("..");
     return formatCommand(settings.store.setChannelNameCommand, channelId, { newChannelName });
-}
-
-export function formatKickCommand(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.kickCommand, channelId, { userId });
-}
-
-export function formatBanCommand(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.banCommand, channelId, { userId });
-}
-
-export function formatUnbanCommand(channelId: string, userId: string): string {
-    const { settings } = require("../settings");
-    return formatCommand(settings.store.unbanCommand, channelId, { userId });
-}
-
-export function formatCustomMessage(template: string, channelId: string, userId?: string, newChannelName?: string): string {
-    return formatCommand(template, channelId, { userId, newChannelName });
 }
 
 export function toDiscordTime(datetime: number | Date, relative = false): string {
