@@ -783,9 +783,7 @@ export const ChannelClaimModule: PluginModule = {
             ch && ChannelMenuItems.getResetChannelItem(ch),
             ch && ChannelMenuItems.getInfoCommandItem(ch),
             ch && ChannelMenuItems.getSetSizeSubmenu(ch),
-            GlobalMenuItems.getCheckOwnershipItem(channel.id),
-            GlobalMenuItems.getChannelInfoItem(channel.id),
-            ...GlobalMenuItems.getOwnerStatusItems(channel.id)
+            GlobalMenuItems.getCheckOwnershipItem(channel.id)
         ].filter(Boolean) as any);
     },
     getGuildMenuItems: (guild) => ([
@@ -795,9 +793,8 @@ export const ChannelClaimModule: PluginModule = {
         ...GlobalMenuItems.getOwnerStatusItems(SelectedChannelStore.getVoiceChannelId() || undefined)
     ].filter(Boolean) as any),
     getToolboxMenuItems: (channel) => ([
-        GlobalMenuItems.getCheckOwnershipItem(channel?.id),
-        GlobalMenuItems.getChannelInfoItem(channel?.id),
         ...GlobalMenuItems.getOwnerStatusItems(channel?.id),
+        GlobalMenuItems.getChannelInfoItem(channel?.id),
         GlobalMenuItems.getCreateChannelActionItem()
     ].filter(Boolean) as any),
     onMessageCreate: (message, channel, guild) => {
