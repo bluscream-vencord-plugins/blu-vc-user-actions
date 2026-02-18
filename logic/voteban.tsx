@@ -140,9 +140,9 @@ export const VotebanModule: PluginModule = {
             }
         },
     ],
-    onMessageCreate: (message, channelId, guildId) => {
-        if (channelId) {
-            handleVoteBan(message, channelId, guildId || "");
+    onMessageCreate: (message, channel, guild) => {
+        if (channel?.id) {
+            handleVoteBan(message, channel.id, guild?.id || "");
         }
     }
 };

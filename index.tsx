@@ -4,6 +4,7 @@ import definePlugin from "@utils/types";
 import {
     ChannelStore,
     UserStore,
+    GuildStore,
     SelectedChannelStore,
     VoiceStateStore,
     Menu,
@@ -180,20 +181,25 @@ export default definePlugin({
                 if (s.channelId) {
                     const newChannel = ChannelStore.getChannel(s.channelId);
                     if (newChannel?.parent_id === settings.store.categoryId) {
-                        Modules.forEach(m => m.onUserJoined?.(s.channelId!, s.userId));
+                        const user = UserStore.getUser(s.userId);
+                        if (user) Modules.forEach(m => m.onUserJoined?.(newChannel, user));
                     }
                 }
                 if (s.oldChannelId && s.oldChannelId !== s.channelId) {
                     const oldChannel = ChannelStore.getChannel(s.oldChannelId);
                     if (oldChannel?.parent_id === settings.store.categoryId) {
-                        Modules.forEach(m => m.onUserLeft?.(s.oldChannelId!, s.userId));
+                        const user = UserStore.getUser(s.userId);
+                        if (user) Modules.forEach(m => m.onUserLeft?.(oldChannel, user));
                     }
                 }
             }
         },
         MESSAGE_CREATE({ message, channelId, guildId }) {
             if (!settings.store.enabled) return;
-            Modules.forEach(m => m.onMessageCreate?.(message, channelId, guildId));
+            const channel = ChannelStore.getChannel(channelId);
+            if (!channel) return;
+            const guild = guildId ? GuildStore.getGuild(guildId) ?? null : null;
+            Modules.forEach(m => m.onMessageCreate?.(message, channel, guild));
         }
     },
     stopCleanup: null as (() => void) | null,

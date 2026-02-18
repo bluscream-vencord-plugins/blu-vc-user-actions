@@ -67,15 +67,14 @@ export const KickNotInRoleModule: PluginModule = {
             }
         }
     },
-    onUserJoined: (channelId, userId) => {
+    onUserJoined: (channel, user) => {
         const { settings } = require("..");
         const me = UserStore.getCurrentUser();
-        const ownership = channelOwners.get(channelId);
+        const ownership = channelOwners.get(channel.id);
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
 
         if (isOwner && settings.store.kickNotInRoleEnabled && settings.store.kickNotInRole) {
-            const channel = ChannelStore.getChannel(channelId);
-            if (channel) checkKickNotInRole(userId, channelId, channel.guild_id);
+            checkKickNotInRole(user.id, channel.id, channel.guild_id);
         }
     }
 };

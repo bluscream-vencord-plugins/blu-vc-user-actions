@@ -417,15 +417,14 @@ export const BlacklistModule: PluginModule = {
             }
         }
     },
-    onUserJoined: (channelId, userId) => {
+    onUserJoined: (channel, user) => {
         const { settings } = require("..");
         const me = UserStore.getCurrentUser();
-        const ownership = channelOwners.get(channelId);
+        const ownership = channelOwners.get(channel.id);
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
 
         if (isOwner && settings.store.banRotateEnabled) {
-            const channel = ChannelStore.getChannel(channelId);
-            if (channel) checkBlacklistEnforcement(userId, channelId, channel.guild_id);
+            checkBlacklistEnforcement(user.id, channel.id, channel.guild_id);
         }
     }
 };

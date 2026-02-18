@@ -231,15 +231,15 @@ export const ChannelNameModule: PluginModule = {
             }
         }
     },
-    onChannelCreatorChanged: (channelId, oldCreator, newCreator) => {
+    onChannelCreatorChanged: (channel, oldCreator, newCreator) => {
         const me = UserStore.getCurrentUser();
-        if (newCreator?.userId === me?.id) startRotation(channelId);
-        else if (oldCreator?.userId === me?.id) stopRotation(channelId);
+        if (newCreator?.userId === me?.id) startRotation(channel.id);
+        else if (oldCreator?.userId === me?.id) stopRotation(channel.id);
     },
-    onChannelClaimantChanged: (channelId, oldClaimant, newClaimant) => {
+    onChannelClaimantChanged: (channel, oldClaimant, newClaimant) => {
         const me = UserStore.getCurrentUser();
-        if (newClaimant?.userId === me?.id) startRotation(channelId);
-        else if (oldClaimant?.userId === me?.id) stopRotation(channelId);
+        if (newClaimant?.userId === me?.id) startRotation(channel.id);
+        else if (oldClaimant?.userId === me?.id) stopRotation(channel.id);
     }
 };
 // #endregion

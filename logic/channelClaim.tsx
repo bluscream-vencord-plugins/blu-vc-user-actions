@@ -277,10 +277,12 @@ export function updateOwner(channelId: string, userId: string, timestamp: number
 
         if (type === 'creator') {
             const { Modules } = require("..");
-            Modules.forEach(m => m.onChannelCreatorChanged?.(channelId, oldCreator, ownership!.creator));
+            const channel = ChannelStore.getChannel(channelId);
+            if (channel) Modules.forEach(m => m.onChannelCreatorChanged?.(channel, oldCreator, ownership!.creator));
         } else {
             const { Modules } = require("..");
-            Modules.forEach(m => m.onChannelClaimantChanged?.(channelId, oldClaimant, ownership!.claimant));
+            const channel = ChannelStore.getChannel(channelId);
+            if (channel) Modules.forEach(m => m.onChannelClaimantChanged?.(channel, oldClaimant, ownership!.claimant));
         }
     }
 
@@ -801,13 +803,13 @@ export const ChannelClaimModule: PluginModule = {
         ...GlobalMenuItems.getOwnerStatusItems(channelId),
         GlobalMenuItems.getCreateChannelActionItem()
     ].filter(Boolean) as any),
-    onMessageCreate: (message, channelId, guildId) => {
+    onMessageCreate: (message, channel, guild) => {
         const { settings } = require("..");
-        if (guildId !== settings.store.guildId) return;
+        if (guild?.id !== settings.store.guildId) return;
 
         const response = new BotResponse(message, settings.store.botId);
         if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
-            handleOwnerUpdate(channelId, response.initiatorId, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
+            handleOwnerUpdate(channel.id, response.initiatorId, response.timestamp, response.type === BotResponseType.CREATED ? 'creator' : 'claimant');
         }
 
         if (response.type === BotResponseType.INFO) {
@@ -882,11 +884,13 @@ export const ChannelClaimModule: PluginModule = {
             }
         }
     },
-    onUserLeft: (channelId, userId) => {
+    onUserLeft: (channel, user) => {
         const { settings } = require("..");
         const { channelOwners, state, saveState } = require("../state");
         const { VoiceStateStore } = require("@webpack/common");
         const { sendMessage } = require("@utils/discord");
+        const channelId = channel.id;
+        const userId = user.id;
 
         const ownership = channelOwners.get(channelId);
         if (!ownership) return;
