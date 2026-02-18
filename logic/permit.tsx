@@ -1,5 +1,5 @@
 import { OptionType } from "@utils/types";
-import { ActionType } from "../state"; import { log } from "../utils/logging";
+import { log } from "../utils/logging";
 import { formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { PluginModule } from "../types/PluginModule";
@@ -46,7 +46,7 @@ export const PermitModule: PluginModule = {
                 const userId = findOption(args, "user", "") as string;
                 const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
                 const cmd = formatPermitCommand(channelId, userId);
-                queueAction({ type: ActionType.PERMIT, userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                queueAction({ userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
                 sendBotMessage(ctx.channel.id, { content: `✅ Queued permit for <@${userId}>.` });
             }
         },
@@ -56,7 +56,7 @@ export const PermitModule: PluginModule = {
                 const userId = findOption(args, "user", "") as string;
                 const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
                 const cmd = formatUnpermitCommand(channelId, userId);
-                queueAction({ type: ActionType.UNPERMIT, userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                queueAction({ userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
                 sendBotMessage(ctx.channel.id, { content: `✅ Queued unpermit for <@${userId}>.` });
             }
         },
@@ -70,7 +70,6 @@ export function bulkPermit(userIds: string[], channelId: string, guildId: string
         const cmd = formatPermitCommand(channelId, userId);
         log(`Queuing PERMIT for ${userId} in ${channelId}`);
         queueAction({
-            type: ActionType.PERMIT,
             userId,
             channelId,
             guildId,
@@ -87,7 +86,6 @@ export function bulkUnpermit(userIds: string[], channelId: string, guildId: stri
         const cmd = formatUnpermitCommand(channelId, userId);
         log(`Queuing UNPERMIT for ${userId} in ${channelId}`);
         queueAction({
-            type: ActionType.UNPERMIT,
             userId,
             channelId,
             guildId,

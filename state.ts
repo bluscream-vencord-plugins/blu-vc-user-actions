@@ -1,15 +1,15 @@
 import * as DataStore from "@api/DataStore";
-import { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant } from "./types";
+import { ActionItem, PluginVoiceChannel, PluginGuildMember, MemberChannelInfo, OwnerEntry } from "./types";
 import { log, error } from "./utils/logging";
 
-export { ActionItem, ActionType, ChannelOwnership, MemberChannelInfo, OwnerEntry, ChannelOwner, ChannelCreator, ChannelClaimant };
+export { ActionItem, PluginVoiceChannel, PluginGuildMember, MemberChannelInfo, OwnerEntry };
 
 // Persistence Keys
 const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v1";
 const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v1";
 
-export const channelOwners = new Map<string, ChannelOwnership>();
-export const memberInfos = new Map<string, MemberChannelInfo>(); // Map<ownerId, MemberChannelInfo>
+export const channelOwners = new Map<string, PluginVoiceChannel>();
+export const memberInfos = new Map<string, PluginGuildMember>(); // Map<ownerId, PluginGuildMember>
 
 let saveTimeout: NodeJS.Timeout | null = null;
 
@@ -18,7 +18,10 @@ export async function saveState() {
 
     saveTimeout = setTimeout(async () => {
         try {
-            await DataStore.set(STORAGE_KEY_OWNERS, Object.fromEntries(channelOwners));
+            const ownersObj = Object.fromEntries(
+                Array.from(channelOwners.entries()).map(([k, v]) => [k, v.toJSON()])
+            );
+            await DataStore.set(STORAGE_KEY_OWNERS, ownersObj);
             await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
             // log("[State] Automatically saved to DataStore");
         } catch (e) {
@@ -34,13 +37,13 @@ export async function loadState() {
         const owners = await DataStore.get(STORAGE_KEY_OWNERS);
         if (owners) {
             for (const [k, v] of Object.entries(owners)) {
-                channelOwners.set(k, v as ChannelOwnership);
+                channelOwners.set(k, PluginVoiceChannel.fromJSON(v as any));
             }
         }
         const members = await DataStore.get(STORAGE_KEY_MEMBERS);
         if (members) {
             for (const [k, v] of Object.entries(members)) {
-                memberInfos.set(k, v as MemberChannelInfo);
+                memberInfos.set(k, { id: k, channelInfo: v as MemberChannelInfo });
             }
         }
         log(`[State] Loaded: ${channelOwners.size} owners, ${memberInfos.size} members`);
@@ -66,7 +69,8 @@ export const state = {
 };
 
 export function setMemberInfo(ownerId: string, info: MemberChannelInfo) {
-    memberInfos.set(ownerId, info);
+    const existing = memberInfos.get(ownerId);
+    memberInfos.set(ownerId, { ...existing, id: ownerId, channelInfo: info });
     saveState();
 }
 

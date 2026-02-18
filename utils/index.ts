@@ -5,4 +5,4 @@ export * from "./navigation";
 export * from "./channels";
 export * from "../types/BotResponse";
 export * from "./members";
-// Removed: kicklist, ownership, rotation, voteban
+export * from "./settings";

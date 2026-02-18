@@ -4,7 +4,7 @@ import {
     Menu, showToast, UserStore, ChannelStore, SelectedChannelStore, ChannelActions, GuildStore, GuildChannelStore, MessageStore, RestAPI, Constants, VoiceStateStore
 } from "@webpack/common";
 import { type Channel, type Message } from "@vencord/discord-types";
-import { ActionType, channelOwners, memberInfos, setMemberInfo, OwnerEntry, ChannelCreator, ChannelClaimant, saveState, MemberChannelInfo, state } from "../state"; import { log, warn, error } from "../utils/logging";
+import { channelOwners, memberInfos, setMemberInfo, OwnerEntry, saveState, MemberChannelInfo, PluginVoiceChannel, PluginGuildMember, state } from "../state"; import { log, warn, error } from "../utils/logging";
 import { formatCommand, formatMessageCommon, formatLimitCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { BotResponse, BotResponseType } from "../types/BotResponse";
@@ -28,7 +28,7 @@ export const ChannelMenuItems = {
                     const { settings } = require("..");
                     const cmd = formatCommand(settings.store.claimCommand, channel.id);
                     queueAction({
-                        type: ActionType.CLAIM,
+                        action: "CLAIM",
                         userId: me.id,
                         channelId: channel.id,
                         guildId: channel.guild_id,
@@ -49,7 +49,6 @@ export const ChannelMenuItems = {
                 const { settings } = require("..");
                 const cmd = formatCommand(settings.store.lockCommand, channel.id);
                 queueAction({
-                    type: ActionType.LOCK,
                     userId: "",
                     channelId: channel.id,
                     guildId: channel.guild_id,
@@ -67,7 +66,6 @@ export const ChannelMenuItems = {
                 const { settings } = require("..");
                 const cmd = formatCommand(settings.store.unlockCommand, channel.id);
                 queueAction({
-                    type: ActionType.UNLOCK,
                     userId: "",
                     channelId: channel.id,
                     guildId: channel.guild_id,
@@ -85,7 +83,6 @@ export const ChannelMenuItems = {
                 const { settings } = require("..");
                 const cmd = formatCommand(settings.store.resetCommand, channel.id);
                 queueAction({
-                    type: ActionType.RESET,
                     userId: "",
                     channelId: channel.id,
                     guildId: channel.guild_id,
@@ -103,7 +100,7 @@ export const ChannelMenuItems = {
                 const { settings } = require("..");
                 const cmd = formatCommand(settings.store.infoCommand, channel.id);
                 queueAction({
-                    type: ActionType.INFO,
+                    action: "INFO",
                     userId: "",
                     channelId: channel.id,
                     guildId: channel.guild_id,
@@ -118,7 +115,7 @@ export const ChannelMenuItems = {
             id="socialize-guild-set-size-submenu"
             label="Set Channel Size"
         >
-            {[0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 99].map(size => (
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(size => (
                 <Menu.MenuItem
                     key={size}
                     id={`socialize-guild-set-size-${size}`}
@@ -126,7 +123,6 @@ export const ChannelMenuItems = {
                     action={() => {
                         const cmd = formatLimitCommand(channel.id, size);
                         queueAction({
-                            type: ActionType.LIMIT,
                             userId: "",
                             channelId: channel.id,
                             guildId: channel.guild_id,
@@ -251,7 +247,7 @@ export const GlobalMenuItems = {
 export function updateOwner(channelId: string, userId: string, timestamp: number, type: 'creator' | 'claimant'): boolean {
     let ownership = channelOwners.get(channelId);
     if (!ownership) {
-        ownership = {};
+        ownership = new PluginVoiceChannel(channelId);
         channelOwners.set(channelId, ownership);
     }
 
@@ -262,12 +258,12 @@ export function updateOwner(channelId: string, userId: string, timestamp: number
 
     if (type === 'creator') {
         if (!oldCreator || oldCreator.userId !== userId) {
-            ownership.creator = new ChannelCreator(userId, timestamp);
+            ownership.creator = { userId, timestamp };
             changed = true;
         }
     } else if (type === 'claimant') {
         if (!oldClaimant || oldClaimant.userId !== userId) {
-            ownership.claimant = new ChannelClaimant(userId, timestamp);
+            ownership.claimant = { userId, timestamp };
             changed = true;
         }
     }
@@ -434,7 +430,7 @@ export function requestChannelInfo(channelId: string) {
     log(`Queuing channel info request for ${channelId}`);
     const msg = formatCommand(settings.store.infoCommand, channelId);
     queueAction({
-        type: ActionType.INFO,
+        action: "INFO",
         userId: UserStore.getCurrentUser()?.id || "",
         channelId: channelId,
         guildId: ChannelStore.getChannel(channelId)?.guild_id || settings.store.guildId,
@@ -447,11 +443,11 @@ export function getMemberInfoForChannel(channelId: string): MemberChannelInfo | 
     if (!ownership) return undefined;
 
     if (ownership.claimant) {
-        const info = memberInfos.get(ownership.claimant.userId);
+        const info = memberInfos.get(ownership.claimant.userId)?.channelInfo;
         if (info) return info;
     }
     if (ownership.creator) {
-        return memberInfos.get(ownership.creator.userId);
+        return memberInfos.get(ownership.creator.userId)?.channelInfo;
     }
     return undefined;
 }
@@ -485,8 +481,9 @@ export function handleBotResponse(response: BotResponse) {
     const initiatorId = response.initiatorId;
     if (!initiatorId) return;
 
-    const info = memberInfos.get(initiatorId);
-    if (!info) return;
+    const member = memberInfos.get(initiatorId);
+    if (!member?.channelInfo) return;
+    const info = member.channelInfo;
 
     const description = response.getRawDescription();
     const targetMatch = description.match(/<@!?(\d+)>/);
@@ -523,9 +520,6 @@ export function handleBotResponse(response: BotResponse) {
             if (targetUserId) {
                 const initialLen = info.permitted.length;
                 info.permitted = info.permitted.filter(id => id !== targetUserId);
-                // Wait, logic.ts had: info.permitted = info.permitted.filter(id => id !== targetUserId);
-                // I'll fix it.
-                info.permitted = info.permitted.filter(id => id !== targetUserId);
                 if (info.permitted.length !== initialLen) {
                     changed = true;
                     log(`Dynamically removed ${targetUserId} from permitted list for ${initiatorId}`);
@@ -533,7 +527,7 @@ export function handleBotResponse(response: BotResponse) {
             }
             break;
         case BotResponseType.SIZE_SET:
-            const sizeMatch = description.match(/\*\*(\d+)\*\*/);
+            const sizeMatch = description.match(/(\d+)/);
             if (sizeMatch) {
                 const newLimit = parseInt(sizeMatch[1]);
                 if (info.limit !== newLimit) {
@@ -697,7 +691,7 @@ export const ChannelClaimModule: PluginModule = {
                 }
 
                 let targetChannelId = channelId;
-                let info = targetUserId ? memberInfos.get(targetUserId) : undefined;
+                let info: MemberChannelInfo | undefined = targetUserId ? memberInfos.get(targetUserId)?.channelInfo : undefined;
 
                 if (info && targetUserId) {
                     for (const [cid, ownership] of channelOwners.entries()) {
@@ -780,27 +774,30 @@ export const ChannelClaimModule: PluginModule = {
             }
         }
     ],
-    getChannelMenuItems: (channel) => ([
-        ChannelMenuItems.getClaimChannelItem(channel),
-        ChannelMenuItems.getLockChannelItem(channel),
-        ChannelMenuItems.getUnlockChannelItem(channel),
-        ChannelMenuItems.getResetChannelItem(channel),
-        ChannelMenuItems.getInfoCommandItem(channel),
-        ChannelMenuItems.getSetSizeSubmenu(channel),
-        GlobalMenuItems.getCheckOwnershipItem(channel.id),
-        GlobalMenuItems.getChannelInfoItem(channel.id),
-        ...GlobalMenuItems.getOwnerStatusItems(channel.id)
-    ].filter(Boolean) as any),
+    getChannelMenuItems: (channel) => {
+        const ch = channel.resolve();
+        return ([
+            ch && ChannelMenuItems.getClaimChannelItem(ch),
+            ch && ChannelMenuItems.getLockChannelItem(ch),
+            ch && ChannelMenuItems.getUnlockChannelItem(ch),
+            ch && ChannelMenuItems.getResetChannelItem(ch),
+            ch && ChannelMenuItems.getInfoCommandItem(ch),
+            ch && ChannelMenuItems.getSetSizeSubmenu(ch),
+            GlobalMenuItems.getCheckOwnershipItem(channel.id),
+            GlobalMenuItems.getChannelInfoItem(channel.id),
+            ...GlobalMenuItems.getOwnerStatusItems(channel.id)
+        ].filter(Boolean) as any);
+    },
     getGuildMenuItems: (guild) => ([
         GlobalMenuItems.getCheckOwnershipItem(SelectedChannelStore.getVoiceChannelId() || undefined),
         GlobalMenuItems.getFetchAllOwnersItem(),
         GlobalMenuItems.getChannelInfoItem(SelectedChannelStore.getVoiceChannelId() || undefined),
         ...GlobalMenuItems.getOwnerStatusItems(SelectedChannelStore.getVoiceChannelId() || undefined)
     ].filter(Boolean) as any),
-    getToolboxMenuItems: (channelId) => ([
-        GlobalMenuItems.getCheckOwnershipItem(channelId),
-        GlobalMenuItems.getChannelInfoItem(channelId),
-        ...GlobalMenuItems.getOwnerStatusItems(channelId),
+    getToolboxMenuItems: (channel) => ([
+        GlobalMenuItems.getCheckOwnershipItem(channel?.id),
+        GlobalMenuItems.getChannelInfoItem(channel?.id),
+        ...GlobalMenuItems.getOwnerStatusItems(channel?.id),
         GlobalMenuItems.getCreateChannelActionItem()
     ].filter(Boolean) as any),
     onMessageCreate: (message, channel, guild) => {

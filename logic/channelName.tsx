@@ -2,7 +2,7 @@ import { OptionType } from "@utils/types";
 import { sendMessage } from "@utils/discord";
 import { Menu, Alerts, TextInput, ChannelStore, SelectedChannelStore, UserStore } from "@webpack/common";
 import { type Channel } from "@vencord/discord-types";
-import { state, channelOwners, ActionType } from "../state"; import { log } from "../utils/logging";
+import { state, channelOwners } from "../state"; import { log } from "../utils/logging";
 import { formatCommand, formatsetChannelNameCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { PluginModule } from "../types/PluginModule";
@@ -37,7 +37,6 @@ export const ChannelNameMenuItems = {
                         if (newName && newName !== channel.name) {
                             const cmd = formatsetChannelNameCommand(channel.id, newName);
                             queueAction({
-                                type: ActionType.NAME,
                                 userId: "",
                                 channelId: channel.id,
                                 guildId: channel.guild_id,
@@ -175,15 +174,17 @@ export const ChannelNameModule: PluginModule = {
             }
         },
     ],
-    getChannelMenuItems: (channel) => ([
-        ChannelNameMenuItems.getRenameChannelItem(channel)
-    ].filter(Boolean) as any),
-    getToolboxMenuItems: (channelId) => {
-        const { ChannelStore } = require("@webpack/common");
-        const channel = channelId ? ChannelStore.getChannel(channelId) : null;
-        if (!channel) return null;
+    getChannelMenuItems: (channel) => {
+        const ch = channel.resolve();
+        return ch ? ([
+            ChannelNameMenuItems.getRenameChannelItem(ch)
+        ].filter(Boolean) as any) : null;
+    },
+    getToolboxMenuItems: (channel) => {
+        const ch = channel?.resolve();
+        if (!ch) return null;
         return ([
-            ChannelNameMenuItems.getRenameChannelItem(channel)
+            ChannelNameMenuItems.getRenameChannelItem(ch)
         ].filter(Boolean) as any);
     },
     onStart: () => {

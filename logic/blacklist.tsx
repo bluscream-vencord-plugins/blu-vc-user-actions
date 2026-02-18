@@ -2,7 +2,7 @@ import { OptionType } from "@utils/types";
 import { Menu, UserStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelStore } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 import { type Channel, type User } from "@vencord/discord-types";
-import { ActionType, channelOwners } from "../state";
+import { channelOwners } from "../state";
 import { log, warn, error } from "../utils/logging";
 import { formatMessageCommon, formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
@@ -88,7 +88,6 @@ export const BlacklistMenuItems = {
                         const { settings } = require("..");
                         const cmd = formatCommand(settings.store.kickCommand, channel.id, { userId: uid });
                         queueAction({
-                            type: ActionType.KICK,
                             userId: uid,
                             channelId: channel.id,
                             guildId: channel.guild_id,
@@ -141,7 +140,6 @@ export const BlacklistMenuItems = {
                         if (info?.banned.includes(user.id)) {
                             log(`Unban from VC: Queuing UNBAN for ${user.id} in ${myChannelId}`);
                             queueAction({
-                                type: ActionType.UNBAN,
                                 userId: user.id,
                                 channelId: myChannelId,
                                 guildId: guildId || ""
@@ -151,7 +149,6 @@ export const BlacklistMenuItems = {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
                         log(`Ban from VC: Queuing KICK for ${user.id} in ${myChannelId}`);
                         queueAction({
-                            type: ActionType.KICK,
                             userId: user.id,
                             channelId: myChannelId,
                             guildId: voiceState?.guildId || guildId
@@ -188,7 +185,6 @@ export const BlacklistMenuItems = {
                     if (isOwner) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
                         queueAction({
-                            type: ActionType.KICK,
                             userId: user.id,
                             channelId: myChannelId,
                             guildId: voiceState?.guildId
@@ -284,7 +280,7 @@ export const BlacklistModule: PluginModule = {
                     if (kickList.includes(uid)) {
                         const { settings } = require("..");
                         const cmd = formatCommand(settings.store.kickCommand, channelId, { userId: uid });
-                        queueAction({ type: ActionType.KICK, userId: uid, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                        queueAction({ userId: uid, channelId, guildId: ctx.channel.guild_id, external: cmd });
                         count++;
                     }
                 }
@@ -380,22 +376,25 @@ export const BlacklistModule: PluginModule = {
             }
         },
     ],
-    getChannelMenuItems: (channel) => ([
-        BlacklistMenuItems.getBanAllItem(channel),
-        BlacklistMenuItems.getUnbanAllItem(channel),
-        BlacklistMenuItems.getKickBannedUsersItem(channel)
-    ].filter(Boolean) as React.ReactElement[]),
+    getChannelMenuItems: (channel) => {
+        const ch = channel.resolve();
+        return ([
+            ch && BlacklistMenuItems.getBanAllItem(ch),
+            ch && BlacklistMenuItems.getUnbanAllItem(ch),
+            ch && BlacklistMenuItems.getKickBannedUsersItem(ch)
+        ].filter(Boolean) as React.ReactElement[]);
+    },
     getUserMenuItems: (user, channelId, guildId) => ([
         BlacklistMenuItems.getBlacklistUserItem(user, channelId, guildId),
         BlacklistMenuItems.getKickUserItem(user, channelId)
     ].filter(Boolean) as React.ReactElement[]),
-    getToolboxMenuItems: (channelId) => {
-        const channel = channelId ? ChannelStore.getChannel(channelId) : null;
-        if (!channel) return null;
+    getToolboxMenuItems: (channel) => {
+        const ch = channel?.resolve();
+        if (!ch) return null;
         return ([
-            BlacklistMenuItems.getBanAllItem(channel),
-            BlacklistMenuItems.getUnbanAllItem(channel),
-            BlacklistMenuItems.getKickBannedUsersItem(channel)
+            BlacklistMenuItems.getBanAllItem(ch),
+            BlacklistMenuItems.getUnbanAllItem(ch),
+            BlacklistMenuItems.getKickBannedUsersItem(ch)
         ].filter(Boolean) as React.ReactElement[]);
     },
     onVoiceStateUpdate: (voiceStates) => {
@@ -424,7 +423,7 @@ export const BlacklistModule: PluginModule = {
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
 
         if (isOwner && settings.store.banRotateEnabled) {
-            checkBlacklistEnforcement(user.id, channel.id, channel.guild_id);
+            checkBlacklistEnforcement(user.id, channel.id, channel.resolve()?.guild_id ?? "");
         }
     }
 };
@@ -439,7 +438,6 @@ export function checkBlacklistEnforcement(userId: string, channelId: string, gui
     const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
     log(`Enforcing blacklist: kicking ${userId} from ${channelId}`);
     queueAction({
-        type: ActionType.KICK,
         userId: userId,
         channelId: channelId,
         guildId: guildId,
@@ -458,7 +456,6 @@ export function bulkBanAndKick(userIds: string[], channelId: string, guildId: st
         const { settings } = require("..");
         const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
         queueAction({
-            type: ActionType.KICK,
             userId: userId,
             channelId: channelId,
             guildId: guildId,
@@ -479,7 +476,6 @@ export function bulkUnban(userIds: string[], channelId: string, guildId: string)
         const { settings } = require("..");
         const cmd = formatCommand(settings.store.unbanCommand, channelId, { userId });
         queueAction({
-            type: ActionType.UNBAN,
             userId: userId,
             channelId: channelId,
             guildId: guildId,

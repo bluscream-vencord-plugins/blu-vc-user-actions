@@ -18,7 +18,8 @@ import { Logger } from "@utils/Logger";
 
 import { log, isVoiceChannel } from "./utils";
 import { registerSharedContextMenu } from "./utils/menus";
-import { loadState } from "./state";
+import { loadState, channelOwners } from "./state";
+import { PluginVoiceChannel } from "./types/PluginVoiceChannel";
 import { PluginModule } from "./types/PluginModule";
 
 // Module Registry
@@ -94,7 +95,8 @@ function getChannelContextMenuItems(channel: Channel) {
     if (channel.type !== ChannelType.GUILD_VOICE) return null;
     if (channel.guild_id !== settings.store.guildId) return null;
 
-    const items = Modules.flatMap(m => m.getChannelMenuItems?.(channel) || []);
+    const pvc = channelOwners.get(channel.id) ?? new PluginVoiceChannel(channel.id, channel);
+    const items = Modules.flatMap(m => m.getChannelMenuItems?.(pvc) || []);
     return items.length > 0 ? items : null;
 }
 
@@ -166,7 +168,12 @@ export default definePlugin({
     authors: pluginInfo.authors,
     settings,
     commands,
-    toolboxActions: (channelId?: string) => Modules.flatMap(m => m.getToolboxMenuItems?.(channelId) || []),
+    toolboxActions: (channelId?: string) => {
+        const pvc = channelId
+            ? (channelOwners.get(channelId) ?? new PluginVoiceChannel(channelId))
+            : undefined;
+        return Modules.flatMap(m => m.getToolboxMenuItems?.(pvc) || []);
+    },
     contextMenus: {
         "user-context": UserContextMenuPatch,
         "guild-context": GuildContextMenuPatch,
@@ -175,31 +182,75 @@ export default definePlugin({
     flux: {
         async VOICE_STATE_UPDATES({ voiceStates }) {
             if (!settings.store.enabled) return;
-            Modules.forEach(m => m.onVoiceStateUpdate?.(voiceStates));
+            const { guildId, categoryId } = settings.store;
 
-            for (const s of voiceStates) {
+            // Filter to only states relevant to our managed guild+category
+            const relevantStates = voiceStates.filter(s => {
+                const channelInCategory = s.channelId
+                    ? ChannelStore.getChannel(s.channelId)?.parent_id === categoryId
+                    : false;
+                const oldChannelInCategory = s.oldChannelId
+                    ? ChannelStore.getChannel(s.oldChannelId)?.parent_id === categoryId
+                    : false;
+                return (s.guildId === guildId || s.guild_id === guildId) &&
+                    (channelInCategory || oldChannelInCategory);
+            });
+
+            if (relevantStates.length > 0) {
+                Modules.forEach(m => m.onVoiceStateUpdate?.(relevantStates));
+            }
+
+            for (const s of relevantStates) {
+                const user = UserStore.getUser(s.userId);
+                if (!user) continue;
+
+            // onUserJoined: user arrived in a channel in our category
+            // covers: connect (no oldChannelId), move-in from outside category, move within category
                 if (s.channelId) {
                     const newChannel = ChannelStore.getChannel(s.channelId);
-                    if (newChannel?.parent_id === settings.store.categoryId) {
-                        const user = UserStore.getUser(s.userId);
-                        if (user) Modules.forEach(m => m.onUserJoined?.(newChannel, user));
+                    if (newChannel?.parent_id === categoryId) {
+                        const pvc = channelOwners.get(s.channelId) ?? new PluginVoiceChannel(s.channelId, newChannel);
+                        Modules.forEach(m => m.onUserJoined?.(pvc, user));
                     }
                 }
+
+                // onUserLeft: user left a channel in our category
+                // covers: disconnect (no channelId), move-out to outside category, move within category
                 if (s.oldChannelId && s.oldChannelId !== s.channelId) {
                     const oldChannel = ChannelStore.getChannel(s.oldChannelId);
-                    if (oldChannel?.parent_id === settings.store.categoryId) {
-                        const user = UserStore.getUser(s.userId);
-                        if (user) Modules.forEach(m => m.onUserLeft?.(oldChannel, user));
+                    if (oldChannel?.parent_id === categoryId) {
+                        const pvc = channelOwners.get(s.oldChannelId) ?? new PluginVoiceChannel(s.oldChannelId, oldChannel);
+                        Modules.forEach(m => m.onUserLeft?.(pvc, user));
                     }
                 }
             }
         },
         MESSAGE_CREATE({ message, channelId, guildId }) {
             if (!settings.store.enabled) return;
+            if (guildId !== settings.store.guildId) return;
+
             const channel = ChannelStore.getChannel(channelId);
             if (!channel) return;
-            const guild = guildId ? GuildStore.getGuild(guildId) ?? null : null;
-            Modules.forEach(m => m.onMessageCreate?.(message, channel, guild));
+
+            // Only fire for text channels in our managed category
+            // (the linked text channel of a voice channel in the category)
+            if (channel.parent_id !== settings.store.categoryId) return;
+            if (!channel.isGuildVoice?.() && channel.type !== 0 /* GUILD_TEXT */) return;
+
+            // Find the voice channel this text channel is linked to (same name, same parent)
+            const { GuildChannelStore } = require("@webpack/common");
+            const guildChannels = GuildChannelStore.getChannels(guildId);
+            const vocal: { channel: Channel; }[] = guildChannels?.VOCAL ?? [];
+            const linkedVoice = vocal
+                .map(c => c.channel)
+                .find(c => c.parent_id === channel.parent_id && c.name === channel.name);
+
+            const voiceChannelId = linkedVoice?.id ?? channelId;
+            const pvc = channelOwners.get(voiceChannelId)
+                ?? new PluginVoiceChannel(voiceChannelId, linkedVoice);
+
+            const guild = GuildStore.getGuild(guildId) ?? null;
+            Modules.forEach(m => m.onMessageCreate?.(message, pvc, guild));
         }
     },
     stopCleanup: null as (() => void) | null,

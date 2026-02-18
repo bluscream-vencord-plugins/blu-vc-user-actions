@@ -1,5 +1,5 @@
 import { OptionType } from "@utils/types";
-import { ActionType, channelOwners } from "../state";
+import { channelOwners } from "../state";
 import { log, error } from "../utils/logging";
 import { queueAction } from "./queue";
 import { formatCommand } from "../utils/formatting";
@@ -41,7 +41,6 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
         log(`Owner ${voterId} used vote ban command, bypassing threshold.`);
         const { settings } = require("..");
         queueAction({
-            type: ActionType.BAN,
             userId: targetId,
             channelId: channelId,
             guildId: guildId,
@@ -81,7 +80,6 @@ export function handleVoteBan(message: Message, channelId: string, guildId: stri
         sendBotMessage(channelId, { content: `✅ Vote threshold met! Banning <@${targetId}>.` });
         const { settings } = require("..");
         queueAction({
-            type: ActionType.BAN,
             userId: targetId,
             channelId: channelId,
             guildId: guildId,

@@ -1,6 +1,6 @@
 import { OptionType } from "@utils/types";
 import { UserStore, ChannelStore, GuildMemberStore } from "@webpack/common";
-import { ActionType, channelOwners } from "../state";
+import { channelOwners } from "../state";
 import { log, error } from "../utils/logging";
 import { formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
@@ -93,7 +93,6 @@ export function checkKickNotInRole(userId: string, channelId: string, guildId: s
         const external = formatkickNotInRoleExternal(channelId, userId);
 
         queueAction({
-            type: ActionType.KICK,
             userId,
             channelId,
             guildId,
