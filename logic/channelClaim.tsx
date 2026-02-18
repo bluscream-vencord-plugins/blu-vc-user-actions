@@ -3,7 +3,7 @@ import { sendMessage } from "@utils/discord";
 import {
     Menu, showToast, UserStore, ChannelStore, SelectedChannelStore, ChannelActions, GuildStore, GuildChannelStore, MessageStore, RestAPI, Constants, VoiceStateStore
 } from "@webpack/common";
-import { type Channel } from "@vencord/discord-types";
+import { type Channel, type Message } from "@vencord/discord-types";
 import { ActionType, channelOwners, memberInfos, setMemberInfo, OwnerEntry, ChannelCreator, ChannelClaimant, saveState, MemberChannelInfo, state } from "../state"; import { log, warn, error } from "../utils/logging";
 import { formatCommand, formatMessageCommon, formatLimitCommand } from "../utils/formatting";
 import { queueAction } from "./queue";

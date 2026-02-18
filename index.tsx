@@ -57,16 +57,9 @@ const logger = new Logger(pluginInfo.id, pluginInfo.color);
 // endregion Variables
 
 // region Settings
-export const settings = definePluginSettings({
-    ...BlacklistModule.settings,
-    ...WhitelistModule.settings,
-    ...PermitModule.settings,
-    ...KickNotInRoleModule.settings,
-    ...ChannelNameModule.settings,
-    ...ChannelClaimModule.settings,
-    ...VotebanModule.settings,
-    ...CoreModule.settings,
-});
+export const settings = definePluginSettings(
+    Object.assign({}, ...Modules.map(m => m.settings ?? {}))
+);
 // endregion Settings
 
 // region Commands
