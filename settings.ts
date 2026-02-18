@@ -6,7 +6,6 @@ import { KickNotInRoleModule } from "./logic/kickNotInRole";
 import { ChannelNameModule } from "./logic/channelName";
 import { ChannelClaimModule } from "./logic/channelClaim";
 import { VotebanModule } from "./logic/voteban";
-import { QueueModule } from "./logic/queue";
 import { CoreModule } from "./logic/core";
 
 export const settings = definePluginSettings({
@@ -17,6 +16,5 @@ export const settings = definePluginSettings({
     ...ChannelNameModule.settings,
     ...ChannelClaimModule.settings,
     ...VotebanModule.settings,
-    ...QueueModule.settings,
     ...CoreModule.settings,
 });

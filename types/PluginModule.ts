@@ -24,4 +24,5 @@ export interface PluginModule {
     onChannelCreatorChanged?: (channelId: string, oldCreator: ChannelOwner | undefined, newCreator: ChannelOwner | undefined) => void;
     onChannelClaimantChanged?: (channelId: string, oldClaimant: ChannelOwner | undefined, newCreator: ChannelOwner | undefined) => void;
     onSettingsUpdate?: (settings: any) => void;
+    commands?: any[];
 }

@@ -6,6 +6,7 @@ import { state, channelOwners, ActionType } from "../state"; import { log } from
 import { formatCommand, formatsetChannelNameCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { PluginModule } from "../types/PluginModule";
+import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 
 // #region Settings
 // #endregion
@@ -97,6 +98,83 @@ export const ChannelNameModule: PluginModule = {
             restartNeeded: false,
         },
     },
+    commands: [
+        {
+            name: "name-start", description: "Start name rotation", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const { sendBotMessage } = require("@api/Commands");
+                startRotation(channelId);
+                sendBotMessage(ctx.channel.id, { content: "✅ Started rotation." });
+            }
+        },
+        {
+            name: "name-rotate", description: "Immediately rotate name", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const { sendBotMessage } = require("@api/Commands");
+                rotateChannelName(channelId);
+                sendBotMessage(ctx.channel.id, { content: "✅ Rotated name." });
+            }
+        },
+        {
+            name: "name-clear", description: "Stop rotation and clear state", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const { sendBotMessage } = require("@api/Commands");
+                stopRotation(channelId);
+                state.rotationIndex.delete(channelId);
+                sendBotMessage(ctx.channel.id, { content: "✅ Stopped rotation and cleared index." });
+            }
+        },
+        {
+            name: "name-check", description: "Check names for duplicates/invalid length", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+                const names = getRotateNames();
+                const invalid = names.filter(n => n.length === 0 || n.length > 15 || n.trim() === "");
+                const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
+
+                if (invalid.length > 0 || duplicates.length > 0) {
+                    let msg = "⚠️ Name check results:\n";
+                    if (invalid.length > 0) msg += `- Invalid: ${invalid.join(", ")}\n`;
+                    if (duplicates.length > 0) msg += `- Duplicates: ${duplicates.join(", ")}\n`;
+
+                    const valid = names.filter(n => !invalid.includes(n) && !duplicates.includes(n));
+                    settings.store.rotateChannelNames = valid.join("\n");
+                    sendBotMessage(ctx.channel.id, { content: msg + "Removed invalid/duplicate items." });
+                } else {
+                    sendBotMessage(ctx.channel.id, { content: "✅ All names are valid and unique." });
+                }
+            }
+        },
+        {
+            name: "name-add", description: "Add a name to the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to add", type: ApplicationCommandOptionType.STRING, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+                const newName = findOption(args, "name", "") as string;
+                const names = getRotateNames();
+                if (names.includes(newName)) { sendBotMessage(ctx.channel.id, { content: "❌ Name already exists." }); return; }
+                if (newName.length > 15) { sendBotMessage(ctx.channel.id, { content: "❌ Name too long (max 15)." }); return; }
+                settings.store.rotateChannelNames += `\n${newName}`;
+                sendBotMessage(ctx.channel.id, { content: `✅ Added ${newName}.` });
+            }
+        },
+        {
+            name: "name-remove", description: "Remove a name from the list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "name", description: "Name to remove", type: ApplicationCommandOptionType.STRING, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+                const toRemove = findOption(args, "name", "") as string;
+                const names = getRotateNames();
+                const newList = names.filter(n => n !== toRemove);
+                settings.store.rotateChannelNames = newList.join("\n");
+                sendBotMessage(ctx.channel.id, { content: `✅ Removed ${toRemove}.` });
+            }
+        },
+        {
+            name: "name-share", description: "Share the name list in chat", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const names = getRotateNames();
+                sendMessage(ctx.channel.id, { content: `\`\`\`\n${names.join("\n")}\n\`\`\`` });
+            }
+        },
+    ],
     getChannelMenuItems: (channel) => ([
         ChannelNameMenuItems.getRenameChannelItem(channel)
     ].filter(Boolean) as any),

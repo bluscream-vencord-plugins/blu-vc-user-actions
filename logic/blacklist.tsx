@@ -1,5 +1,6 @@
 import { OptionType } from "@utils/types";
 import { Menu, UserStore, SelectedChannelStore, VoiceStateStore, showToast, ChannelStore } from "@webpack/common";
+import { sendMessage } from "@utils/discord";
 import { type Channel, type User } from "@vencord/discord-types";
 import { ActionType, channelOwners } from "../state";
 import { log, warn, error } from "../utils/logging";
@@ -7,6 +8,7 @@ import { formatMessageCommon, formatKickCommand, formatUnbanCommand } from "../u
 import { queueAction } from "./queue";
 import { checkChannelOwner, getMemberInfoForChannel } from "./channelClaim";
 import { PluginModule } from "../types/PluginModule";
+import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 
 export function getKickList(): string[] {
     const { settings } = require("../settings");
@@ -248,6 +250,134 @@ export const BlacklistModule: PluginModule = {
             restartNeeded: false,
         },
     },
+    commands: [
+        {
+            name: "bans-add", description: "Add a user to local ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to ban", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const kickList = getKickList();
+                if (kickList.includes(userId)) { sendBotMessage(ctx.channel.id, { content: "❌ User already banned." }); return; }
+                kickList.push(userId);
+                setKickList(kickList);
+                sendBotMessage(ctx.channel.id, { content: `✅ Added <@${userId}> to ban list.` });
+            }
+        },
+        {
+            name: "bans-remove", description: "Remove a user from local ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to unban", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const kickList = getKickList();
+                const newList = kickList.filter(id => id !== userId);
+                setKickList(newList);
+                sendBotMessage(ctx.channel.id, { content: `✅ Removed <@${userId}> from ban list.` });
+            }
+        },
+        {
+            name: "bans-kick", description: "Kick all local-banned users from VC", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId);
+                const kickList = getKickList();
+                let count = 0;
+                for (const uid in voiceStates) {
+                    if (kickList.includes(uid)) {
+                        const cmd = formatKickCommand(channelId, uid);
+                        queueAction({ type: ActionType.KICK, userId: uid, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                        count++;
+                    }
+                }
+                sendBotMessage(ctx.channel.id, { content: `✅ Queued kicks for ${count} users.` });
+            }
+        },
+        {
+            name: "bans-clear", description: "Clear local ban list", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                setKickList([]);
+                sendBotMessage(ctx.channel.id, { content: "✅ Local ban list cleared." });
+            }
+        },
+        {
+            name: "bans-list", description: "Show merged ban list", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "Specific user to check", type: ApplicationCommandOptionType.USER, required: false }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+                const { memberInfos, state, channelOwners } = require("../state");
+                const me = UserStore.getCurrentUser();
+                let targetUserId = findOption(args, "user", "") as string;
+
+                let info: any;
+                let contextName = "";
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+
+                if (targetUserId) {
+                    info = memberInfos.get(targetUserId);
+                    const user = UserStore.getUser(targetUserId);
+                    contextName = user?.globalName || user?.username || targetUserId;
+                } else {
+                    const ownership = channelOwners.get(channelId);
+                    const ownerId = ownership?.claimant?.userId || ownership?.creator?.userId;
+                    if (ownerId) {
+                        targetUserId = ownerId;
+                        info = memberInfos.get(targetUserId);
+                        const user = UserStore.getUser(targetUserId);
+                        contextName = user?.globalName || user?.username || targetUserId;
+                    } else if (me) {
+                        targetUserId = me.id;
+                        info = memberInfos.get(targetUserId);
+                        contextName = "Your Settings";
+                    }
+                }
+
+                const localUserBlacklist = getKickList();
+                const bannedIds = info?.banned || [];
+                const allIds = Array.from(new Set([...bannedIds, ...localUserBlacklist]));
+                const nextToReplace = (bannedIds.length >= settings.store.banLimit) ? bannedIds[0] : null;
+
+                const lines = allIds.map(id => {
+                    const user = UserStore.getUser(id);
+                    const name = user ? `<@${id}>` : `Unknown (\`${id}\`)`;
+                    const isAuto = localUserBlacklist.includes(id);
+                    const isChannel = bannedIds.includes(id);
+
+                    let marker = "";
+                    if (isAuto && isChannel) marker = " ⭐";
+                    else if (isAuto) marker = " ⚙️";
+                    else marker = " 📍";
+
+                    if (id === nextToReplace) marker += " ♻️";
+
+                    let source = "";
+                    if (isAuto && isChannel) source = "(Both)";
+                    else if (isAuto) source = "(Sync)";
+                    else source = "(MemberInfo)";
+
+                    return `- ${name} ${source}${marker}`;
+                });
+
+                const embed: any = {
+                    type: "rich",
+                    title: `🚫 Ban Configuration: ${contextName}`,
+                    description: lines.length > 0 ? lines.join("\n") : "No users are currently banned in this configuration.",
+                    color: 0xED4245,
+                    fields: [
+                        {
+                            name: "📊 Stats",
+                            value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nGlobal Sync: ${localUserBlacklist.length}`,
+                            inline: false
+                        }
+                    ],
+                    footer: { text: `⭐=Both | ⚙️=Sync Only | 📍=MemberOnly | ♻️=Next to replace` }
+                };
+
+                sendBotMessage(ctx.channel.id, { embeds: [embed] });
+            }
+        },
+        {
+            name: "bans-share", description: "Share local ban list in chat", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const kickList = getKickList();
+                sendMessage(ctx.channel.id, { content: `**Local Ban List:**\n${kickList.map(id => `<@${id}>`).join(", ") || "None"}` });
+            }
+        },
+    ],
     getChannelMenuItems: (channel) => ([
         BlacklistMenuItems.getBanAllItem(channel),
         BlacklistMenuItems.getUnbanAllItem(channel),

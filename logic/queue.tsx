@@ -5,28 +5,6 @@ import { state, actionQueue, ActionType } from "../state"; import { ActionItem }
 import { log } from "../utils/logging";
 import { PluginModule } from "../types/PluginModule";
 
-// #region Settings
-// #endregion
-// #endregion
-
-export const QueueModule: PluginModule = {
-    id: "queue",
-    name: "Action Queue",
-    settings: {
-        queueTime: {
-            type: OptionType.SLIDER as const,
-            description: "Time in ms to wait between actions",
-            default: 1000,
-            min: 500,
-            max: 5000,
-            markers: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
-            stickToMarkers: false,
-            restartNeeded: false,
-        },
-    }
-};
-
-
 // #region Logic
 export function queueAction(options: {
     type: ActionType;

@@ -5,6 +5,8 @@ import { plugins } from "@api/PluginManager";
 import { pluginInfo } from "../info";
 import { PluginModule } from "../types/PluginModule";
 import { log, error } from "../utils/logging";
+import { ApplicationCommandOptionType } from "@api/Commands";
+import { channelOwners, memberInfos } from "../state";
 
 // #region Settings
 // #endregion
@@ -113,7 +115,55 @@ export const CoreModule: PluginModule = {
             },
             restartNeeded: false,
         },
+        queueTime: {
+            type: OptionType.SLIDER as const,
+            description: "Time in ms to wait between actions",
+            default: 1000,
+            min: 500,
+            max: 5000,
+            markers: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000],
+            stickToMarkers: false,
+            restartNeeded: false,
+        },
     },
+    commands: [
+        {
+            name: "stats", description: "Show plugin statistics", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const embed = {
+                    type: "rich",
+                    title: "📈 Socialize Guild Stats",
+                    color: 0x5865F2,
+                    fields: [
+                        { name: "👑 Owned Channels", value: channelOwners.size.toString(), inline: true },
+                        { name: "👤 Member Infos", value: memberInfos.size.toString(), inline: true },
+                        { name: "Modules", value: require("../ModuleRegistry").Modules.length.toString(), inline: true }
+                    ]
+                };
+                sendBotMessage(ctx.channel.id, { embeds: [embed] });
+            }
+        },
+        {
+            name: "reset-state", description: "Reset plugin state", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { resetState } = require("../state");
+                resetState();
+                sendBotMessage(ctx.channel.id, { content: "✅ Plugin state has been reset." });
+            }
+        },
+        {
+            name: "reset-settings", description: "Reset plugin settings", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+                for (const key in settings.def) {
+                    const opt = (settings.def as any)[key];
+                    if (key === "enabled" || opt.readonly) continue;
+                    (settings.store as any)[key] = opt.default;
+                }
+                sendBotMessage(ctx.channel.id, { content: "✅ Settings have been reset to defaults." });
+            }
+        },
+    ],
     getGuildMenuItems: () => [
         CoreMenuItems.getEditSettingsItem(),
         CoreMenuItems.getResetStateItem(),

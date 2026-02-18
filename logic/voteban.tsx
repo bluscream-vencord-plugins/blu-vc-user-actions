@@ -5,8 +5,8 @@ import { queueAction } from "./queue";
 import { formatBanCommand } from "../utils/formatting";
 import { PluginModule } from "../types/PluginModule";
 import { type Message } from "@vencord/discord-types";
-import { sendBotMessage } from "@api/Commands";
-import { VoiceStateStore } from "@webpack/common";
+import { sendBotMessage, ApplicationCommandOptionType, findOption } from "@api/Commands";
+import { VoiceStateStore, SelectedChannelStore } from "@webpack/common";
 
 // #region Settings
 // #endregion
@@ -129,6 +129,15 @@ export const VotebanModule: PluginModule = {
             restartNeeded: false,
         },
     },
+    commands: [
+        {
+            name: "voteban", description: "Start a vote to ban a user", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to ban", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const userId = findOption(args, "user", "") as string;
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                handleVoteBan({ content: `vk <@!${userId}>`, author: ctx.user } as any, channelId, ctx.channel.guild_id);
+            }
+        },
+    ],
     onMessageCreate: (message, channelId, guildId) => {
         if (channelId) {
             handleVoteBan(message, channelId, guildId || "");

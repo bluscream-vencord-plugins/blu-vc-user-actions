@@ -4,6 +4,8 @@ import { type User } from "@vencord/discord-types";
 import { formatMessageCommon } from "../utils/formatting";
 import { bulkPermit, bulkUnpermit } from "./permit";
 import { PluginModule } from "../types/PluginModule";
+import { ApplicationCommandOptionType, findOption } from "@api/Commands";
+import { sendMessage } from "@utils/discord";
 
 export function getWhitelist(): string[] {
     const { settings } = require("../settings");
@@ -68,6 +70,33 @@ export const WhitelistModule: PluginModule = {
             restartNeeded: false,
         },
     },
+    commands: [
+        {
+            name: "whitelist-add", description: "Add a user to local whitelist", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to whitelist", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const whitelist = getWhitelist();
+                if (whitelist.includes(userId)) { sendBotMessage(ctx.channel.id, { content: "❌ User already whitelisted." }); return; }
+                setWhitelist([...whitelist, userId]);
+                sendBotMessage(ctx.channel.id, { content: `✅ Added <@${userId}> to whitelist.` });
+            }
+        },
+        {
+            name: "whitelist-remove", description: "Remove a user from local whitelist", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to unwhitelist", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const whitelist = getWhitelist();
+                setWhitelist(whitelist.filter(id => id !== userId));
+                sendBotMessage(ctx.channel.id, { content: `✅ Removed <@${userId}> from whitelist.` });
+            }
+        },
+        {
+            name: "whitelist-list", description: "Share local whitelist in chat", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const whitelist = getWhitelist();
+                sendMessage(ctx.channel.id, { content: `**Local Whitelist:**\n${whitelist.map(id => `<@${id}>`).join(", ") || "None"}` });
+            }
+        },
+    ],
     getUserMenuItems: (user, channelId, guildId) => [
         WhitelistMenuItems.getWhitelistUserItem(user, channelId, guildId)
     ]

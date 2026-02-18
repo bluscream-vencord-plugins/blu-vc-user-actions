@@ -24,7 +24,6 @@ import { BlacklistModule } from "./logic/blacklist";
 import { WhitelistModule } from "./logic/whitelist";
 import { VotebanModule } from "./logic/voteban";
 import { PermitModule } from "./logic/permit";
-import { QueueModule } from "./logic/queue";
 
 // Register all modules immediately
 [
@@ -36,7 +35,6 @@ import { QueueModule } from "./logic/queue";
     WhitelistModule,
     VotebanModule,
     PermitModule,
-    QueueModule
 ].forEach(registerModule);
 
 import { registerSharedContextMenu } from "./utils/menus"; // Assuming menus stays in utils

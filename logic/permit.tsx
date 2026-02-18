@@ -3,6 +3,8 @@ import { ActionType } from "../state"; import { log } from "../utils/logging";
 import { formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
 import { PluginModule } from "../types/PluginModule";
+import { ApplicationCommandOptionType, findOption } from "@api/Commands";
+import { SelectedChannelStore } from "@webpack/common";
 
 export function formatPermitCommand(channelId: string, userId: string): string {
     const { settings } = require("../settings");
@@ -36,7 +38,29 @@ export const PermitModule: PluginModule = {
             default: false,
             restartNeeded: false,
         },
-    }
+    },
+    commands: [
+        {
+            name: "permit", description: "Permit a user to the channel", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to permit", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const cmd = formatPermitCommand(channelId, userId);
+                queueAction({ type: ActionType.PERMIT, userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                sendBotMessage(ctx.channel.id, { content: `✅ Queued permit for <@${userId}>.` });
+            }
+        },
+        {
+            name: "unpermit", description: "Unpermit a user from the channel", type: ApplicationCommandOptionType.SUB_COMMAND, options: [{ name: "user", description: "User to unpermit", type: ApplicationCommandOptionType.USER, required: true }], execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const userId = findOption(args, "user", "") as string;
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const cmd = formatUnpermitCommand(channelId, userId);
+                queueAction({ type: ActionType.UNPERMIT, userId, channelId, guildId: ctx.channel.guild_id, external: cmd });
+                sendBotMessage(ctx.channel.id, { content: `✅ Queued unpermit for <@${userId}>.` });
+            }
+        },
+    ],
 };
 
 // #region Logic

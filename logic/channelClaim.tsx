@@ -12,6 +12,7 @@ import { startRotation, stopRotation } from "./channelName";
 import { jumpToFirstMessage } from "../utils/navigation";
 import { PluginModule } from "../types/PluginModule";
 import { Modules } from "../ModuleRegistry";
+import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 // #region Settings
 // #endregion
 // #endregion
@@ -670,6 +671,111 @@ export const ChannelClaimModule: PluginModule = {
             restartNeeded: false,
         },
     },
+    commands: [
+        {
+            name: "info",
+            description: "View channel/user info",
+            type: ApplicationCommandOptionType.SUB_COMMAND,
+            options: [
+                { name: "user", description: "Target user (optional)", type: ApplicationCommandOptionType.USER, required: false },
+                { name: "share", description: "Share results in chat", type: ApplicationCommandOptionType.BOOLEAN, required: false }
+            ],
+            execute: async (args: any, ctx: any) => {
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const { sendBotMessage } = require("@api/Commands");
+
+                const isShare = findOption(args, "share", false) as boolean;
+                let targetUserId = findOption(args, "user", "") as string;
+
+                if (!targetUserId) {
+                    const me = UserStore.getCurrentUser();
+                    targetUserId = me?.id;
+                }
+
+                let targetChannelId = channelId;
+                let info = targetUserId ? memberInfos.get(targetUserId) : undefined;
+
+                if (info && targetUserId) {
+                    for (const [cid, ownership] of channelOwners.entries()) {
+                        if (ownership.claimant?.userId === targetUserId || ownership.creator?.userId === targetUserId) {
+                            targetChannelId = cid;
+                            break;
+                        }
+                    }
+                } else if (!info) {
+                    info = getMemberInfoForChannel(channelId);
+                }
+
+                const ownership = channelOwners.get(targetChannelId);
+
+                const embed: any = {
+                    type: "rich",
+                    title: `📊 Channel Information`,
+                    color: 0x5865F2,
+                    fields: [
+                        {
+                            name: "📝 Channel",
+                            value: `<#${targetChannelId}>\n\`${targetChannelId}\``,
+                            inline: true
+                        },
+                        {
+                            name: "👑 Owner",
+                            value: ownership
+                                ? `Creator: ${ownership.creator?.userId ? `<@${ownership.creator.userId}>` : "None"}\nClaimant: ${ownership.claimant?.userId ? `<@${ownership.claimant.userId}>` : "None"}`
+                                : "Unknown",
+                            inline: true
+                        }
+                    ]
+                };
+
+                if (info) {
+                    embed.fields.push({
+                        name: "🔧 Channel Settings",
+                        value: `Name: ${info.name || "N/A"}\nLimit: ${info.limit || "N/A"}\nOwnerID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}`,
+                        inline: false
+                    });
+                    if (info.permitted.length > 0) embed.fields.push({ name: `Permitted (${info.permitted.length})`, value: info.permitted.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
+                    if (info.banned.length > 0) embed.fields.push({ name: `Banned (${info.banned.length})`, value: info.banned.map(id => `<@${id}>`).join(", ").slice(0, 1000), inline: false });
+                }
+
+                if (isShare) {
+                    const guild = GuildStore.getGuild(ctx.channel.guild_id);
+                    let content = `### 📊 Channel Information for <#${targetChannelId}>\n`;
+                    content += `- **Channel ID:** \`${targetChannelId}\`\n`;
+                    if (ownership) {
+                        content += `- **Creator:** ${ownership.creator?.userId ? `<@${ownership.creator.userId}>` : "None"}\n`;
+                        content += `- **Claimant:** ${ownership.claimant?.userId ? `<@${ownership.claimant.userId}>` : "None"}\n`;
+                    }
+                    if (info) {
+                        content += `**🔧 Settings:**\n`;
+                        content += `- Name: \`${info.name || "N/A"}\`\n`;
+                        content += `- Limit: \`${info.limit || "N/A"}\`\n`;
+                        content += `- Owner ID: ${info.ownerId ? `<@${info.ownerId}>` : (ownership?.creator?.userId ? `<@${ownership.creator.userId}>` : "N/A")}\n`;
+                        if (info.permitted.length > 0) content += `- Permitted: ${info.permitted.length} users\n`;
+                        if (info.banned.length > 0) content += `- Banned: ${info.banned.length} users\n`;
+                    }
+                    sendMessage(ctx.channel.id, { content });
+                } else {
+                    sendBotMessage(ctx.channel.id, { embeds: [embed] });
+                }
+            }
+        },
+        {
+            name: "check",
+            description: "Sync ownership and info",
+            type: ApplicationCommandOptionType.SUB_COMMAND,
+            execute: async (args: any, ctx: any) => {
+                const channelId = SelectedChannelStore.getVoiceChannelId() || ctx.channel.id;
+                const { sendBotMessage } = require("@api/Commands");
+                const { settings } = require("../settings");
+
+                sendBotMessage(ctx.channel.id, { content: "🔄 Checking ownership and channel info..." });
+                await checkChannelOwner(channelId, settings.store.botId);
+                requestChannelInfo(channelId);
+                sendBotMessage(ctx.channel.id, { content: "✅ Ownership check and sync complete." });
+            }
+        }
+    ],
     getChannelMenuItems: (channel) => ([
         ChannelMenuItems.getClaimChannelItem(channel),
         ChannelMenuItems.getLockChannelItem(channel),
