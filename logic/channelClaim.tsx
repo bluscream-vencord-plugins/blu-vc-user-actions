@@ -782,12 +782,10 @@ export const ChannelClaimModule: PluginModule = {
             ch && ChannelMenuItems.getUnlockChannelItem(ch),
             ch && ChannelMenuItems.getResetChannelItem(ch),
             ch && ChannelMenuItems.getInfoCommandItem(ch),
-            ch && ChannelMenuItems.getSetSizeSubmenu(ch),
-            GlobalMenuItems.getCheckOwnershipItem(channel.id)
+            ch && ChannelMenuItems.getSetSizeSubmenu(ch)
         ].filter(Boolean) as any);
     },
     getGuildMenuItems: (guild) => ([
-        GlobalMenuItems.getCheckOwnershipItem(SelectedChannelStore.getVoiceChannelId() || undefined),
         GlobalMenuItems.getFetchAllOwnersItem(),
         GlobalMenuItems.getChannelInfoItem(SelectedChannelStore.getVoiceChannelId() || undefined),
         ...GlobalMenuItems.getOwnerStatusItems(SelectedChannelStore.getVoiceChannelId() || undefined)
