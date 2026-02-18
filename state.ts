@@ -11,25 +11,17 @@ const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v1";
 export const channelOwners = new Map<string, PluginVoiceChannel>();
 export const memberInfos = new Map<string, PluginGuildMember>(); // Map<ownerId, PluginGuildMember>
 
-let saveTimeout: NodeJS.Timeout | null = null;
-
 export async function saveState() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-
-    saveTimeout = setTimeout(async () => {
-        try {
-            const ownersObj = Object.fromEntries(
-                Array.from(channelOwners.entries()).map(([k, v]) => [k, v.toJSON()])
-            );
-            await DataStore.set(STORAGE_KEY_OWNERS, ownersObj);
-            await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
-            // log("[State] Automatically saved to DataStore");
-        } catch (e) {
-            error("[State] Failed to save state:", e);
-        } finally {
-            saveTimeout = null;
-        }
-    }, 2000); // 2 second debounce
+    try {
+        const ownersObj = Object.fromEntries(
+            Array.from(channelOwners.entries()).map(([k, v]) => [k, v.toJSON()])
+        );
+        await DataStore.set(STORAGE_KEY_OWNERS, ownersObj);
+        await DataStore.set(STORAGE_KEY_MEMBERS, Object.fromEntries(memberInfos));
+        log("[State] Saved to DataStore");
+    } catch (e) {
+        error("[State] Failed to save state:", e);
+    }
 }
 
 export async function loadState() {
@@ -71,7 +63,6 @@ export const state = {
 export function setMemberInfo(ownerId: string, info: MemberChannelInfo) {
     const existing = memberInfos.get(ownerId);
     memberInfos.set(ownerId, { ...existing, id: ownerId, channelInfo: info });
-    saveState();
 }
 
 export function resetState() {

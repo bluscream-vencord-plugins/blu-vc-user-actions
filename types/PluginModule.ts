@@ -25,6 +25,6 @@ export interface PluginModule {
     onChannelCreatorChanged?: (channel: PluginVoiceChannel, oldCreator: OwnerEntry | undefined, newCreator: OwnerEntry | undefined) => void;
     onChannelClaimantChanged?: (channel: PluginVoiceChannel, oldClaimant: OwnerEntry | undefined, newCreator: OwnerEntry | undefined) => void;
     onSettingsUpdate?: (settings: any) => void;
-    onActionDequeue?: (item: ActionItem) => void;
+    onActionDequeue?: (item: ActionItem, message?: Message) => void;
     commands?: any[];
 }

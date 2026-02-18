@@ -52,7 +52,21 @@ export const CoreMenuItems = {
             label="Edit Settings"
             action={() => openPluginModal(plugins[pluginInfo.name])}
         />
-    )
+    ),
+
+    getToggleEnabledItem: () => {
+        const { settings } = require("..");
+        return (
+            <Menu.MenuCheckboxItem
+                id="socialize-guild-toggle-enabled"
+                label="Actions"
+                checked={settings.store.pluginEnabled}
+                action={() => {
+                    settings.store.pluginEnabled = !settings.store.pluginEnabled;
+                }}
+            />
+        );
+    }
 };
 
 export const CoreModule: PluginModule = {
@@ -83,7 +97,7 @@ export const CoreModule: PluginModule = {
             default: "913852862990262282",
             restartNeeded: false,
         },
-        enabled: {
+        pluginEnabled: {
             type: OptionType.BOOLEAN as const,
             description: "Enable automated actions",
             default: true,
@@ -100,10 +114,11 @@ export const CoreModule: PluginModule = {
 {guild_name} = Current Guild Name
 {channel_id} = Current Channel ID
 {channel_name} = Current Channel Name
-{user_id} = User ID [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
-{user_name} = User Name [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage]
+{user_id} = User ID [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage, kickNotInRoleMessage]
+{user_name} = User Name [ownershipChangeMessage, kickCommand, banCommand, unbanCommand, claimCommand, setChannelNameCommand, banRotationMessage, whitelistSkipMessage, kickNotInRoleMessage]
 {user_id_old} = Old User ID [banRotationMessage]
 {user_name_old} = Old User Name [banRotationMessage]
+{role_id} = Role ID [kickNotInRoleMessage]
 {action} = Action Type [whitelistSkipMessage]
 {reason} = Reason for ownership (Unknown/Created/Claimed) [ownershipChangeMessage, setChannelNameCommand]
 {channel_name_new} = New channel name [setChannelNameCommand]`,

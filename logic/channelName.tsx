@@ -173,6 +173,20 @@ export const ChannelNameModule: PluginModule = {
                 sendMessage(ctx.channel.id, { content: `\`\`\`\n${names.join("\n")}\n\`\`\`` });
             }
         },
+        {
+            name: "name-list", description: "Show name list in an embed", type: ApplicationCommandOptionType.SUB_COMMAND, execute: (args: any, ctx: any) => {
+                const { sendBotMessage } = require("@api/Commands");
+                const names = getRotateNames();
+                const embed: any = {
+                    type: "rich",
+                    title: "🏷️ Channel Name Rotation List",
+                    description: names.length > 0 ? names.map((n, i) => `${i + 1}. \`${n}\``).join("\n") : "No names configured.",
+                    color: 0x5865F2,
+                    footer: { text: `Total: ${names.length} names` }
+                };
+                sendBotMessage(ctx.channel.id, { embeds: [embed] });
+            }
+        },
     ],
     getChannelMenuItems: (channel) => {
         const ch = channel.resolve();
@@ -189,7 +203,7 @@ export const ChannelNameModule: PluginModule = {
     },
     onStart: () => {
         const { settings } = require("..");
-        if (settings.store.enabled && settings.store.rotateChannelNamesEnabled) {
+        if (settings.store.pluginEnabled && settings.store.rotateChannelNamesEnabled) {
             const myChannelId = SelectedChannelStore.getVoiceChannelId();
             if (myChannelId) {
                 const ownership = channelOwners.get(myChannelId);
@@ -269,7 +283,7 @@ export function rotateChannelName(channelId: string) {
 
 export function startRotation(channelId: string) {
     const { settings } = require("..");
-    if (!settings.store.enabled) return;
+    if (!settings.store.pluginEnabled) return;
     if (state.rotationIntervals.has(channelId)) return;
 
     if (!settings.store.rotateChannelNamesEnabled) {
@@ -334,7 +348,7 @@ export function restartAllRotations() {
     }
 
     const myChannelId = SelectedChannelStore.getVoiceChannelId();
-    if (settings.store.enabled && settings.store.rotateChannelNamesEnabled && myChannelId) {
+    if (settings.store.pluginEnabled && settings.store.rotateChannelNamesEnabled && myChannelId) {
         const ownership = channelOwners.get(myChannelId);
         const me = UserStore.getCurrentUser();
         if (ownership && (ownership.creator?.userId === me?.id || ownership.claimant?.userId === me?.id)) {

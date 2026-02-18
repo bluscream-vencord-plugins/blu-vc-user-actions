@@ -14,13 +14,18 @@ export function queueAction(options: {
     userId?: string;
     guildId?: string;
 }) {
-    const { action, ephemeral, external } = options;
+    const { action, ephemeral, external, channelId } = options;
 
-    if (!ephemeral && !external) return;
+    // Send ephemeral messages immediately instead of queuing
+    if (ephemeral) {
+        sendBotMessage(channelId, { content: ephemeral });
+    }
+
+    if (!external) return;
 
     const item: ActionItem = {
+        channelId,
         action,
-        ephemeral,
         external
     };
 
@@ -38,36 +43,24 @@ export async function processQueue() {
     if (state.isProcessing || actionQueue.length === 0) return;
 
     const { settings } = require("..");
-    const channelId = state.myLastVoiceChannelId;
-    if (!channelId) {
-        log("No active channel, clearing queue.");
-        actionQueue.length = 0;
-        return;
-    }
-
     state.isProcessing = true;
 
     while (actionQueue.length > 0) {
         const item = actionQueue[0];
         actionQueue.shift();
 
-        // Let modules handle items with special actions themselves
-        if (item.action) {
-            Modules.forEach(m => m.onActionDequeue?.(item));
-        }
-
-        if (item.ephemeral) {
-            sendBotMessage(channelId, { content: item.ephemeral });
-            await new Promise(r => setTimeout(r, 500));
-        }
-
+        let message: any;
         if (item.external) {
-            log(`Sending command/message to ${channelId}: ${item.external}`);
-            sendMessage(channelId, { content: item.external });
+            log(`Sending command/message to ${item.channelId}: ${item.external}`);
+
+            message = await sendMessage(item.channelId, { content: item.external });
             if (settings.store.queueTime > 0) {
                 await new Promise(r => setTimeout(r, settings.store.queueTime));
             }
         }
+
+        // Let modules handle dequeued items with the resulting message
+        Modules.forEach(m => m.onActionDequeue?.(item, message));
     }
 
     state.isProcessing = false;

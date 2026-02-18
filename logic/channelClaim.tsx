@@ -204,7 +204,7 @@ export const GlobalMenuItems = {
                 checked={enabled}
                 action={() => {
                     const { settings } = require("..");
-                    settings.store.enabled = !enabled;
+                    settings.store.pluginEnabled = !enabled;
                 }}
             />,
             <Menu.MenuCheckboxItem
@@ -214,7 +214,7 @@ export const GlobalMenuItems = {
                 checked={enabled}
                 action={() => {
                     const { settings } = require("..");
-                    settings.store.enabled = !enabled;
+                    settings.store.pluginEnabled = !enabled;
                 }}
             />
         ];
@@ -288,7 +288,7 @@ export function updateOwner(channelId: string, userId: string, timestamp: number
 export function notifyOwnership(channelId: string) {
     const { settings } = require("..");
     const { sendBotMessage } = require("@api/Commands");
-    if (!settings.store.enabled) return;
+    if (!settings.store.pluginEnabled) return;
 
     const ownership = channelOwners.get(channelId);
     if (!ownership) return;
@@ -817,7 +817,7 @@ export const ChannelClaimModule: PluginModule = {
     },
     onStart: () => {
         const { settings } = require("..");
-        if (settings.store.enabled && settings.store.fetchOwnersOnStartup) {
+        if (settings.store.pluginEnabled && settings.store.fetchOwnersOnStartup) {
             fetchAllOwners();
         }
     },

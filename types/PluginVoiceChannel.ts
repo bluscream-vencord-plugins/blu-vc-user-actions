@@ -129,10 +129,33 @@ export class PluginVoiceChannel {
     }
 
     /**
-     * Returns true if the voice channel is currently empty.
+     * Returns true if the current user can join this channel.
+     * Takes into account: user limit, CONNECT permissions, and "locked" state.
      */
-    isEmpty(): boolean {
-        return this.getOccupantCount() === 0;
+    isJoinable(): boolean {
+        const { PermissionStore, PermissionsBits } = require("@webpack/common");
+        const ch = this.resolve();
+        if (!ch) return false;
+
+        // Check if we have CONNECT permission
+        if (!PermissionStore.can(PermissionsBits.CONNECT, ch)) return false;
+
+        // Check user limit (unless we have MOVE_MEMBERS to bypass it)
+        if (ch.userLimit > 0 && this.getOccupantCount() >= ch.userLimit) {
+            if (!PermissionStore.can(PermissionsBits.MOVE_MEMBERS, ch)) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Attempts to join this voice channel. Returns true if join was attempted.
+     */
+    tryJoin(): boolean {
+        if (!this.isJoinable()) return false;
+        const { ChannelActions } = require("@webpack/common");
+        ChannelActions.selectVoiceChannel(this.id);
+        return true;
     }
 
     // ─── Serialization ────────────────────────────────────────────────────────

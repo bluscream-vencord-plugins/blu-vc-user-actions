@@ -30,17 +30,20 @@ export function registerModule(module: PluginModule) {
 }
 
 // Module Imports
-import { CoreModule } from "./logic/core";
-import { ChannelClaimModule } from "./logic/channelClaim";
+import { CoreModule, CoreMenuItems } from "./logic/core";
+import { ChannelClaimModule, GlobalMenuItems } from "./logic/channelClaim";
 import { ChannelNameModule } from "./logic/channelName";
 import { KickNotInRoleModule } from "./logic/kickNotInRole";
 import { BlacklistModule } from "./logic/blacklist";
 import { WhitelistModule } from "./logic/whitelist";
 import { VotebanModule } from "./logic/voteban";
 import { PermitModule } from "./logic/permit";
+import { StorageModule } from "./logic/storage";
+import { CommandDeleteModule } from "./logic/commandDelete";
 
 // Register all modules immediately
 [
+    StorageModule,
     CoreModule,
     ChannelClaimModule,
     ChannelNameModule,
@@ -49,6 +52,7 @@ import { PermitModule } from "./logic/permit";
     WhitelistModule,
     VotebanModule,
     PermitModule,
+    CommandDeleteModule,
 ].forEach(registerModule);
 
 import { pluginInfo } from "./info";
@@ -169,10 +173,13 @@ export default definePlugin({
     settings,
     commands,
     toolboxActions: (channelId?: string) => {
-        const pvc = channelId
-            ? (channelOwners.get(channelId) ?? new PluginVoiceChannel(channelId))
-            : undefined;
-        return Modules.flatMap(m => m.getToolboxMenuItems?.(pvc) || []);
+        const { settings } = require(".");
+        return [
+            ...GlobalMenuItems.getOwnerStatusItems(channelId),
+            GlobalMenuItems.getCreateChannelActionItem(),
+            CoreMenuItems.getEditSettingsItem(),
+            CoreMenuItems.getToggleEnabledItem(),
+        ].filter(Boolean) as React.ReactElement[];
     },
     contextMenus: {
         "user-context": UserContextMenuPatch,
@@ -181,7 +188,7 @@ export default definePlugin({
     },
     flux: {
         async VOICE_STATE_UPDATES({ voiceStates }) {
-            if (!settings.store.enabled) return;
+            if (!settings.store.pluginEnabled) return;
             const { guildId, categoryId } = settings.store;
 
             // Filter to only states relevant to our managed guild+category
@@ -226,7 +233,7 @@ export default definePlugin({
             }
         },
         MESSAGE_CREATE({ message, channelId, guildId }) {
-            if (!settings.store.enabled) return;
+            if (!settings.store.pluginEnabled) return;
             if (guildId !== settings.store.guildId) return;
 
             const channel = ChannelStore.getChannel(channelId);
@@ -256,7 +263,7 @@ export default definePlugin({
     stopCleanup: null as (() => void) | null,
     async onStart() {
         await loadState();
-        log(`Plugin starting... enabled=${settings.store.enabled}`);
+        log(`Plugin starting... enabled=${settings.store.pluginEnabled}`);
 
         Modules.forEach(m => m.onStart?.());
 

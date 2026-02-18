@@ -1,5 +1,5 @@
 import { OptionType } from "@utils/types";
-import { UserStore, ChannelStore, GuildMemberStore } from "@webpack/common";
+import { UserStore, ChannelStore, GuildMemberStore, Menu } from "@webpack/common";
 import { channelOwners } from "../state";
 import { log, error } from "../utils/logging";
 import { formatCommand } from "../utils/formatting";
@@ -9,14 +9,27 @@ import { PluginModule } from "../types/PluginModule";
 // #region Settings
 // #endregion
 
-export function formatkickNotInRoleEphemeral(channelId: string, userId: string): string {
-    const { settings } = require("..");
-    return formatCommand(settings.store.kickNotInRoleEphemeral, channelId, { userId });
-}
+export const KickNotInRoleMenuItems = {
+    getResetStateItem: () => {
+        const { settings } = require("..");
+        return (
+            <Menu.MenuCheckboxItem
+                id="socialize-guild-toggle-kick-not-in-role"
+                label="Role Kick"
+                checked={settings.store.kickNotInRoleEnabled}
+                action={() => {
+                    settings.store.kickNotInRoleEnabled = !settings.store.kickNotInRoleEnabled;
+                }}
+            />
+        );
+    }
+};
 
-export function formatkickNotInRoleExternal(channelId: string, userId: string): string {
+export function formatKickNotInRoleMessage(channelId: string, userId: string, roleId: string): string {
     const { settings } = require("..");
-    return formatCommand(settings.store.kickNotInRoleExternal, channelId, { userId });
+    const msg = settings.store.kickNotInRoleMessage as string;
+    return formatCommand(msg, channelId, { userId })
+        .replace(/{role_id}/g, roleId);
 }
 
 export const KickNotInRoleModule: PluginModule = {
@@ -35,18 +48,23 @@ export const KickNotInRoleModule: PluginModule = {
             default: "",
             restartNeeded: false,
         },
-        kickNotInRoleEphemeral: {
+        kickNotInRoleMessage: {
             type: OptionType.STRING as const,
-            description: "Ephemeral message to show when a user is kicked for missing role",
-            default: "⚠️ <@{user_id}> was kicked from VC because they don't have the required role.",
+            description: "Message to show when a user is kicked for missing role",
+            default: "⚠️ <@{user_id}> was kicked from VC because they don't have the required role (<@&{role_id}>).",
             restartNeeded: false,
         },
-        kickNotInRoleExternal: {
+        kickCommand: {
             type: OptionType.STRING as const,
             description: "External message to send when a user is kicked for missing role",
             default: "!v kick {user_id}",
             restartNeeded: false,
         },
+    },
+    getToolboxMenuItems: () => {
+        return [
+            KickNotInRoleMenuItems.getResetStateItem(),
+        ];
     },
     onVoiceStateUpdate: (voiceStates) => {
         const { settings } = require("..");
@@ -74,7 +92,10 @@ export const KickNotInRoleModule: PluginModule = {
         const isOwner = ownership?.creator?.userId === me.id || ownership?.claimant?.userId === me.id;
 
         if (isOwner && settings.store.kickNotInRoleEnabled && settings.store.kickNotInRole) {
-            checkKickNotInRole(user.id, channel.id, channel.guild_id);
+            const resolved = channel.resolve();
+            if (resolved?.guild_id) {
+                checkKickNotInRole(user.id, channel.id, resolved.guild_id);
+            }
         }
     }
 };
@@ -89,8 +110,8 @@ export function checkKickNotInRole(userId: string, channelId: string, guildId: s
 
     if (!member.roles.includes(requiredRole)) {
         log(`Enforcing role requirement: user ${userId} missing role ${requiredRole} in ${channelId}`);
-        const ephemeral = formatkickNotInRoleEphemeral(channelId, userId);
-        const external = formatkickNotInRoleExternal(channelId, userId);
+        const ephemeral = formatKickNotInRoleMessage(channelId, userId, requiredRole);
+        const external = formatCommand(settings.store.kickCommand, channelId, { userId });
 
         queueAction({
             userId,

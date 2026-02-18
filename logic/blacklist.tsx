@@ -5,19 +5,18 @@ import { type Channel, type User } from "@vencord/discord-types";
 import { channelOwners } from "../state";
 import { log, warn, error } from "../utils/logging";
 import { formatMessageCommon, formatCommand } from "../utils/formatting";
+import { getUserIdList, setNewLineList } from "../utils/settings";
 import { queueAction } from "./queue";
 import { checkChannelOwner, getMemberInfoForChannel } from "./channelClaim";
 import { PluginModule } from "../types/PluginModule";
 import { ApplicationCommandOptionType, findOption } from "@api/Commands";
 
 export function getKickList(): string[] {
-    const { settings } = require("..");
-    return (settings.store.localUserBlacklist as string).split(/\r?\n/).map(s => s.trim()).filter(id => /^\d{17,19}$/.test(id));
+    return getUserIdList("localUserBlacklist");
 }
 
 export function setKickList(newList: string[]) {
-    const { settings } = require("..");
-    settings.store.localUserBlacklist = newList.join("\n");
+    setNewLineList("localUserBlacklist", newList);
 }
 
 export function formatBanRotationMessage(channelId: string, oldUserId: string, newUserId: string): string {
@@ -139,19 +138,23 @@ export const BlacklistMenuItems = {
                     if (isBanned) {
                         if (info?.banned.includes(user.id)) {
                             log(`Unban from VC: Queuing UNBAN for ${user.id} in ${myChannelId}`);
+                            const { settings } = require("..");
                             queueAction({
                                 userId: user.id,
                                 channelId: myChannelId,
-                                guildId: guildId || ""
+                                guildId: guildId || "",
+                                external: formatCommand(settings.store.unbanCommand, myChannelId, { userId: user.id })
                             });
                         }
                     } else if (isTargetInMyChannel) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                        const { settings } = require("..");
                         log(`Ban from VC: Queuing KICK for ${user.id} in ${myChannelId}`);
                         queueAction({
                             userId: user.id,
                             channelId: myChannelId,
-                            guildId: voiceState?.guildId || guildId
+                            guildId: voiceState?.guildId || guildId,
+                            external: formatCommand(settings.store.kickCommand, myChannelId, { userId: user.id })
                         });
                     }
                 }}
@@ -184,10 +187,12 @@ export const BlacklistMenuItems = {
 
                     if (isOwner) {
                         const voiceState = VoiceStateStore.getVoiceStateForChannel(myChannelId, user.id);
+                        const { settings } = require("..");
                         queueAction({
                             userId: user.id,
                             channelId: myChannelId,
-                            guildId: voiceState?.guildId
+                            guildId: voiceState?.guildId,
+                            external: formatCommand(settings.store.kickCommand, myChannelId, { userId: user.id })
                         });
                     } else {
                         warn(`Not owner of channel ${myChannelId}`);
