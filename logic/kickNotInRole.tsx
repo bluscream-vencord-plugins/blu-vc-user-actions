@@ -1,6 +1,6 @@
 import { OptionType } from "@utils/types";
 import { UserStore, ChannelStore, GuildMemberStore, Menu } from "@webpack/common";
-import { channelOwners } from "../state";
+import { channelOwners, state } from "../state";
 import { log, error } from "../utils/logging";
 import { formatCommand } from "../utils/formatting";
 import { queueAction } from "./queue";
@@ -120,5 +120,6 @@ export function checkKickNotInRole(userId: string, channelId: string, guildId: s
             ephemeral,
             external
         });
+        state.recentlyKickedUsers.set(userId, Date.now());
     }
 }

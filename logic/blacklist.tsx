@@ -9,7 +9,8 @@ import { getUserIdList, setNewLineList } from "../utils/settings";
 import { queueAction } from "./queue";
 import { checkChannelOwner, getMemberInfoForChannel } from "./channelClaim";
 import { PluginModule } from "../types/PluginModule";
-import { ApplicationCommandOptionType, findOption } from "@api/Commands";
+import { ApplicationCommandOptionType, findOption, sendBotMessage } from "@api/Commands";
+import { state } from "../state";
 
 export function getKickList(): string[] {
     return getUserIdList("localUserBlacklist");
@@ -364,7 +365,7 @@ export const BlacklistModule: PluginModule = {
                     fields: [
                         {
                             name: "📊 Stats",
-                            value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nGlobal Sync: ${localUserBlacklist.length}`,
+                            value: `MemberInfo Bans: ${bannedIds.length}/${settings.store.banLimit}\nLocal Blacklist: ${localUserBlacklist.length}`,
                             inline: false
                         }
                     ],
@@ -440,13 +441,61 @@ export function checkBlacklistEnforcement(userId: string, channelId: string, gui
     if (!kickList.includes(userId)) return;
 
     const { settings } = require("..");
-    const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
-    log(`Enforcing blacklist: kicking ${userId} from ${channelId}`);
+    const now = Date.now();
+    const lastKick = state.recentlyKickedUsers.get(userId) || 0;
+
+    if (settings.store.banRotateEnabled && (now - lastKick < 60000)) {
+        log(`Ban rotation triggered for ${userId} in ${channelId} (rejoined within 60s)`);
+        applyBanRotation(userId, channelId, guildId);
+    } else {
+        const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
+        log(`Enforcing blacklist: kicking ${userId} from ${channelId}`);
+        queueAction({
+            userId: userId,
+            channelId: channelId,
+            guildId: guildId,
+            external: cmd
+        });
+        state.recentlyKickedUsers.set(userId, now);
+    }
+}
+
+export function applyBanRotation(userId: string, channelId: string, guildId: string) {
+    const { settings } = require("..");
+    const info = getMemberInfoForChannel(channelId);
+    if (!info) {
+        warn(`Cannot rotate ban for ${userId} in ${channelId}: MemberInfo not found.`);
+        return;
+    }
+
+    if (info.banned.includes(userId)) {
+        log(`User ${userId} already banned in channel ${channelId}, skipping rotation.`);
+        return;
+    }
+
+    if (info.banned.length >= settings.store.banLimit) {
+        const oldestBannedId = info.banned[0];
+        log(`Ban limit reached (${info.banned.length}). Rotating out oldest ban: ${oldestBannedId}`);
+
+        const unbanCmd = formatCommand(settings.store.unbanCommand, channelId, { userId: oldestBannedId });
+        queueAction({
+            userId: oldestBannedId,
+            channelId: channelId,
+            guildId: guildId,
+            external: unbanCmd
+        });
+
+        const ephemeral = formatBanRotationMessage(channelId, oldestBannedId, userId);
+        sendBotMessage(channelId, { content: ephemeral });
+    }
+
+    const banCmd = formatCommand(settings.store.banCommand, channelId, { userId });
+    log(`Queuing ban for joiner ${userId} in ${channelId}`);
     queueAction({
         userId: userId,
         channelId: channelId,
         guildId: guildId,
-        external: cmd
+        external: banCmd
     });
 }
 

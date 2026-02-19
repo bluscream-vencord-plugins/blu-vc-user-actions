@@ -58,6 +58,7 @@ export const state = {
         restartAllRotations();
     },
     requestedInfo: new Map<string, number>(),
+    recentlyKickedUsers: new Map<string, number>(),
 };
 
 export function setMemberInfo(ownerId: string, info: MemberChannelInfo) {
