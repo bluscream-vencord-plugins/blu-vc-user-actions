@@ -227,6 +227,20 @@ export const BlacklistModule: PluginModule = {
             default: "♻️ Ban rotated: <@{user_id}> was unbanned to make room for <@{user_id_new}>",
             restartNeeded: false,
         },
+        banRotateCooldown: {
+            type: OptionType.SLIDER as const,
+            description: "Time in seconds to track recently kicked users for rotation (0 for infinite)",
+            default: 60,
+            markers: [0, 5, 15, 30, 60, 120, 300, 600],
+            stickToMarkers: false,
+            restartNeeded: false,
+            onChange: (v) => {
+                if (typeof v === "number") {
+                    const { settings } = require("..");
+                    settings.store.banRotateCooldown = Math.round(v);
+                }
+            }
+        },
         kickCommand: {
             type: OptionType.STRING as const,
             description: "Message to send to kick a user",
@@ -443,13 +457,17 @@ export function checkBlacklistEnforcement(userId: string, channelId: string, gui
     const { settings } = require("..");
     const now = Date.now();
     const lastKick = state.recentlyKickedUsers.get(userId) || 0;
+    const timeSinceLastKick = now - lastKick;
+    const cooldownMs = (settings.store.banRotateCooldown ?? 60) * 1000;
 
-    if (settings.store.banRotateEnabled && (now - lastKick < 60000)) {
-        log(`Ban rotation triggered for ${userId} in ${channelId} (rejoined within 60s)`);
+    log(`[BlacklistEnforcement] Checking ${userId} in ${channelId}. Last kick: ${lastKick ? timeSinceLastKick + "ms ago" : "never"} (Cooldown: ${cooldownMs}ms)`);
+
+    if (settings.store.banRotateEnabled && (cooldownMs === 0 || timeSinceLastKick < cooldownMs)) {
+        log(`[BlacklistEnforcement] Ban rotation triggered for ${userId} (rejoined within ${cooldownMs}ms)`);
         applyBanRotation(userId, channelId, guildId);
     } else {
         const cmd = formatCommand(settings.store.kickCommand, channelId, { userId });
-        log(`Enforcing blacklist: kicking ${userId} from ${channelId}`);
+        log(`[BlacklistEnforcement] Enforcing blacklist: queuing kick for ${userId}`);
         queueAction({
             userId: userId,
             channelId: channelId,
@@ -457,25 +475,30 @@ export function checkBlacklistEnforcement(userId: string, channelId: string, gui
             external: cmd
         });
         state.recentlyKickedUsers.set(userId, now);
+        log(`[BlacklistEnforcement] User ${userId} marked as recently kicked at ${now}`);
     }
 }
 
 export function applyBanRotation(userId: string, channelId: string, guildId: string) {
     const { settings } = require("..");
+    log(`[BanRotation] Starting rotation for user ${userId} in channel ${channelId}`);
+
     const info = getMemberInfoForChannel(channelId);
     if (!info) {
-        warn(`Cannot rotate ban for ${userId} in ${channelId}: MemberInfo not found.`);
+        warn(`[BanRotation] Cannot rotate: MemberInfo (memberchannelinfo) not found for channel ${channelId}.`);
         return;
     }
 
+    log(`[BanRotation] Current banned users: [${info.banned.join(", ")}] (${info.banned.length}/${settings.store.banLimit})`);
+
     if (info.banned.includes(userId)) {
-        log(`User ${userId} already banned in channel ${channelId}, skipping rotation.`);
+        log(`[BanRotation] User ${userId} is already in the channel's ban list. No rotation needed.`);
         return;
     }
 
     if (info.banned.length >= settings.store.banLimit) {
         const oldestBannedId = info.banned[0];
-        log(`Ban limit reached (${info.banned.length}). Rotating out oldest ban: ${oldestBannedId}`);
+        log(`[BanRotation] Pool full. Rotating OUT oldest: ${oldestBannedId}`);
 
         const unbanCmd = formatCommand(settings.store.unbanCommand, channelId, { userId: oldestBannedId });
         queueAction({
@@ -487,10 +510,11 @@ export function applyBanRotation(userId: string, channelId: string, guildId: str
 
         const ephemeral = formatBanRotationMessage(channelId, oldestBannedId, userId);
         sendBotMessage(channelId, { content: ephemeral });
+        log(`[BanRotation] Unban command queued and notification sent.`);
     }
 
     const banCmd = formatCommand(settings.store.banCommand, channelId, { userId });
-    log(`Queuing ban for joiner ${userId} in ${channelId}`);
+    log(`[BanRotation] Rotating IN (banning) joiner: ${userId}`);
     queueAction({
         userId: userId,
         channelId: channelId,

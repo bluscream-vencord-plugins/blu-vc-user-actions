@@ -109,7 +109,7 @@ export function checkKickNotInRole(userId: string, channelId: string, guildId: s
     if (!requiredRole) return;
 
     if (!member.roles.includes(requiredRole)) {
-        log(`Enforcing role requirement: user ${userId} missing role ${requiredRole} in ${channelId}`);
+        log(`[KickNotInRole] Enforcing role requirement: user ${userId} missing role ${requiredRole} in ${channelId}`);
         const ephemeral = formatKickNotInRoleMessage(channelId, userId, requiredRole);
         const external = formatCommand(settings.store.kickCommand, channelId, { userId });
 
@@ -120,6 +120,8 @@ export function checkKickNotInRole(userId: string, channelId: string, guildId: s
             ephemeral,
             external
         });
-        state.recentlyKickedUsers.set(userId, Date.now());
+        const now = Date.now();
+        state.recentlyKickedUsers.set(userId, now);
+        log(`[KickNotInRole] User ${userId} marked as recently kicked at ${now}`);
     }
 }
