@@ -8,6 +8,7 @@ import { UserStore as Users, VoiceStateStore, RelationshipStore, GuildMemberStor
 import { Message, VoiceState } from "@vencord/discord-types";
 import { formatCommand } from "../utils/formatting";
 import { parseVoiceUserFromInput, MemberLike, extractId } from "../utils/parsing";
+import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { WhitelistingModule } from "./whitelisting";
 export const VoteBanningModule: SocializeModule = {
@@ -102,7 +103,9 @@ export const VoteBanningModule: SocializeModule = {
         }
 
         if (isLocallyBlacklisted || isBlocked || isMissingRole) {
-            logger.info(`User ${userId} failed validity check (Blacklisted: ${isLocallyBlacklisted}, Blocked: ${isBlocked}, MissingRole: ${isMissingRole})`);
+            sendDebugMessage(channelId, `User <@${userId}> failed join check: ` +
+                [isLocallyBlacklisted && "Blacklisted", isBlocked && "Blocked", isMissingRole && "Missing Role"].filter(Boolean).join(", "));
+
             this.enforceBanPolicy(userId, channelId, true);
         }
     },
@@ -118,7 +121,7 @@ export const VoteBanningModule: SocializeModule = {
 
             if (!lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs)) {
                 // User hasn't been kicked recently, or cooldown expired. Kick them first.
-                logger.info(`Kick-First applied. Kicking user ${userId}`);
+                sendDebugMessage(channelId, `Kick-First applied. Kicking user ${userId}`);
                 actionQueue.enqueue(formatCommand(this.settings.kickCommand, channelId, { userId }), channelId, true);
 
                 // Track kick time so they get banned if they rejoin
@@ -128,7 +131,7 @@ export const VoteBanningModule: SocializeModule = {
         }
 
         // Waitlist re-triggered (or immediate ban requested), process Ban Rotation
-        logger.info(`Executing ban rotation sequence for ${userId}`);
+        sendDebugMessage(channelId, `Executing ban rotation sequence for ${userId}`);
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
@@ -138,7 +141,7 @@ export const VoteBanningModule: SocializeModule = {
         if (this.settings.banRotateEnabled && config.bannedUsers.length >= this.settings.banLimit) {
             const oldestBannedUser = config.bannedUsers.shift();
             if (oldestBannedUser) {
-                logger.info(`Ban list full. Unbanning ${oldestBannedUser} to make room...`);
+                sendDebugMessage(channelId, `Ban list full. Unbanning ${oldestBannedUser} to make room...`);
                 actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser }), channelId, true);
 
                 if (this.settings.banRotationMessage) {
@@ -183,7 +186,7 @@ export const VoteBanningModule: SocializeModule = {
         const occupantCount = currentVoiceStates.length;
         const requiredVotes = Math.ceil(occupantCount * (this.settings.voteBanPercentage / 100));
 
-        logger.info(`Vote registered against ${targetUser} by ${voterId}. ${voteData.voters.size} / ${requiredVotes}`);
+        sendDebugMessage(channelId, `Vote registered against ${targetUser} by ${voterId}. (${voteData.voters.size}/${requiredVotes})`);
 
         if (voteData.voters.size >= requiredVotes) {
             logger.info(`Vote threshold reached for ${targetUser}. Executing ban policy.`);

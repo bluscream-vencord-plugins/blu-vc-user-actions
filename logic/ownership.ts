@@ -10,6 +10,7 @@ import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
+import { sendDebugMessage } from "../utils/debug";
 import { GuildChannelStore, ChannelStore, GuildStore } from "@webpack/common";
 import { NamingModule } from "./naming";
 
@@ -73,6 +74,8 @@ export const OwnershipModule: SocializeModule = {
         const response = new BotResponse(message, settings.botId);
         if (response.type === BotResponseType.UNKNOWN) return;
 
+        sendDebugMessage(message.channel_id, `Received Bot Response: **${response.type}** from <@${response.initiatorId || "Unknown"}>`);
+
         // Dispatch general event
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
@@ -106,7 +109,7 @@ export const OwnershipModule: SocializeModule = {
             const result = parseBotInfoMessage(response);
             if (result && result.info.userId) {
                 stateManager.updateMemberConfig(result.info.userId, result.info);
-                logger.debug(`Synchronized info for user ${result.info.userId} via bot embed`);
+                sendDebugMessage(message.channel_id, `Synchronized info for user ${result.info.userId} via bot embed`);
             }
         }
 
@@ -177,6 +180,8 @@ export const OwnershipModule: SocializeModule = {
         // Notify others if configured
         this.notifyOwnership(channelId, ownerId, type);
 
+        sendDebugMessage(channelId, `Conflict Resolution: **${ownerId === meId ? "We" : "User"}** (${ownerId}) recognized as ${type}`);
+
         // Dispatch typed event for other modules
         moduleRegistry.dispatch(SocializeEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
 
@@ -212,6 +217,7 @@ export const OwnershipModule: SocializeModule = {
 
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
+            sendDebugMessage(channelId, `You joined managed channel <#${channelId}>`);
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
             // Check if we are the owner, if so restart naming rotation
@@ -224,6 +230,7 @@ export const OwnershipModule: SocializeModule = {
         // If this is an owned channel, dispatch an event
         const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
+            sendDebugMessage(channelId, `User Joined Owned Channel: <@${userId}> (Owner: <@${ownership.creatorId || ownership.claimantId}>)`);
             moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId });
         }
     },
@@ -240,7 +247,7 @@ export const OwnershipModule: SocializeModule = {
 
             // Check if creator or claimant left
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
-                logger.info(`Owner ${userId} left channel ${channelId}`);
+                sendDebugMessage(channelId, `Owner ${userId} left channel ${channelId}`);
 
                 // If the owner left and it was us, stop rotation
                 if (userId === currentUserId) {

@@ -1,6 +1,7 @@
 import { ActionQueueItem } from "../types/state";
 
 import { logger } from "./logger";
+import { sendDebugMessage } from "./debug";
 
 // Simple Action Queue
 export class ActionQueue {
@@ -48,6 +49,8 @@ export class ActionQueue {
             this.queue.push(item);
         }
 
+        sendDebugMessage(channelId, `Enqueued command: \`${command.substring(0, 50)}${command.length > 50 ? "..." : ""}\` (Priority: ${priority})`);
+
         this.emitQueuedEvent(item);
         this.processQueue();
     }
@@ -92,7 +95,8 @@ export class ActionQueue {
 
         if (item && this.sendCommandCallback) {
             try {
-                logger.debug("Executing queued command:", item.command);
+
+                sendDebugMessage(item.channelId, `Executing command: \`${item.command}\``);
                 const result = await this.sendCommandCallback(item.command, item.channelId);
 
                 // If it's a message object from Discord

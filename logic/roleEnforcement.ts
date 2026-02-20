@@ -6,6 +6,7 @@ import { stateManager } from "../utils/stateManager";
 import { UserStore as Users, GuildMemberStore } from "@webpack/common";
 import { SocializeEvent } from "../types/events";
 import { getNewLineList } from "../utils/settingsHelpers";
+import { sendDebugMessage } from "../utils/debug";
 
 export const RoleEnforcementModule: SocializeModule = {
     name: "RoleEnforcementModule",
@@ -30,7 +31,8 @@ export const RoleEnforcementModule: SocializeModule = {
             const member = GuildMemberStore.getMember(guildId, userId);
 
             if (member && requiredRoleList.length > 0 && !member.roles.some((r: string) => requiredRoleList.includes(r))) {
-                logger.info(`User ${userId} missing required roles, kicking...`);
+                sendDebugMessage(channelId, `<@${userId}> is missing required roles.`);
+
                 const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
 
                 // Check if they are whitelisted before kicking

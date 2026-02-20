@@ -5,6 +5,7 @@ import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../utils/actionQueue";
 import { MemberLike, extractId } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
+import { sendDebugMessage } from "../utils/debug";
 
 export const WhitelistingModule: SocializeModule = {
     name: "WhitelistingModule",
@@ -38,6 +39,7 @@ export const WhitelistingModule: SocializeModule = {
             const userId = extractId(member);
             if (!userId) continue;
             const cmd = formatCommand(this.settings.permitCommand, channelId, { userId });
+            sendDebugMessage(channelId, `Permitting user <@${userId}>`);
             actionQueue.enqueue(cmd, channelId);
         }
     },
@@ -52,6 +54,7 @@ export const WhitelistingModule: SocializeModule = {
             const userId = extractId(member);
             if (!userId) continue;
             const cmd = formatCommand(this.settings.unpermitCommand, channelId, { userId });
+            sendDebugMessage(channelId, `Unpermitting user <@${userId}>`);
             actionQueue.enqueue(cmd, channelId);
         }
     },

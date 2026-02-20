@@ -3,6 +3,7 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
+import { sendDebugMessage } from "../utils/debug";
 import { UserStore as Users } from "@webpack/common";
 export const NamingModule: SocializeModule = {
     name: "NamingModule",
@@ -34,7 +35,8 @@ export const NamingModule: SocializeModule = {
             this.stopRotation();
         }
 
-        logger.info(`Starting name rotation for channel ${channelId}`);
+        sendDebugMessage(channelId, `Starting name rotation for channel <#${channelId}>`);
+
         const intervalMs = this.settings.channelNameRotationInterval * 1000;
         if (!intervalMs) {
             logger.error("Naming interval is not defined in settings.");
@@ -50,7 +52,8 @@ export const NamingModule: SocializeModule = {
         if (this.rotationIntervalId) {
             clearInterval(this.rotationIntervalId);
             this.rotationIntervalId = null;
-            logger.info("Name rotation stopped.");
+            sendDebugMessage("", "Name rotation stopped."); // No channelId context easily available here unless stored
+
         }
     },
 
@@ -64,6 +67,7 @@ export const NamingModule: SocializeModule = {
 
         stateManager.updateMemberConfig(userId, { nameRotationIndex: config.nameRotationIndex });
 
+        sendDebugMessage(channelId, `Rotating name to: **${nextName}**`);
         const renameCmd = this.settings.renameCommand.replace("{name}", nextName);
         actionQueue.enqueue(renameCmd, channelId, false);
     },
