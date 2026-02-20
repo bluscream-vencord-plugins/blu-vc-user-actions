@@ -1,5 +1,4 @@
-import { UserStore as Users, ChannelStore as Channels, React, Menu } from "@webpack/common";
-import type { GlobalContextMenuPatchCallback } from "@api/ContextMenu";
+import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChannelStore } from "@webpack/common";
 
 // Vencord types
 import { User, Channel, Guild } from "@vencord/discord-types";
@@ -11,52 +10,7 @@ import { OwnershipModule } from "../logic/ownership";
 import { formatCommand } from "../utils/formatting";
 import { logger } from "../utils/logger";
 
-export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[], log?: (...args: any[]) => void) {
-    let targetMenu: any = null;
-    let targetList: any[] = [];
-    let targetIndex: number = -1;
-
-    const findMenu = (list: any[]) => {
-        for (let i = 0; i < list.length; i++) {
-            const item = list[i];
-            if (!item) continue;
-
-            const label = item.props?.label?.toString().toLowerCase().trim();
-            const targetLabel = menuLabel.toLowerCase().trim();
-
-            if (item.props?.id === menuId || label === targetLabel) {
-                if (!targetMenu) {
-                    targetMenu = item;
-                    targetList = list;
-                    targetIndex = i;
-                    if (log) log(`Found target menu: ${item.props?.label} (${item.props?.id}) at index ${i}`);
-                } else {
-                    if (log) log(`Removing duplicate menu: ${item.props?.label} (${item.props?.id}) at index ${i}`);
-                    const dupeChildren = React.Children.toArray(item.props.children);
-                    const currentChildren = React.Children.toArray(targetMenu.props.children);
-                    targetList[targetIndex] = React.cloneElement(targetMenu, targetMenu.props, ...currentChildren, ...dupeChildren);
-                    list.splice(i, 1);
-                    i--;
-                }
-                continue;
-            }
-
-            if (item.props?.children) {
-                findMenu(React.Children.toArray(item.props.children));
-            }
-        }
-    };
-
-    findMenu(children);
-
-    if (targetMenu) {
-        if (log) log(`Merging into existing menu: ${targetMenu.props?.label}`);
-        const oldChildren = React.Children.toArray(targetMenu.props.children);
-        targetList[targetIndex] = React.cloneElement(targetMenu, { id: menuId, label: menuLabel }, ...oldChildren, ...newItems);
-        return;
-    }
-
-    if (log) log(`Creating new menu ${menuId}`);
+export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[]) {
     const newMenu = (
         <Menu.MenuItem id={menuId} label={menuLabel} key={menuId}>
             {newItems}
@@ -72,23 +26,6 @@ export function addToSubmenu(children: any[], menuId: string, menuLabel: string,
     } else {
         children.splice(-1, 0, newMenu);
     }
-}
-
-export function registerSharedContextMenu(pluginName: string, handlers: Record<string, (children: any[], props: any) => void>, log?: (...args: any[]) => void) {
-    const { addGlobalContextMenuPatch, removeGlobalContextMenuPatch } = require("@api/ContextMenu");
-
-    const patch: GlobalContextMenuPatchCallback = (navId, children, ...args) => {
-        const handler = handlers[navId];
-        if (handler) {
-            try {
-                handler(children, args[0]);
-            } catch (e) {
-                if (log) log(`Error in context menu handler for ${navId}:`, e);
-            }
-        }
-    };
-    addGlobalContextMenuPatch(patch);
-    return () => removeGlobalContextMenuPatch(patch);
 }
 
 function buildUserContextMenuItems(user: User, channel?: Channel) {
@@ -183,26 +120,24 @@ function buildGuildContextMenuItems(guild: Guild) {
     ];
 }
 
-export function setupContextMenus() {
-    return registerSharedContextMenu("socializeGuild", {
-        "user-context": (children, props) => {
-            const user = props?.user;
-            const channel = props?.channel || Channels.getChannel(props?.channelId);
-            if (!user) return;
-            const items = buildUserContextMenuItems(user, channel);
-            if (items) addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items, undefined);
-        },
-        "channel-context": (children, props) => {
-            const channel = props?.channel;
-            if (!channel) return;
-            const items = buildChannelContextMenuItems(channel);
-            if (items) addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items, undefined);
-        },
-        "guild-context": (children, props) => {
-            const guild = props?.guild;
-            if (!guild) return;
-            const items = buildGuildContextMenuItems(guild);
-            if (items) addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items, undefined);
-        }
-    }, (msg) => logger.debug(msg));
-}
+export const contextMenuHandlers = {
+    "user-context": (children: any[], props: any) => {
+        const user = props?.user;
+        const channel = props?.channel || Channels.getChannel(props?.channelId) || Channels.getChannel(SelectedChannelStore.getChannelId());
+        if (!user) return;
+        const items = buildUserContextMenuItems(user, channel);
+        if (items) addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items);
+    },
+    "channel-context": (children: any[], props: any) => {
+        const channel = props?.channel;
+        if (!channel) return;
+        const items = buildChannelContextMenuItems(channel);
+        if (items) addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items);
+    },
+    "guild-context": (children: any[], props: any) => {
+        const guild = props?.guild;
+        if (!guild) return;
+        const items = buildGuildContextMenuItems(guild);
+        if (items) addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items);
+    }
+};

@@ -58,22 +58,21 @@ export const VoteBanningModule: SocializeModule = {
     },
 
     onMessageCreate(message: Message) {
-        if (!this.settings || !this.settings.botId || !this.settings.voteBanCommandString) return;
+        if (!this.settings || !this.settings.botId || !this.settings.voteBanRegex) return;
 
-        const cmdPrefix = this.settings.voteBanCommandString.split("{user}")[0].trim().toLowerCase();
+        const regex = new RegExp(this.settings.voteBanRegex, "i");
+        const match = message.content.match(regex);
 
-        if (message.content.toLowerCase().startsWith(cmdPrefix)) {
-            const inputArg = message.content.substring(cmdPrefix.length).trim();
-            if (!inputArg) return;
+        if (match) {
+            const targetUser = match.groups?.target;
+            const reason = match.groups?.reason || "";
+            if (!targetUser) return;
 
             const voterId = message.author.id;
             const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
             if (!voterVoiceState || !voterVoiceState.channelId) return;
 
-            const targetUser = parseVoiceUserFromInput(inputArg, voterVoiceState.channelId);
-            if (!targetUser) return;
-
-            this.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId);
+            this.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId, reason);
         }
     },
 
@@ -103,14 +102,14 @@ export const VoteBanningModule: SocializeModule = {
         }
 
         if (isLocallyBlacklisted || isBlocked || isMissingRole) {
-            sendDebugMessage(channelId, `User <@${userId}> failed join check: ` +
-                [isLocallyBlacklisted && "Blacklisted", isBlocked && "Blocked", isMissingRole && "Missing Role"].filter(Boolean).join(", "));
+            const reason = [isLocallyBlacklisted && "Blacklisted", isBlocked && "Blocked", isMissingRole && "Missing Role"].filter(Boolean).join(", ");
+            sendDebugMessage(channelId, `User <@${userId}> failed join check: ${reason}`);
 
-            this.enforceBanPolicy(userId, channelId, true);
+            this.enforceBanPolicy(userId, channelId, true, reason);
         }
     },
 
-    enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false) {
+    enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false, reason?: string) {
         if (!this.settings) return;
 
         // Kick First Policy
@@ -122,7 +121,7 @@ export const VoteBanningModule: SocializeModule = {
             if (!lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs)) {
                 // User hasn't been kicked recently, or cooldown expired. Kick them first.
                 sendDebugMessage(channelId, `Kick-First applied. Kicking user ${userId}`);
-                actionQueue.enqueue(formatCommand(this.settings.kickCommand, channelId, { userId }), channelId, true);
+                actionQueue.enqueue(formatCommand(this.settings.kickCommand, channelId, { userId, reason }), channelId, true);
 
                 // Track kick time so they get banned if they rejoin
                 this.recentlyKickedWaitlist.set(userId, now);
@@ -159,11 +158,11 @@ export const VoteBanningModule: SocializeModule = {
             stateManager.updateMemberConfig(currentUserId, { bannedUsers: config.bannedUsers });
         }
 
-        actionQueue.enqueue(formatCommand(this.settings.banCommand, channelId, { userId }), channelId, true);
+        actionQueue.enqueue(formatCommand(this.settings.banCommand, channelId, { userId, reason }), channelId, true);
         this.recentlyKickedWaitlist.delete(userId); // Consume the waitlist
     },
 
-    registerVote(targetUser: string, voterId: string, channelId: string, guildId: string) {
+    registerVote(targetUser: string, voterId: string, channelId: string, guildId: string, reason?: string) {
         if (!this.settings) return;
         const ownership = stateManager.getOwnership(channelId);
         if (!ownership) return; // Only allow in managed channels
@@ -190,7 +189,7 @@ export const VoteBanningModule: SocializeModule = {
 
         if (voteData.voters.size >= requiredVotes) {
             logger.info(`Vote threshold reached for ${targetUser}. Executing ban policy.`);
-            this.enforceBanPolicy(targetUser, channelId, false); // Votebans do not offer kick warnings (immediate)
+            this.enforceBanPolicy(targetUser, channelId, false, reason || "Vote Ban"); // Votebans do not offer kick warnings (immediate)
             this.activeVotes.delete(voteKey);
         }
     },

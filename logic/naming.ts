@@ -3,6 +3,7 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
+import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { UserStore as Users } from "@webpack/common";
 export const NamingModule: SocializeModule = {
@@ -68,7 +69,7 @@ export const NamingModule: SocializeModule = {
         stateManager.updateMemberConfig(userId, { nameRotationIndex: config.nameRotationIndex });
 
         sendDebugMessage(channelId, `Rotating name to: **${nextName}**`);
-        const renameCmd = this.settings.renameCommand.replace("{name}", nextName);
+        const renameCmd = formatCommand(this.settings.setChannelNameCommand, channelId, { newChannelName: nextName });
         actionQueue.enqueue(renameCmd, channelId, false);
     },
 

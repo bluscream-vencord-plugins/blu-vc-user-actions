@@ -14,21 +14,16 @@ import { NamingModule } from "./logic/naming";
 import { RoleEnforcementModule } from "./logic/roleEnforcement";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { CommandCleanupModule } from "./logic/commandCleanup";
-import { setupContextMenus } from "./components/menus";
+import { contextMenuHandlers } from "./components/menus";
+import SocializeToolbox from "./components/toolbox";
 
 export default definePlugin({
     ...pluginInfo,
     settings: defaultSettings,
 
-    _stopContextMenus: undefined as (() => void) | undefined,
-
     onStart() {
         logger.info("Starting SocializeGuild Plugin...");
 
-        // Setup store connection to Vencord (using this.store to mock it if available)
-        // Normally vencord gives us `this.store` inside the plugin object?
-        // We'll mock it via empty object if undefined, though real Vencord persists automatically per plugin via `this.settings`?
-        // Wait, Vencord's definePlugin gives `useSettings` and `settings`. Using them.
         stateManager.init(this.settings.store || {});
         actionQueue.setDelay((this.settings.store.queueInterval || 2) * 1000);
 
@@ -49,9 +44,6 @@ export default definePlugin({
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as PluginSettings);
 
-        // Setup UI context menus
-        this._stopContextMenus = setupContextMenus();
-
         logger.info("SocializeGuild started successfully.");
     },
 
@@ -59,19 +51,21 @@ export default definePlugin({
         logger.info("Stopping SocializeGuild Plugin...");
         moduleRegistry.stop();
         actionQueue.clear();
+    },
 
-        if (this._stopContextMenus) {
-            this._stopContextMenus();
-            this._stopContextMenus = undefined;
-        }
+    contextMenus: contextMenuHandlers,
+
+    toolboxActions() {
+        const { SelectedChannelStore } = require("@webpack/common");
+        const channelId = SelectedChannelStore.getChannelId();
+        if (!channelId) return null;
+        return <SocializeToolbox channelId={channelId} />;
     },
 
     commands: [
         socializeCommand
     ],
 
-    // We can also patch standard React component functions here for the UI additions
-    // e.g., using `vencord/api/patcher`
     patches: [
         // Example: Inject into context menus
     ]
