@@ -64,6 +64,8 @@ export const RoleEnforcementModule: SocializeModule = {
                     );
                     payload.isHandled = true;
                     payload.reason = "Role Enforcement Violation";
+                } else {
+                    sendDebugMessage(`<@${userId}> did not match role enforcement conditions (${settings.requiredRoleMode}). Not kicking.`, channelId);
                 }
             }
         });
