@@ -1,6 +1,12 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
+export enum RequiredRoleMode {
+    ALL = "All",
+    ANY = "Any",
+    NONE = "None"
+}
+
 export const defaultSettings = definePluginSettings({
 
     // ── Channel Claiming / Ownership ──────────────────────────────────────
@@ -25,6 +31,15 @@ export const defaultSettings = definePluginSettings({
     // ── Role Enforcement ──────────────────────────────────────────────────
     banNotInRoles: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users missing required roles", default: true, restartNeeded: false },
     requiredRoleIds: { type: OptionType.STRING, description: "Required role IDs — users missing these are auto-kicked (one per line)", default: "", multiline: true, restartNeeded: false },
+    requiredRoleMode: {
+        type: OptionType.SELECT,
+        description: "How to match roles?",
+        options: [
+            { label: "Must have ALL of the roles (All)", value: RequiredRoleMode.ALL },
+            { label: "Must have at least one of the roles (Any)", value: RequiredRoleMode.ANY, default: true },
+            { label: "Must NOT have any of the roles (None)", value: RequiredRoleMode.NONE }
+        ]
+    },
 
     // ── Vote Banning ──────────────────────────────────────────────────────
     voteBanCommandString: { type: OptionType.STRING, description: "Command users type to vote-ban someone (e.g. !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },

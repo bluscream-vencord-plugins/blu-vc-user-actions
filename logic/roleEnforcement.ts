@@ -1,5 +1,5 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
-import { PluginSettings } from "../types/settings";
+import { PluginSettings, RequiredRoleMode } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
@@ -35,20 +35,36 @@ export const RoleEnforcementModule: SocializeModule = {
 
             const member = GuildMemberStore.getMember(guildId, userId);
 
-            if (member && requiredRoleList.length > 0 && !member.roles.some((r: string) => requiredRoleList.includes(r))) {
-                sendDebugMessage(channelId, `<@${userId}> is missing required roles.`);
+            if (member && requiredRoleList.length > 0) {
+                let shouldKick = false;
 
-                const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
+                if (settings.requiredRoleMode === RequiredRoleMode.ALL) {
+                    const hasAllRoles = requiredRoleList.every(r => member.roles.includes(r));
+                    shouldKick = !hasAllRoles;
+                } else if (settings.requiredRoleMode === RequiredRoleMode.NONE) {
+                    const hasAnyRole = member.roles.some((r: string) => requiredRoleList.includes(r));
+                    shouldKick = hasAnyRole;
+                } else {
+                    // Default / ANY
+                    const hasAnyRole = member.roles.some((r: string) => requiredRoleList.includes(r));
+                    shouldKick = !hasAnyRole;
+                }
 
-                // Action taken
-                actionQueue.enqueue(
-                    kickCmd,
-                    channelId,
-                    true,
-                    () => isUserInVoiceChannel(userId, channelId)
-                );
-                payload.isHandled = true;
-                payload.reason = "Missing Required Roles";
+                if (shouldKick) {
+                    sendDebugMessage(channelId, `<@${userId}> matched role enforcement conditions (${settings.requiredRoleMode}). Kicking.`);
+
+                    const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
+
+                    // Action taken
+                    actionQueue.enqueue(
+                        kickCmd,
+                        channelId,
+                        true,
+                        () => isUserInVoiceChannel(userId, channelId)
+                    );
+                    payload.isHandled = true;
+                    payload.reason = "Role Enforcement Violation";
+                }
             }
         });
     },
