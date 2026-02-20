@@ -1,6 +1,6 @@
 import type { Channel } from "@vencord/discord-types";
 import { ChannelType } from "@vencord/discord-types/enums";
-import { ChannelStore, GuildChannelStore } from "@webpack/common";
+import { ChannelStore, GuildChannelStore, VoiceStateStore } from "@webpack/common";
 
 export const isVoiceChannel = (channel: Channel | null | undefined): channel is Channel =>
     channel?.type === ChannelType.GUILD_VOICE || channel?.type === ChannelType.GUILD_STAGE_VOICE;
@@ -35,4 +35,13 @@ export function findAssociatedTextChannel(voiceChannel: Channel | string | null 
             c.parent_id === ch.parent_id &&
             c.name === ch.name
         ) ?? null;
+}
+
+/**
+ * Checks if a specific user is currently in a given voice channel.
+ */
+export function isUserInVoiceChannel(userId: string, channelId: string): boolean {
+    if (!userId || !channelId) return false;
+    const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId);
+    return !!voiceStates?.[userId];
 }

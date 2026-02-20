@@ -7,6 +7,7 @@ import { UserStore as Users, GuildMemberStore, VoiceStateStore } from "@webpack/
 import { SocializeEvent } from "../types/events";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
+import { isUserInVoiceChannel } from "../utils/channels";
 
 export const RoleEnforcementModule: SocializeModule = {
     name: "RoleEnforcementModule",
@@ -44,7 +45,7 @@ export const RoleEnforcementModule: SocializeModule = {
                     kickCmd,
                     channelId,
                     true,
-                    () => !!VoiceStateStore.getVoiceStatesForChannel(channelId)?.[userId]
+                    () => isUserInVoiceChannel(userId, channelId)
                 );
                 payload.isHandled = true;
                 payload.reason = "Missing Required Roles";

@@ -10,6 +10,7 @@ import { formatCommand } from "../utils/formatting";
 import { MemberLike, extractId } from "../utils/parsing";
 import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settingsHelpers";
+import { isUserInVoiceChannel } from "../utils/channels";
 import { BlacklistModule } from "./blacklist";
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
@@ -96,7 +97,7 @@ export const BansModule: SocializeModule = {
                     formatCommand(this.settings.kickCommand, channelId, { userId, reason }),
                     channelId,
                     true,
-                    () => !!VoiceStateStore.getVoiceStatesForChannel(channelId)?.[userId]
+                    () => isUserInVoiceChannel(userId, channelId)
                 );
                 this.recentlyKickedWaitlist.set(userId, now);
                 return;

@@ -10,6 +10,7 @@ import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
+import { isUserInVoiceChannel } from "../utils/channels";
 import {
     GuildChannelStore, ChannelStore, GuildStore,
     SelectedChannelStore, UserStore as Users,
@@ -125,7 +126,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                         formatCommand(settings.kickCommand, channel.id, { userId: uid }),
                         channel.id,
                         false,
-                        () => !!VoiceStateStore.getVoiceStatesForChannel(channel.id)?.[uid]
+                        () => isUserInVoiceChannel(uid, channel.id)
                     );
                 }
                 showToast(`Queued kicks for ${ids.length} users.`);
@@ -145,7 +146,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                             formatCommand(settings.kickCommand, channel.id, { userId: uid }),
                             channel.id,
                             false,
-                            () => !!VoiceStateStore.getVoiceStatesForChannel(channel.id)?.[uid]
+                            () => isUserInVoiceChannel(uid, channel.id)
                         );
                         n++;
                     }
@@ -219,7 +220,7 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                         formatCommand(settings.kickCommand, myChannelId!, { userId: user.id }),
                         myChannelId!,
                         false,
-                        () => !!VoiceStateStore.getVoiceStatesForChannel(myChannelId!)?.[user.id]
+                        () => isUserInVoiceChannel(user.id, myChannelId!)
                     );
                 }}
             />
