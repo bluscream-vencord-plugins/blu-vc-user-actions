@@ -56,7 +56,7 @@ export const VoteBanningModule: SocializeModule = {
             this.activeVotes.set(voteKey, {
                 targetUser,
                 voters: new Set(),
-                expiresAt: now + this.settings.voteBanWindowMs
+                expiresAt: now + ((this.settings as any).voteBanWindowSecs ?? 300) * 1000
             });
         }
 

@@ -286,33 +286,99 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
 // Guild Menu Items
 // ─────────────────────────────────────────────────────────────
 
-function makeGuildItems(guild: Guild): React.ReactElement[] {
-    const voiceChannelId = getMyVoiceChannelId() || undefined;
+function makeStatusItems(voiceChannelId?: string, prefix = "guild"): React.ReactElement[] {
     const ownership = voiceChannelId ? getOwnership(voiceChannelId) : null;
+    const s = getSettings();
 
-    const creatorStatus = ownership?.creatorId
-        ? `Creator: ${getUserDisplayName(ownership.creatorId)}`
-        : "Creator: None";
-    const claimantStatus = ownership?.claimantId
-        ? `Claimant: ${getUserDisplayName(ownership.claimantId)}`
-        : "Claimant: None";
+    const creatorLabel = ownership?.creatorId
+        ? `✨ Creator: ${getUserDisplayName(ownership.creatorId)}`
+        : "✨ Creator: None";
+    const claimantLabel = ownership?.claimantId
+        ? `👑 Claimant: ${getUserDisplayName(ownership.claimantId)}`
+        : "👑 Claimant: None";
 
     return [
-        // Creator/Claimant status display
-        <Menu.MenuCheckboxItem
-            key="socialize-guild-creator"
-            id="socialize-guild-creator-status"
-            label={creatorStatus}
-            checked={!!ownership?.creatorId}
+        // Read-only status labels (disabled plain MenuItems)
+        <Menu.MenuItem
+            key={`${prefix}-creator-status`}
+            id={`socialize-${prefix}-creator-status`}
+            label={creatorLabel}
+            disabled
             action={() => { }}
         />,
-        <Menu.MenuCheckboxItem
-            key="socialize-guild-claimant"
-            id="socialize-guild-claimant-status"
-            label={claimantStatus}
-            checked={!!ownership?.claimantId}
+        <Menu.MenuItem
+            key={`${prefix}-claimant-status`}
+            id={`socialize-${prefix}-claimant-status`}
+            label={claimantLabel}
+            disabled
             action={() => { }}
         />,
+        <Menu.MenuSeparator key={`${prefix}-status-sep`} />,
+        // Real feature toggles
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-queue`}
+            id={`socialize-${prefix}-toggle-queue`}
+            label="Queue Actions"
+            checked={!!s?.queueEnabled}
+            action={() => { if (s) s.queueEnabled = !s.queueEnabled; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-ban-rotate`}
+            id={`socialize-${prefix}-toggle-ban-rotate`}
+            label="Ban Rotation"
+            checked={!!s?.banRotateEnabled}
+            action={() => { if (s) s.banRotateEnabled = !s.banRotateEnabled; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-permit-rotate`}
+            id={`socialize-${prefix}-toggle-permit-rotate`}
+            label="Permit Rotation"
+            checked={!!(s as any)?.permitRotateEnabled}
+            action={() => { if (s) (s as any).permitRotateEnabled = !(s as any).permitRotateEnabled; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-ban-blacklist`}
+            id={`socialize-${prefix}-toggle-ban-blacklist`}
+            label="Ban Blacklisted"
+            checked={!!s?.banInLocalBlacklist}
+            action={() => { if (s) s.banInLocalBlacklist = !s.banInLocalBlacklist; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-ban-blocked`}
+            id={`socialize-${prefix}-toggle-ban-blocked`}
+            label="Ban Blocked Users"
+            checked={!!s?.banBlockedUsers}
+            action={() => { if (s) s.banBlockedUsers = !s.banBlockedUsers; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-ban-roles`}
+            id={`socialize-${prefix}-toggle-ban-roles`}
+            label="Ban Not-in-Role"
+            checked={!!s?.banNotInRoles}
+            action={() => { if (s) s.banNotInRoles = !s.banNotInRoles; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-cleanup`}
+            id={`socialize-${prefix}-toggle-cleanup`}
+            label="Command Cleanup"
+            checked={!!s?.commandCleanup}
+            action={() => { if (s) s.commandCleanup = !s.commandCleanup; }}
+        />,
+        <Menu.MenuCheckboxItem
+            key={`${prefix}-toggle-debug`}
+            id={`socialize-${prefix}-toggle-debug`}
+            label="Debug Mode"
+            checked={!!s?.enableDebug}
+            action={() => { if (s) s.enableDebug = !s.enableDebug; }}
+        />,
+    ];
+}
+
+function makeGuildItems(guild: Guild): React.ReactElement[] {
+    const voiceChannelId = getMyVoiceChannelId() || undefined;
+
+    return [
+        ...makeStatusItems(voiceChannelId, "guild"),
         <Menu.MenuSeparator key="socialize-guild-sep" />,
         <Menu.MenuItem
             id="socialize-guild-fetch-owners"
@@ -352,9 +418,9 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
             }}
         />,
         <Menu.MenuItem
-            id="socialize-edit-settings"
-            label="Edit Settings"
-            key="socialize-edit-settings"
+            id="socialize-open-settings"
+            label="Open Settings"
+            key="socialize-open-settings"
             action={() => {
                 try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
             }}
@@ -368,32 +434,9 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
 
 function makeToolboxItems(channel?: Channel): React.ReactElement[] {
     const voiceChannelId = channel?.id || getMyVoiceChannelId() || undefined;
-    const ownership = voiceChannelId ? getOwnership(voiceChannelId) : null;
-
-    const creatorStatus = ownership?.creatorId
-        ? `Creator: ${getUserDisplayName(ownership.creatorId)}`
-        : "Creator: None";
-    const claimantStatus = ownership?.claimantId
-        ? `Claimant: ${getUserDisplayName(ownership.claimantId)}`
-        : "Claimant: None";
 
     const items: (React.ReactElement | null)[] = [
-        // Status indicators
-        <Menu.MenuCheckboxItem
-            key="socialize-toolbox-creator"
-            id="socialize-toolbox-creator-status"
-            label={creatorStatus}
-            checked={!!ownership?.creatorId}
-            action={() => { }}
-        />,
-        <Menu.MenuCheckboxItem
-            key="socialize-toolbox-claimant"
-            id="socialize-toolbox-claimant-status"
-            label={claimantStatus}
-            checked={!!ownership?.claimantId}
-            action={() => { }}
-        />,
-        <Menu.MenuSeparator key="socialize-toolbox-sep" />,
+        ...makeStatusItems(voiceChannelId, "toolbox"),
     ];
 
     // Channel-specific items when we have a channel
@@ -455,10 +498,11 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
             key="socialize-toolbox-fetch-owners"
             action={() => OwnershipModule.fetchAllOwners()}
         />,
+        <Menu.MenuSeparator key="socialize-toolbox-settings-sep" />,
         <Menu.MenuItem
-            id="socialize-toolbox-edit-settings"
-            label="Edit Settings"
-            key="socialize-toolbox-edit-settings"
+            id="socialize-toolbox-open-settings"
+            label="Open Settings"
+            key="socialize-toolbox-open-settings"
             action={() => {
                 try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
             }}

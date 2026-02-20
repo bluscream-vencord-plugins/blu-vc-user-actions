@@ -46,9 +46,15 @@ export class StateManager {
     private async flushSave() {
         this.saveTimer = null;
         try {
+            // Deep-clone via JSON round-trip to produce a plain object.
+            // this.store is a Vencord Proxy — the structured clone algorithm
+            // used by IndexedDB cannot serialize Proxy objects directly, causing
+            // DataCloneError. The JSON round-trip strips the Proxy wrapper.
+            const ownerships = JSON.parse(JSON.stringify(this.store.activeChannelOwnerships ?? {}));
+            const members = JSON.parse(JSON.stringify(this.store.memberConfigs ?? {}));
             await DataStore.setMany([
-                [STORAGE_KEY_OWNERS, this.store.activeChannelOwnerships],
-                [STORAGE_KEY_MEMBERS, this.store.memberConfigs],
+                [STORAGE_KEY_OWNERS, ownerships],
+                [STORAGE_KEY_MEMBERS, members],
             ]);
         } catch (e) {
             logger.error("Failed to save plugin state:", e);
