@@ -81,14 +81,9 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
 
     const info: MemberChannelInfo = {
         userId: response.initiatorId || "",
-        customName: null,
-        userLimit: null,
-        permittedUsers: [],
+        isLocked: false,
         bannedUsers: [],
-        whitelistedUsers: [],
-        nameRotationList: [],
-        nameRotationIndex: 0,
-        isLocked: false
+        permittedUsers: [],
     };
 
     let targetChannelId = response.channelId;

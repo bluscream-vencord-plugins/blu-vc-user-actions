@@ -6,7 +6,7 @@ import { stateManager } from "../utils/stateManager";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settingsHelpers";
-import { UserStore as Users } from "@webpack/common";
+import { UserStore as Users, ChannelStore } from "@webpack/common";
 
 export const ChannelNameRotationModule: SocializeModule = {
     name: "ChannelNameRotationModule",
@@ -25,14 +25,8 @@ export const ChannelNameRotationModule: SocializeModule = {
 
     startRotation(channelId: string) {
         if (!this.settings || !this.settings.channelNameRotationEnabled) return;
-        const currentUserId = Users.getCurrentUser()?.id;
-        if (!currentUserId) return;
 
-        const config = stateManager.getMemberConfig(currentUserId);
-        const nameList = config.nameRotationList.length > 0
-            ? config.nameRotationList
-            : getNewLineList(this.settings.channelNameRotationNames);
-
+        const nameList = getNewLineList(this.settings.channelNameRotationNames);
         if (nameList.length === 0) {
             logger.warn("Rotation started but list is empty!");
             return;
@@ -51,7 +45,7 @@ export const ChannelNameRotationModule: SocializeModule = {
         }
 
         this.rotationIntervalId = setInterval(() => {
-            this.rotateNextName(channelId, currentUserId);
+            this.rotateNextName(channelId);
         }, intervalMs);
     },
 
@@ -63,45 +57,33 @@ export const ChannelNameRotationModule: SocializeModule = {
         }
     },
 
-    rotateNextName(channelId: string, userId: string) {
+    rotateNextName(channelId: string) {
         if (!this.settings || !this.settings.channelNameRotationEnabled) return;
-        const config = stateManager.getMemberConfig(userId);
 
-        const nameList = config.nameRotationList.length > 0
-            ? config.nameRotationList
-            : getNewLineList(this.settings.channelNameRotationNames);
-
+        const nameList = getNewLineList(this.settings.channelNameRotationNames);
         if (nameList.length === 0) return;
 
-        // Ensure index wraps correctly for the active list
-        config.nameRotationIndex = config.nameRotationIndex % nameList.length;
-        const nextName = nameList[config.nameRotationIndex];
-        config.nameRotationIndex = (config.nameRotationIndex + 1) % nameList.length;
+        // Try to get the current channel name to calculate index dynamically
+        const channel = ChannelStore.getChannel(channelId);
+        let currentIndex = -1;
+        if (channel && channel.name) {
+            currentIndex = nameList.indexOf(channel.name);
+        }
 
-        stateManager.updateMemberConfig(userId, { nameRotationIndex: config.nameRotationIndex });
+        const nextIndex = (currentIndex + 1) % nameList.length;
+        const nextName = nameList[nextIndex];
 
         sendDebugMessage(channelId, `Rotating name to: **${nextName}**`);
         const renameCmd = formatCommand(this.settings.setChannelNameCommand, channelId, { newChannelName: nextName });
         actionQueue.enqueue(renameCmd, channelId, false);
     },
 
+    // addName and removeName are deprecated as name rotation is now strictly driven by global settings
     addName(userId: string, name: string) {
-        const config = stateManager.getMemberConfig(userId);
-        if (!config.nameRotationList.includes(name)) {
-            config.nameRotationList.push(name);
-            stateManager.updateMemberConfig(userId, { nameRotationList: config.nameRotationList });
-            return true;
-        }
         return false;
     },
 
     removeName(userId: string, name: string) {
-        const config = stateManager.getMemberConfig(userId);
-        const filtered = config.nameRotationList.filter(n => n !== name);
-        if (filtered.length !== config.nameRotationList.length) {
-            stateManager.updateMemberConfig(userId, { nameRotationList: filtered });
-            return true;
-        }
         return false;
     }
 };

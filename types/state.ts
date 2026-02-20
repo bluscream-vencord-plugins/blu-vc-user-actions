@@ -13,9 +13,6 @@ export interface MemberChannelInfo {
     isLocked: boolean;
     bannedUsers: string[];
     permittedUsers: string[];
-    whitelistedUsers: string[];
-    nameRotationList: string[];
-    nameRotationIndex: number;
 }
 
 export interface ActionQueueItem {

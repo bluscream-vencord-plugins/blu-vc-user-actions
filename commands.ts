@@ -96,67 +96,6 @@ export const socializeCommands = [
         }
     },
     {
-        name: "socialize naming add",
-        description: "Add a name to your channel name rotation list",
-        inputType: ApplicationCommandInputType.BUILT_IN,
-        options: [
-            {
-                name: "name",
-                description: "The name to add",
-                type: ApplicationCommandOptionType.STRING,
-                required: true
-            }
-        ],
-        execute: (args: any[], ctx: any) => {
-            const name = args.find(a => a.name === "name")?.value as string;
-            if (!name) return sendBotMessage(ctx.channel.id, { content: "Missing name." });
-            const meId = Users.getCurrentUser()?.id || "";
-            if (ChannelNameRotationModule.addName(meId, name)) {
-                sendBotMessage(ctx.channel.id, { content: `Added **"${name}"** to rotation list.` });
-            } else {
-                sendBotMessage(ctx.channel.id, { content: `**"${name}"** is already in the list.` });
-            }
-        }
-    },
-    {
-        name: "socialize naming remove",
-        description: "Remove a name from your channel name rotation list",
-        inputType: ApplicationCommandInputType.BUILT_IN,
-        options: [
-            {
-                name: "name",
-                description: "The name to remove",
-                type: ApplicationCommandOptionType.STRING,
-                required: true
-            }
-        ],
-        execute: (args: any[], ctx: any) => {
-            const name = args.find(a => a.name === "name")?.value as string;
-            if (!name) return sendBotMessage(ctx.channel.id, { content: "Missing name." });
-            const meId = Users.getCurrentUser()?.id || "";
-            if (ChannelNameRotationModule.removeName(meId, name)) {
-                sendBotMessage(ctx.channel.id, { content: `Removed **"${name}"** from rotation list.` });
-            } else {
-                sendBotMessage(ctx.channel.id, { content: `**"${name}"** not found in list.` });
-            }
-        }
-    },
-    {
-        name: "socialize naming list",
-        description: "List your channel name rotation names",
-        inputType: ApplicationCommandInputType.BUILT_IN,
-        execute: (_args: any[], ctx: any) => {
-            const meId = Users.getCurrentUser()?.id || "";
-            const config = stateManager.getMemberConfig(meId);
-            if (!config.nameRotationList.length) {
-                return sendBotMessage(ctx.channel.id, { content: "Your rotation list is empty." });
-            }
-            sendBotMessage(ctx.channel.id, {
-                content: `**Rotation List:**\n${config.nameRotationList.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
-            });
-        }
-    },
-    {
         name: "socialize naming start",
         description: "Manually start name rotation for current channel",
         inputType: ApplicationCommandInputType.BUILT_IN,

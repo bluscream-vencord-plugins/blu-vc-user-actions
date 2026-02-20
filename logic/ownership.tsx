@@ -18,6 +18,7 @@ import {
     Menu, React, showToast
 } from "@webpack/common";
 import { ChannelNameRotationModule } from "./channelNameRotation";
+import { WhitelistModule } from "./whitelist";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
 
@@ -176,10 +177,8 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     const meId = Users.getCurrentUser()?.id || "";
     const ownership = myChannelId ? getOwnership(myChannelId) : null;
     const amOwner = ownership?.creatorId === meId || ownership?.claimantId === meId;
-
     // Whitelist toggle
-    const config = stateManager.getMemberConfig(meId);
-    const isWhitelisted = config.whitelistedUsers.includes(user.id);
+    const isWhitelisted = WhitelistModule.isWhitelisted(user.id);
 
     // Ban check: check the current owner's ban list
     const ownerConfig = myChannelId
@@ -198,8 +197,8 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                     id="socialize-user-is-owner"
                     key="socialize-user-is-owner"
                     label={o.claimantId === user.id
-                        ? `👑 Claimant of <#${myChannelId}>`
-                        : `✨ Creator of <#${myChannelId}>`}
+                        ? `👑 Is Claimant`
+                        : `✨ Is Creator`}
                     disabled
                     action={() => { }}
                 />

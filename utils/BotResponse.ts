@@ -133,6 +133,17 @@ export class BotResponse {
     }
 
     private findTargetId(): string | undefined {
+        if (
+            this.type === BotResponseType.INFO ||
+            this.type === BotResponseType.CREATED ||
+            this.type === BotResponseType.SIZE_SET ||
+            this.type === BotResponseType.LOCKED ||
+            this.type === BotResponseType.UNLOCKED ||
+            this.type === BotResponseType.CLAIMED
+        ) {
+            return undefined;
+        }
+
         const rawDesc = this.getRawDescription();
         const content = this.msg.content || "";
 

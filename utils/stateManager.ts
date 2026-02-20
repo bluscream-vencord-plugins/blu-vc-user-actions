@@ -3,8 +3,8 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "./logger";
 import * as DataStore from "@api/DataStore";
 
-const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v2";
-const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v2";
+const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v3";
+const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v3";
 
 type StoreWithState = PluginSettings & {
     activeChannelOwnerships: Record<string, ChannelOwnership>;
@@ -86,10 +86,7 @@ export class StateManager {
                 userLimit: null,
                 isLocked: false,
                 bannedUsers: [],
-                permittedUsers: [],
-                whitelistedUsers: [],
-                nameRotationList: [],
-                nameRotationIndex: 0
+                permittedUsers: []
             };
         }
         return this.store.memberConfigs[userId];
