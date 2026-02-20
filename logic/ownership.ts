@@ -92,16 +92,13 @@ export const OwnershipModule: SocializeModule = {
             const userId = response.initiatorId;
 
             const oldOwnership = stateManager.getOwnership(channelId);
-            const newOwnership = {
+            const newOwnership: Partial<ChannelOwnership> = {
                 channelId: channelId,
-                creatorId: isCreator ? userId : null,
-                claimantId: !isCreator ? userId : null,
-                createdAt: isCreator ? response.timestamp : null,
-                claimedAt: !isCreator ? response.timestamp : null
+                ...(isCreator ? { creatorId: userId, createdAt: response.timestamp } : { claimantId: userId, claimedAt: response.timestamp })
             };
 
             stateManager.setOwnership(channelId, newOwnership);
-            this.handleOwnershipUpdate(channelId, userId, isCreator ? "creator" : "claimant", oldOwnership, newOwnership);
+            this.handleOwnershipUpdate(channelId, userId, isCreator ? "creator" : "claimant", oldOwnership, stateManager.getOwnership(channelId));
         }
 
         // Handle Info synchronization
@@ -188,6 +185,7 @@ export const OwnershipModule: SocializeModule = {
         // Manage naming rotation
         if (ownerId === meId) {
             NamingModule.startRotation(channelId);
+            this.requestChannelInfo(channelId);
         } else {
             NamingModule.stopRotation(channelId);
         }

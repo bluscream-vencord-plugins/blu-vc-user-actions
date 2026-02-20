@@ -86,11 +86,21 @@ export class BotResponse {
             if (descMatch) return descMatch[1];
         }
 
-        // 2. Icon URL (Claimed/Info)
-        const iconURL = this.embed?.author?.icon_url || this.embed?.author?.iconURL;
-        if (iconURL) {
-            const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
-            if (userIdFromUrl) return userIdFromUrl;
+        // 2. Embed Fields (Author, Icon URL)
+        const author = this.embed?.author;
+        if (author) {
+            // Check icon URL for user ID
+            const iconURL = author.icon_url || author.iconURL;
+            if (iconURL) {
+                const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
+                if (userIdFromUrl) return userIdFromUrl;
+            }
+
+            // Check author name for mentions if type is CREATED
+            if (this.type === BotResponseType.CREATED && author.name) {
+                const authorMatch = author.name.match(/<@!?(\d+)>/);
+                if (authorMatch) return authorMatch[1];
+            }
         }
 
         // 3. Message Reference / Reply

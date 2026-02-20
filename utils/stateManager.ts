@@ -56,11 +56,19 @@ export class StateManager {
         return this.store.activeChannelOwnerships[channelId] || null;
     }
 
-    public setOwnership(channelId: string, ownership: ChannelOwnership | null) {
+    public setOwnership(channelId: string, ownership: Partial<ChannelOwnership> | null) {
         if (ownership === null) {
             delete this.store.activeChannelOwnerships[channelId];
         } else {
-            this.store.activeChannelOwnerships[channelId] = ownership;
+            const existing = this.store.activeChannelOwnerships[channelId];
+            if (existing) {
+                this.store.activeChannelOwnerships[channelId] = {
+                    ...existing,
+                    ...(ownership as ChannelOwnership)
+                };
+            } else {
+                this.store.activeChannelOwnerships[channelId] = ownership as ChannelOwnership;
+            }
         }
         this.saveState();
     }
