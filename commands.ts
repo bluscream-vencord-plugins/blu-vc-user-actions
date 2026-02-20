@@ -3,6 +3,8 @@ import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
 import { stateManager } from "./utils/stateManager";
 
+import { CommandArgument, CommandContext } from "@vencord/discord-types";
+
 // Mocking Vencord's command registration.
 // Vencord uses a specific structure for ApplicationCommands for plugins.
 
@@ -14,7 +16,7 @@ export const socializeCommand = {
             name: "stats",
             description: "View memory statistics",
             type: 1, // Subcommand
-            execute: (args: any, ctx: any) => {
+            execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const settings = moduleRegistry["settings"];
                 if (!settings) return;
 
@@ -27,7 +29,7 @@ export const socializeCommand = {
             name: "sync",
             description: "Force manual sync of channel info and ownership",
             type: 1, // Subcommand
-            execute: (args: any, ctx: any) => {
+            execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const settings = moduleRegistry["settings"];
                 if (!settings || !ctx.channel) return;
 
@@ -47,7 +49,7 @@ export const socializeCommand = {
                     required: true
                 }
             ],
-            execute: (args: any, ctx: any) => {
+            execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
                 const settings = moduleRegistry["settings"];
                 if (!settings || !ctx.channel) return;
@@ -70,7 +72,7 @@ export const socializeCommand = {
                     required: true
                 }
             ],
-            execute: (args: any, ctx: any) => {
+            execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
                 // We'd need current user ID to update stateManager here, mocked for now
                 console.log(`Whitelisting ${userId}`);
@@ -78,7 +80,7 @@ export const socializeCommand = {
             }
         }
     ],
-    execute: (args: any[], ctx: any) => {
+    execute: (args: CommandArgument[], ctx: CommandContext) => {
         // Fallback or help text
         return { content: "Use subcommands like `/socialize stats` or `/socialize ban`." };
     }

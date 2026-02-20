@@ -1,19 +1,19 @@
 export class Logger {
     private prefix = "[SocializeGuild]";
 
-    public info(...args: any[]) {
-        console.log(`%c${this.prefix}`, "color: #7289da; font-weight: bold;", ...args);
+    public info(...args: unknown[]) {
+        console.log(`[${this.prefix}]`, ...args);
     }
 
-    public warn(...args: any[]) {
-        console.warn(`%c${this.prefix}`, "color: #faa61a; font-weight: bold;", ...args);
+    public warn(...args: unknown[]) {
+        console.warn(`[${this.prefix}]`, ...args);
     }
 
-    public error(...args: any[]) {
-        console.error(`%c${this.prefix}`, "color: #f04747; font-weight: bold;", ...args);
+    public error(...args: unknown[]) {
+        console.error(`[${this.prefix}]`, ...args);
     }
 
-    public debug(...args: any[]) {
+    public debug(...args: unknown[]) {
         console.debug(`%c${this.prefix}`, "color: #747f8d; font-weight: bold;", ...args);
     }
 }

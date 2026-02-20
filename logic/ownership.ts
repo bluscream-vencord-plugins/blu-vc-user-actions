@@ -4,6 +4,8 @@ import { SocializeEvent } from "../types/events";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
 import { UserStore as Users } from "@webpack/common";
+import { Message, VoiceState } from "@vencord/discord-types";
+
 export const OwnershipModule: SocializeModule = {
     name: "OwnershipModule",
 
@@ -15,7 +17,7 @@ export const OwnershipModule: SocializeModule = {
         logger.info("OwnershipModule stopping");
     },
 
-    onVoiceStateUpdate(oldState: any, newState: any) {
+    onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
         // Here we track when users join/leave the creation channel or owned channels
         // Since we don't have exact Vencord types right now, we use Any
         const currentUserId = Users.getCurrentUser()?.id;
@@ -34,7 +36,7 @@ export const OwnershipModule: SocializeModule = {
         }
     },
 
-    onMessageCreate(message: any) {
+    onMessageCreate(message: Message) {
         // Parse messages from the BOT to determine ownership
         // Example check for channel created message
         if (message.author.id === moduleRegistry["settings"]?.botId) {
@@ -72,7 +74,7 @@ export const OwnershipModule: SocializeModule = {
         }
     },
 
-    parseBotEmbed(message: any) {
+    parseBotEmbed(message: Message) {
         // Regex checking the embed title or description for "Channel Created" etc
         // Example: Update stateManager if we detect "Creator: <@id>"
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {

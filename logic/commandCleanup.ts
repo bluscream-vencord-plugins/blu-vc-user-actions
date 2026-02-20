@@ -2,7 +2,7 @@ import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { ActionQueueItem } from "../types/state";
-import { SocializeEvent } from "../types/events";
+import { SocializeEvent, EventPayloads } from "../types/events";
 import { MessageStore, ChannelStore } from "@webpack/common";
 
 export const CommandCleanupModule: SocializeModule = {
@@ -11,7 +11,7 @@ export const CommandCleanupModule: SocializeModule = {
     init(settings: PluginSettings) {
         logger.info("CommandCleanupModule initializing");
 
-        moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: any) => {
+        moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: EventPayloads[SocializeEvent.ACTION_EXECUTED]) => {
             const item: ActionQueueItem = payload.item;
             if (!settings.commandCleanup) return;
 

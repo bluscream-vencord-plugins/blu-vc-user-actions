@@ -1,14 +1,16 @@
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
+import { Message, VoiceState } from "@vencord/discord-types";
 
 export interface SocializeModule {
     name: string;
+    settings?: PluginSettings;
     init(settings: PluginSettings): void;
     stop(): void;
 
     // Optional Event Hooks
-    onVoiceStateUpdate?(oldState: any, newState: any): void;
-    onMessageCreate?(message: any): void;
+    onVoiceStateUpdate?(oldState: VoiceState, newState: VoiceState): void;
+    onMessageCreate?(message: Message): void;
     onCustomEvent?<K extends SocializeEvent>(event: K, payload: EventPayloads[K]): void;
 
     [key: string]: any;
@@ -17,7 +19,7 @@ export interface SocializeModule {
 export class ModuleRegistry {
     private modules: SocializeModule[] = [];
     private settings!: PluginSettings;
-    private eventListeners: Map<SocializeEvent, Array<(payload: any) => void>> = new Map();
+    private eventListeners: Map<SocializeEvent, Array<(payload: unknown) => void>> = new Map();
 
     public init(settings: PluginSettings) {
         this.settings = settings;
@@ -43,7 +45,7 @@ export class ModuleRegistry {
         if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, []);
         }
-        this.eventListeners.get(event)!.push(listener);
+        this.eventListeners.get(event)!.push(listener as (payload: unknown) => void);
     }
 
     public dispatch<K extends SocializeEvent>(event: K, payload: EventPayloads[K]) {
@@ -66,7 +68,7 @@ export class ModuleRegistry {
     }
 
     // Discord Event Dispatchers
-    public dispatchVoiceStateUpdate(oldState: any, newState: any) {
+    public dispatchVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
         for (const mod of this.modules) {
             if (mod.onVoiceStateUpdate) {
                 mod.onVoiceStateUpdate(oldState, newState);
@@ -74,7 +76,7 @@ export class ModuleRegistry {
         }
     }
 
-    public dispatchMessageCreate(message: any) {
+    public dispatchMessageCreate(message: Message) {
         for (const mod of this.modules) {
             if (mod.onMessageCreate) {
                 mod.onMessageCreate(message);

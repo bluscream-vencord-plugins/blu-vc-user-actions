@@ -1,4 +1,5 @@
 import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
+import { PluginSettings } from "../types/settings";
 import { logger } from "./logger";
 
 
@@ -9,11 +10,16 @@ interface Store<T> {
     subscribe(listener: () => void): () => void;
 }
 
-export class StateManager {
-    private store: any; // Using `any` for Vencord plugin store definition until we integrate with definePlugin
+type StoreWithState = PluginSettings & {
+    activeChannelOwnerships: Record<string, ChannelOwnership>;
+    memberConfigs: Record<string, MemberChannelInfo>;
+};
 
-    public init(vencordStore: any) {
-        this.store = vencordStore;
+export class StateManager {
+    private store!: StoreWithState; // Vencord plugin store definition
+
+    public init(vencordStore: PluginSettings) {
+        this.store = vencordStore as StoreWithState;
 
         // Ensure default state exists
         if (!this.store.activeChannelOwnerships) {

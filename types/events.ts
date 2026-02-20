@@ -28,7 +28,7 @@ export interface EventPayloads {
     [SocializeEvent.BOT_EMBED_RECEIVED]: {
         messageId: string;
         channelId: string;
-        embed: any; // Ideally Discord Embed type
+        embed: unknown; // Ideally Discord Embed type
     };
     [SocializeEvent.ACTION_EXECUTED]: {
         item: ActionQueueItem;

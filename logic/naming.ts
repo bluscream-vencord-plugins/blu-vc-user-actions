@@ -6,8 +6,8 @@ import { stateManager } from "../utils/stateManager";
 import { UserStore as Users } from "@webpack/common";
 export const NamingModule: SocializeModule = {
     name: "NamingModule",
-    settings: null as any,
-    rotationIntervalId: null as any,
+    settings: null as unknown as PluginSettings,
+    rotationIntervalId: null as unknown as number,
 
     init(settings: PluginSettings) {
         this.settings = settings;
@@ -20,6 +20,7 @@ export const NamingModule: SocializeModule = {
     },
 
     startRotation(channelId: string) {
+        if (!this.settings) return;
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
@@ -34,9 +35,21 @@ export const NamingModule: SocializeModule = {
         }
 
         logger.info(`Starting name rotation for channel ${channelId}`);
+        // The original code uses this.settings.namingIntervalMs.
+        // The instruction's code edit suggests using rotationIntervalMin, but it's unclear where that comes from.
+        // Assuming the intent is to add a check before using settings, and potentially change the interval calculation.
+        // If rotationIntervalMin is intended, it should be part of PluginSettings.
+        // For now, I'll add the check and use the existing namingIntervalMs.
+        // If the intent was to use rotationIntervalMin, the settings type would need to be updated.
+        const intervalMs = this.settings.namingIntervalMs; // Using existing setting
+        if (!intervalMs) { // Added check for intervalMs
+            logger.error("Naming interval is not defined in settings.");
+            return;
+        }
+
         this.rotationIntervalId = setInterval(() => {
             this.rotateNextName(channelId, currentUserId);
-        }, this.settings.namingIntervalMs);
+        }, intervalMs);
     },
 
     stopRotation() {
@@ -48,6 +61,7 @@ export const NamingModule: SocializeModule = {
     },
 
     rotateNextName(channelId: string, userId: string) {
+        if (!this.settings) return; // Added undefined check for settings
         const config = stateManager.getMemberConfig(userId);
         if (config.nameRotationList.length === 0) return;
 

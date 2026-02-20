@@ -4,9 +4,10 @@ import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
 import { UserStore as Users, VoiceStateStore } from "@webpack/common";
+import { Message } from "@vencord/discord-types";
 export const VoteBanningModule: SocializeModule = {
     name: "VoteBanningModule",
-    settings: null as any,
+    settings: null as unknown as PluginSettings,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
 
     init(settings: PluginSettings) {
@@ -22,14 +23,15 @@ export const VoteBanningModule: SocializeModule = {
         logger.info("VoteBanningModule stopping");
     },
 
-    onMessageCreate(message: any) {
+    onMessageCreate(message: Message) {
+        if (!this.settings || !this.settings.botId) return;
         // Look for chat regex patterns, like "!voteban @user" or similar in our watched channel
         // For simplicity, checking if content starts with "!voteban"
         if (message.content.startsWith("!voteban")) {
             const mentions = message.mentions;
             if (!mentions || mentions.length === 0) return;
 
-            const targetUser = mentions[0].id;
+            const targetUser = mentions[0] as unknown as string;
             const voterId = message.author.id;
             const channelId = message.channel_id; // Note: this is text channel. Need equivalent Voice Channel.
 
@@ -42,6 +44,7 @@ export const VoteBanningModule: SocializeModule = {
     },
 
     registerVote(targetUser: string, voterId: string, channelId: string) {
+        if (!this.settings) return;
         const ownership = stateManager.getOwnership(channelId);
         if (!ownership) return; // Only allow in managed channels
 

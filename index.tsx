@@ -1,5 +1,6 @@
 import definePlugin from "@utils/types"; import { pluginInfo } from "./info";
 import { defaultSettings } from "./types/settings";
+import { PluginSettings } from "./types/settings";
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { stateManager } from "./utils/stateManager";
 import { logger } from "./utils/logger";
@@ -43,7 +44,7 @@ export default definePlugin({
         moduleRegistry.register(CommandCleanupModule);
 
         // Initialize them with current settings
-        moduleRegistry.init(this.settings.store as any);
+        moduleRegistry.init(this.settings.store as unknown as PluginSettings);
 
         logger.info("SocializeGuild started successfully.");
     },

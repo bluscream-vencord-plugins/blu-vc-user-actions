@@ -1,9 +1,7 @@
 import { UserStore as Users, ChannelStore as Channels } from "@webpack/common";
 
-// Mock types
-type User = any;
-type Channel = any;
-type Guild = any;
+// Vencord types
+import { User, Channel, Guild } from "@vencord/discord-types";
 import { moduleRegistry } from "../logic/moduleRegistry";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
