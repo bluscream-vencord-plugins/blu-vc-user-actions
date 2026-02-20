@@ -13,7 +13,9 @@ export const defaultSettings = definePluginSettings({
     ownershipChangeMessage: { type: OptionType.STRING, description: "Message sent when ownership changes (supports {reason}, {channel_id}, {channel_name}, {guild_id}, {guild_name}, {user_id}, {user_name})", default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})", restartNeeded: false },
 
     // ── Channel Name Rotation ─────────────────────────────────────────────
-    channelNameRotationInterval: { type: OptionType.SLIDER, description: "Channel Name Rotation Interval (seconds)", default: 11 * 60, markers: [60, 300, 600, 1800], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.channelNameRotationInterval = Math.round(v); } },
+    channelNameRotationEnabled: { type: OptionType.BOOLEAN, description: "Enable Channel Name Rotation", default: true, restartNeeded: false },
+    channelNameRotationNames: { type: OptionType.STRING, description: "Channel name rotation list (one per line)", default: "", multiline: true, restartNeeded: false },
+    channelNameRotationInterval: { type: OptionType.SLIDER, description: "Channel Name Rotation Interval (minutes)", default: 11, markers: [11, 15, 30, 60], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.channelNameRotationInterval = Math.max(11, Math.round(v)); } },
 
     // ── Banning ───────────────────────────────────────────────────────────
     banLimit: { type: OptionType.SLIDER, description: "Max users in ban list before rotation", default: 10, markers: [5, 10, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.banLimit = Math.round(v); } },

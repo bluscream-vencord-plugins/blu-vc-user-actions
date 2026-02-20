@@ -5,6 +5,7 @@ import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
+import { getNewLineList } from "../utils/settingsHelpers";
 import { UserStore as Users } from "@webpack/common";
 
 export const ChannelNameRotationModule: SocializeModule = {
@@ -23,12 +24,16 @@ export const ChannelNameRotationModule: SocializeModule = {
     },
 
     startRotation(channelId: string) {
-        if (!this.settings) return;
+        if (!this.settings || !this.settings.channelNameRotationEnabled) return;
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
         const config = stateManager.getMemberConfig(currentUserId);
-        if (config.nameRotationList.length === 0) {
+        const nameList = config.nameRotationList.length > 0
+            ? config.nameRotationList
+            : getNewLineList(this.settings.channelNameRotationNames);
+
+        if (nameList.length === 0) {
             logger.warn("Rotation started but list is empty!");
             return;
         }
@@ -39,7 +44,7 @@ export const ChannelNameRotationModule: SocializeModule = {
 
         sendDebugMessage(channelId, `Starting name rotation for channel <#${channelId}>`);
 
-        const intervalMs = this.settings.channelNameRotationInterval * 1000;
+        const intervalMs = this.settings.channelNameRotationInterval * 60 * 1000;
         if (!intervalMs) {
             logger.error("Naming interval is not defined in settings.");
             return;
@@ -59,12 +64,19 @@ export const ChannelNameRotationModule: SocializeModule = {
     },
 
     rotateNextName(channelId: string, userId: string) {
-        if (!this.settings) return;
+        if (!this.settings || !this.settings.channelNameRotationEnabled) return;
         const config = stateManager.getMemberConfig(userId);
-        if (config.nameRotationList.length === 0) return;
 
-        const nextName = config.nameRotationList[config.nameRotationIndex];
-        config.nameRotationIndex = (config.nameRotationIndex + 1) % config.nameRotationList.length;
+        const nameList = config.nameRotationList.length > 0
+            ? config.nameRotationList
+            : getNewLineList(this.settings.channelNameRotationNames);
+
+        if (nameList.length === 0) return;
+
+        // Ensure index wraps correctly for the active list
+        config.nameRotationIndex = config.nameRotationIndex % nameList.length;
+        const nextName = nameList[config.nameRotationIndex];
+        config.nameRotationIndex = (config.nameRotationIndex + 1) % nameList.length;
 
         stateManager.updateMemberConfig(userId, { nameRotationIndex: config.nameRotationIndex });
 
