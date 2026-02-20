@@ -1,6 +1,6 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
-import { SocializeEvent } from "../types/events";
+import { SocializeEvent, BotResponseType } from "../types/events";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
 import { UserStore as Users } from "@webpack/common";
@@ -75,12 +75,65 @@ export const OwnershipModule: SocializeModule = {
     },
 
     parseBotEmbed(message: Message) {
-        // Regex checking the embed title or description for "Channel Created" etc
-        // Example: Update stateManager if we detect "Creator: <@id>"
+        const embed = message.embeds?.[0] as any;
+        if (!embed) return;
+
+        const authorName = embed.author?.name?.toLowerCase() || "";
+        const title = embed.title?.toLowerCase() || "";
+        const description = (embed.rawDescription || embed.description || "").toLowerCase();
+
+        const check = (str: string) => {
+            const s = str.toLowerCase();
+            return authorName.includes(s) || title.includes(s) || description.includes(s);
+        };
+
+        let type = BotResponseType.UNKNOWN;
+        if (check("Channel Created")) type = BotResponseType.CREATED;
+        else if (check("Channel Claimed")) type = BotResponseType.CLAIMED;
+        else if (check("Channel Settings") || check("Channel Info Updated")) type = BotResponseType.INFO;
+        else if (description.includes("__banned__")) type = BotResponseType.BANNED;
+        else if (description.includes("__unbanned__")) type = BotResponseType.UNBANNED;
+        else if (description.includes("__permitted")) type = BotResponseType.PERMITTED;
+        else if (description.includes("__unpermitted")) type = BotResponseType.UNPERMITTED;
+        else if (description.includes("__channel size__")) type = BotResponseType.SIZE_SET;
+        else if (description.includes("__locked__")) type = BotResponseType.LOCKED;
+        else if (description.includes("__unlocked__")) type = BotResponseType.UNLOCKED;
+
+        let initiatorId: string | undefined;
+        let targetUserId: string | undefined;
+
+        // Extract target user if applicable
+        const targetMatch = description.match(/<@!?(\d+)>/);
+        if (targetMatch) {
+            targetUserId = targetMatch[1];
+        }
+
+        // 1. Mentions (Created)
+        if (type === BotResponseType.CREATED) {
+            const mentionedUser = message.mentions?.[0];
+            if (mentionedUser) {
+                initiatorId = typeof mentionedUser === "string" ? mentionedUser : (mentionedUser as any).id;
+            } else {
+                initiatorId = targetUserId;
+            }
+        }
+
+        // 2. Icon URL (Claimed/Info)
+        if (!initiatorId) {
+            const iconURL = embed.author?.icon_url || embed.author?.iconURL;
+            if (iconURL) {
+                const userIdFromUrl = iconURL.split("/avatars/")[1]?.split("/")[0];
+                if (userIdFromUrl) initiatorId = userIdFromUrl;
+            }
+        }
+
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
             channelId: message.channel_id,
-            embed: message.embeds?.[0]
+            type,
+            initiatorId,
+            targetUserId,
+            embed: embed
         });
     }
 };

@@ -4,7 +4,9 @@ import { UserStore as Users, ChannelStore as Channels } from "@webpack/common";
 import { User, Channel, Guild } from "@vencord/discord-types";
 import { moduleRegistry } from "../logic/moduleRegistry";
 import { actionQueue } from "../utils/actionQueue";
-import { stateManager } from "../utils/stateManager";
+import { VoteBanningModule } from "../logic/voteBanning";
+import { WhitelistingModule } from "../logic/whitelisting";
+import { formatCommand } from "../utils/formatting";
 
 // Mocking some Vencord ContextMenu builder for UI abstraction
 // In reality, you'd use Vencord's components and patchers
@@ -17,24 +19,29 @@ export function buildUserContextMenu(user: User, channel?: Channel) {
             label: "Ban from Channel",
             id: "socialize-ban-user",
             action: () => {
-                const cmd = settings.banCommand.replace("{user}", `<@${user.id}>`);
-                if (channel) actionQueue.enqueue(cmd, channel.id, true);
+                if (channel) VoteBanningModule.enforceBanPolicy(user.id, channel.id, false);
             }
         },
         {
             label: "Kick from Channel",
             id: "socialize-kick-user",
             action: () => {
-                const cmd = settings.kickCommand.replace("{user}", `<@${user.id}>`);
+                const cmd = formatCommand(settings.kickCommand, channel?.id || "", { userId: user.id });
                 if (channel) actionQueue.enqueue(cmd, channel.id, true);
             }
         },
         {
-            label: "Whitelist User",
+            label: WhitelistingModule.isWhitelisted(user.id) ? "Unwhitelist User" : "Whitelist User",
             id: "socialize-whitelist-user",
             action: () => {
-                // Should update state via StateManager
-                console.log(`Whitelisting user ${user.id}`);
+                const isWhite = WhitelistingModule.isWhitelisted(user.id);
+                const list = WhitelistingModule.getWhitelist();
+                if (isWhite) {
+                    WhitelistingModule.setWhitelist(list.filter(id => id !== user.id));
+                } else {
+                    list.push(user.id);
+                    WhitelistingModule.setWhitelist(list);
+                }
             }
         }
     ];

@@ -1,7 +1,8 @@
 
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
-import { stateManager } from "./utils/stateManager";
+import { VoteBanningModule } from "./logic/voteBanning";
+import { WhitelistingModule } from "./logic/whitelisting";
 
 import { CommandArgument, CommandContext } from "@vencord/discord-types";
 
@@ -54,10 +55,10 @@ export const socializeCommand = {
                 const settings = moduleRegistry["settings"];
                 if (!settings || !ctx.channel) return;
 
-                const cmd = settings.banCommand.replace("{user}", `<@${userId}>`);
-                actionQueue.enqueue(cmd, ctx.channel.id, true);
+                // Pass into the smart logic module instead of blindly queueing
+                VoteBanningModule.enforceBanPolicy(userId, ctx.channel.id, false);
 
-                return { content: `Queued ban for <@${userId}>` };
+                return { content: `Triggered ban sequence for <@${userId}>` };
             }
         },
         {
@@ -74,9 +75,26 @@ export const socializeCommand = {
             ],
             execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
-                // We'd need current user ID to update stateManager here, mocked for now
-                console.log(`Whitelisting ${userId}`);
+
+                const whitelist = WhitelistingModule.getWhitelist();
+                if (!whitelist.includes(userId)) {
+                    whitelist.push(userId);
+                    WhitelistingModule.setWhitelist(whitelist);
+                }
+
                 return { content: `Whitelisted <@${userId}> locally.` };
+            }
+        },
+        {
+            name: "permit",
+            description: "Permit user into managed channel",
+            type: 1,
+            options: [{ name: "user", description: "The user to permit", type: 6, required: true }],
+            execute: (args: CommandArgument[], ctx: CommandContext) => {
+                const userId = args[0].value;
+                if (!ctx.channel) return;
+                WhitelistingModule.bulkPermit([userId], ctx.channel.id);
+                return { content: `Permitted <@${userId}>` };
             }
         }
     ],

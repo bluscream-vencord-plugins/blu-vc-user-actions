@@ -9,7 +9,7 @@ import { actionQueue } from "./utils/actionQueue";
 
 // Modules
 import { OwnershipModule } from "./logic/ownership";
-import { ModerationModule } from "./logic/moderation";
+import { WhitelistingModule } from "./logic/whitelisting";
 import { NamingModule } from "./logic/naming";
 import { RoleEnforcementModule } from "./logic/roleEnforcement";
 import { VoteBanningModule } from "./logic/voteBanning";
@@ -37,7 +37,7 @@ export default definePlugin({
 
         // Register core logic modules
         moduleRegistry.register(OwnershipModule);
-        moduleRegistry.register(ModerationModule);
+        moduleRegistry.register(WhitelistingModule);
         moduleRegistry.register(NamingModule);
         moduleRegistry.register(RoleEnforcementModule);
         moduleRegistry.register(VoteBanningModule);

@@ -1,4 +1,19 @@
 import { ActionQueueItem, ChannelOwnership, MemberChannelInfo } from "./state";
+import { Message } from "@vencord/discord-types";
+
+export enum BotResponseType {
+    CREATED = "Channel Created",
+    CLAIMED = "Channel Claimed",
+    INFO = "Channel Settings",
+    BANNED = "Banned",
+    UNBANNED = "Unbanned",
+    PERMITTED = "Permitted",
+    UNPERMITTED = "Unpermitted",
+    SIZE_SET = "Size Set",
+    LOCKED = "Locked",
+    UNLOCKED = "Unlocked",
+    UNKNOWN = "Unknown"
+}
 
 export enum SocializeEvent {
     // Fired when the internal state of a channel changes
@@ -28,6 +43,9 @@ export interface EventPayloads {
     [SocializeEvent.BOT_EMBED_RECEIVED]: {
         messageId: string;
         channelId: string;
+        type: BotResponseType;
+        initiatorId?: string;
+        targetUserId?: string;
         embed: unknown; // Ideally Discord Embed type
     };
     [SocializeEvent.ACTION_EXECUTED]: {

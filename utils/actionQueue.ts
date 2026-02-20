@@ -21,6 +21,11 @@ export class ActionQueue {
     }
 
     public enqueue(command: string, channelId: string, priority: boolean = false) {
+        // Auto-prioritize specific high value bot actions
+        if (command.includes(" claim") || command.includes(" info")) {
+            priority = true;
+        }
+
         const item: ActionQueueItem = {
             id: Math.random().toString(36).substring(7),
             command,
@@ -35,6 +40,20 @@ export class ActionQueue {
             this.queue.push(item);
         }
 
+        this.processQueue();
+    }
+
+    public unshift(command: string, channelId: string) {
+        const item: ActionQueueItem = {
+            id: Math.random().toString(36).substring(7),
+            command,
+            channelId,
+            priority: true,
+            timestamp: Date.now()
+        };
+
+        // Push directly to front of priority queue
+        this.priorityQueue.unshift(item);
         this.processQueue();
     }
 

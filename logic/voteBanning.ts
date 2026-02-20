@@ -1,14 +1,20 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
+import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
-import { UserStore as Users, VoiceStateStore } from "@webpack/common";
-import { Message } from "@vencord/discord-types";
+import { UserStore as Users, VoiceStateStore, RelationshipStore, GuildMemberStore } from "@webpack/common";
+import { Message, VoiceState } from "@vencord/discord-types";
+import { formatCommand } from "../utils/formatting";
+import { WhitelistingModule } from "./whitelisting";
 export const VoteBanningModule: SocializeModule = {
     name: "VoteBanningModule",
     settings: null as unknown as PluginSettings,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
+
+    // Map tracking users that were kicked. Key: userId, Value: timestamp
+    recentlyKickedWaitlist: new Map<string, number>(),
 
     init(settings: PluginSettings) {
         this.settings = settings;
@@ -16,40 +22,146 @@ export const VoteBanningModule: SocializeModule = {
 
         // Cleanup expired votes every minute
         setInterval(() => this.cleanupExpiredVotes(), 60000);
+
+        // Listen to Local User Left to clear queues
+        moduleRegistry.on(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, () => {
+            this.recentlyKickedWaitlist.clear();
+            actionQueue.clear();
+        });
     },
 
     stop() {
         this.activeVotes.clear();
+        this.recentlyKickedWaitlist.clear();
         logger.info("VoteBanningModule stopping");
+    },
+
+    onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
+        if (!this.settings) return;
+
+        // If user joins our channel (ignoring self)
+        if (newState.channelId && oldState.channelId !== newState.channelId) {
+            const currentUserId = Users.getCurrentUser()?.id;
+            if (newState.userId === currentUserId) return; // Ignore ourselves
+
+            const ownership = stateManager.getOwnership(newState.channelId);
+            if (!ownership) return;
+
+            // Make sure we are the ones enforcing (We must be creator or claimant)
+            if (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId) return;
+
+            this.evaluateUserJoin(newState.userId, newState.channelId, newState.guildId);
+        }
     },
 
     onMessageCreate(message: Message) {
         if (!this.settings || !this.settings.botId) return;
-        // Look for chat regex patterns, like "!voteban @user" or similar in our watched channel
-        // For simplicity, checking if content starts with "!voteban"
+
         if (message.content.startsWith("!voteban")) {
             const mentions = message.mentions;
             if (!mentions || mentions.length === 0) return;
 
             const targetUser = mentions[0] as unknown as string;
             const voterId = message.author.id;
-            const channelId = message.channel_id; // Note: this is text channel. Need equivalent Voice Channel.
 
-            // Assume the user is in a voice channel
             const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
             if (!voterVoiceState || !voterVoiceState.channelId) return;
 
-            this.registerVote(targetUser, voterId, voterVoiceState.channelId);
+            this.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId);
         }
     },
 
-    registerVote(targetUser: string, voterId: string, channelId: string) {
+    evaluateUserJoin(userId: string, channelId: string, guildId: string) {
+        if (!this.settings) return;
+        if (WhitelistingModule.isWhitelisted(userId)) return;
+
+        // 1. Is user locally blacklisted?
+        const isLocallyBlacklisted = (this.settings.localUserBlacklist?.split(/\r?\n/) || []).some(s => s.trim() === userId);
+
+        // 2. Is user blocked by the channel owner (us)?
+        // RelationshipStore types: 1 = Friend, 2 = Blocked
+        const isBlocked = RelationshipStore.isBlocked(userId);
+
+        // 3. Are they missing required roles?
+        let isMissingRole = false;
+        if (this.settings.requiredRoleIds && this.settings.requiredRoleIds.trim().length > 0) {
+            const requiredRoleList = this.settings.requiredRoleIds.split(/\r?\n/).map(s => s.trim());
+            const member = GuildMemberStore.getMember(guildId, userId);
+            if (member && member.roles) {
+                // Return true if they do NOT have ANY of the required roles
+                isMissingRole = requiredRoleList.length > 0 && !member.roles.some((r: string) => requiredRoleList.includes(r));
+            } else {
+                // If member object absent, assume missing
+                isMissingRole = true;
+            }
+        }
+
+        if (isLocallyBlacklisted || isBlocked || isMissingRole) {
+            logger.info(`User ${userId} failed validity check (Blacklisted: ${isLocallyBlacklisted}, Blocked: ${isBlocked}, MissingRole: ${isMissingRole})`);
+            this.enforceBanPolicy(userId, channelId, true);
+        }
+    },
+
+    enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false) {
+        if (!this.settings) return;
+
+        // Kick First Policy
+        if (kickFirst) {
+            const lastKickTime = this.recentlyKickedWaitlist.get(userId);
+            const now = Date.now();
+            const cooldownMs = this.settings.banRotateCooldown * 1000;
+
+            if (!lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs)) {
+                // User hasn't been kicked recently, or cooldown expired. Kick them first.
+                logger.info(`Kick-First applied. Kicking user ${userId}`);
+                actionQueue.enqueue(formatCommand(this.settings.kickCommand, channelId, { userId }), channelId, true);
+
+                // Track kick time so they get banned if they rejoin
+                this.recentlyKickedWaitlist.set(userId, now);
+                return;
+            }
+        }
+
+        // Waitlist re-triggered (or immediate ban requested), process Ban Rotation
+        logger.info(`Executing ban rotation sequence for ${userId}`);
+        const currentUserId = Users.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        const config = stateManager.getMemberConfig(currentUserId);
+
+        // Unban oldest if hitting limit
+        if (this.settings.banRotateEnabled && config.bannedUsers.length >= this.settings.banLimit) {
+            const oldestBannedUser = config.bannedUsers.shift();
+            if (oldestBannedUser) {
+                logger.info(`Ban list full. Unbanning ${oldestBannedUser} to make room...`);
+                actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser }), channelId, true);
+
+                if (this.settings.banRotationMessage) {
+                    const rotationStr = this.settings.banRotationMessage
+                        .replace(/{user_id}/g, oldestBannedUser)
+                        .replace(/{user_id_new}/g, userId);
+                    actionQueue.enqueue(rotationStr, channelId); // Not prioritized over the ban commands
+                }
+            }
+        }
+
+        // Apply final ban
+        if (!config.bannedUsers.includes(userId)) {
+            config.bannedUsers.push(userId);
+            stateManager.updateMemberConfig(currentUserId, { bannedUsers: config.bannedUsers });
+        }
+
+        actionQueue.enqueue(formatCommand(this.settings.banCommand, channelId, { userId }), channelId, true);
+        this.recentlyKickedWaitlist.delete(userId); // Consume the waitlist
+    },
+
+    registerVote(targetUser: string, voterId: string, channelId: string, guildId: string) {
         if (!this.settings) return;
         const ownership = stateManager.getOwnership(channelId);
         if (!ownership) return; // Only allow in managed channels
 
-        const now = Date.now();
         const voteKey = `${channelId}-${targetUser}`;
+        const now = Date.now();
 
         if (!this.activeVotes.has(voteKey)) {
             this.activeVotes.set(voteKey, {
@@ -62,22 +174,15 @@ export const VoteBanningModule: SocializeModule = {
         const voteData = this.activeVotes.get(voteKey)!;
         voteData.voters.add(voterId);
 
-        // Calculate threshold
         const currentVoiceStates = Object.values(VoiceStateStore.getVoiceStatesForChannel(channelId) || {});
-        // +1 to exclude bot, basic estimation
         const occupantCount = currentVoiceStates.length;
-
         const requiredVotes = Math.ceil(occupantCount * (this.settings.voteBanPercentage / 100));
 
         logger.info(`Vote registered against ${targetUser} by ${voterId}. ${voteData.voters.size} / ${requiredVotes}`);
 
         if (voteData.voters.size >= requiredVotes) {
-            logger.info(`Vote threshold reached for ${targetUser}. Executing ban.`);
-
-            // Enqueue ban via action queue
-            const cmd = this.settings.banCommand.replace("{user}", `<@${targetUser}>`);
-            actionQueue.enqueue(cmd, channelId, true);
-
+            logger.info(`Vote threshold reached for ${targetUser}. Executing ban policy.`);
+            this.enforceBanPolicy(targetUser, channelId, false); // Votebans do not offer kick warnings (immediate)
             this.activeVotes.delete(voteKey);
         }
     },

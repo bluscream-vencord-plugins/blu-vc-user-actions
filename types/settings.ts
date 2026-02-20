@@ -25,7 +25,24 @@ export const defaultSettings = definePluginSettings({
     namingIntervalMs: { type: OptionType.SLIDER, description: "Naming Interval (ms)", default: 11 * 60 * 1000, markers: [60000, 300000, 660000, 1800000], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.namingIntervalMs = Math.round(v); } },
     voteBanPercentage: { type: OptionType.SLIDER, description: "Vote Ban Percentage", default: 50, markers: [10, 25, 50, 75, 100], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
     voteBanWindowMs: { type: OptionType.SLIDER, description: "Vote Ban Window (ms)", default: 5 * 60 * 1000, markers: [60000, 300000, 600000], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowMs = Math.round(v); } },
-    commandCleanup: { type: OptionType.BOOLEAN, description: "Command Cleanup", default: true, restartNeeded: false }
+    commandCleanup: { type: OptionType.BOOLEAN, description: "Command Cleanup", default: true, restartNeeded: false },
+
+    // Feature: Channel Claiming
+    ownershipChangeMessage: { type: OptionType.STRING, description: "Ownership Change Message", default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})", restartNeeded: false },
+
+    // Feature: Blacklisting & Banning
+    banLimit: { type: OptionType.SLIDER, description: "Ban Pool Limit", default: 10, markers: [5, 10, 20], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.banLimit = Math.round(v); } },
+    banRotateEnabled: { type: OptionType.BOOLEAN, description: "Enable Ban Rotation", default: true, restartNeeded: false },
+    banRotationMessage: { type: OptionType.STRING, description: "Ban Rotation Message", default: "♻️ Ban rotated: <@{user_id}> was unbanned to make room for <@{user_id_new}>", restartNeeded: false },
+    banRotateCooldown: { type: OptionType.NUMBER, description: "Ban Rotation Cooldown (s) (0=infinite)", default: 0, restartNeeded: false },
+    localUserBlacklist: { type: OptionType.STRING, description: "Local User Blacklist (one ID per line)", default: "", multiline: true, restartNeeded: false },
+
+    // Feature: Whitelisting
+    whitelistSkipMessage: { type: OptionType.STRING, description: "Whitelist Skip Message", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
+    localUserWhitelist: { type: OptionType.STRING, description: "Local User Whitelist (one ID per line)", default: "", multiline: true, restartNeeded: false },
+
+    // Feature: Roles
+    requiredRoleIds: { type: OptionType.STRING, description: "Required Role IDs (one ID per line)", default: "", multiline: true, restartNeeded: false }
 });
 
 export type PluginSettings = typeof defaultSettings.store;
