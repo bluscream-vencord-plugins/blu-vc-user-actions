@@ -64,11 +64,16 @@ export default definePlugin({
     // The flux handler receives the fully-hydrated event object with proper
     // channelId / guildId fields that manual subscribers don't get reliably.
     flux: {
-        VOICE_STATE_UPDATE(event: any) {
-            try {
-                moduleRegistry.dispatchVoiceStateUpdate(event.oldState, event.newState);
-            } catch (e) {
-                logger.error("Error in VOICE_STATE_UPDATE:", e);
+        VOICE_STATE_UPDATES({ voiceStates }: { voiceStates: any[] }) {
+            for (const state of voiceStates) {
+                try {
+                    // Normalize voice state update to provide both old and new state fragments
+                    const oldState = { ...state, channelId: state.oldChannelId };
+                    const newState = { ...state };
+                    moduleRegistry.dispatchVoiceStateUpdate(oldState, newState);
+                } catch (e) {
+                    logger.error("Error in VOICE_STATE_UPDATES handler:", e);
+                }
             }
         },
 
