@@ -122,9 +122,13 @@ function buildGuildContextMenuItems(guild: Guild) {
 
 export const contextMenuHandlers = {
     "user-context": (children: any[], props: any) => {
-        const user = props?.user;
-        const channel = props?.channel || Channels.getChannel(props?.channelId) || Channels.getChannel(SelectedChannelStore.getChannelId());
+        if (!props) return;
+        const user = props.user;
         if (!user) return;
+
+        const channelId = props.channelId || props.channel?.id || SelectedChannelStore.getChannelId();
+        const channel = props.channel || (channelId ? Channels.getChannel(channelId) : null);
+
         const items = buildUserContextMenuItems(user, channel);
         if (items) addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items);
     },
@@ -135,9 +139,8 @@ export const contextMenuHandlers = {
         if (items) addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items);
     },
     "guild-context": (children: any[], props: any) => {
-        const guild = props?.guild;
-        if (!guild) return;
-        const items = buildGuildContextMenuItems(guild);
+        if (!props || !props.guild) return;
+        const items = buildGuildContextMenuItems(props.guild);
         if (items) addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items);
     }
 };

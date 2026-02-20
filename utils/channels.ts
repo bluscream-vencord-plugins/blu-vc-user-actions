@@ -11,8 +11,8 @@ export const isStageChannel = (channel: Channel | null | undefined): channel is 
 export const isTextChannel = (channel: Channel | null | undefined): channel is Channel =>
     channel?.type === ChannelType.GUILD_TEXT;
 
-export const isGuildChannel = (channel: Channel | null | undefined): channel is Channel =>
-    channel ? !channel.isDM() && !channel.isGroupDM() : false;
+export const isGuildChannel = (channel: any): channel is Channel =>
+    channel && typeof channel.isDM === "function" ? !channel.isDM() && !channel.isGroupDM() : false;
 
 /**
  * Finds the text channel associated with a voice channel.
