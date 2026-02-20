@@ -6,6 +6,7 @@ export const defaultSettings = definePluginSettings({
     categoryId: { type: OptionType.STRING, description: "Category ID", default: "763914042628112455", restartNeeded: false },
     creationChannelId: { type: OptionType.STRING, description: "Creation Channel ID", default: "763914043252801566", restartNeeded: false },
     botId: { type: OptionType.STRING, description: "Bot ID", default: "913852862990262282", restartNeeded: false },
+    enableDebug: { type: OptionType.BOOLEAN, description: "Display Debug Messages (Ephemeral)", default: false, restartNeeded: false },
 
     claimCommand: { type: OptionType.STRING, description: "Claim Command Template", default: "!v claim", restartNeeded: false },
     infoCommand: { type: OptionType.STRING, description: "Info Command Template", default: "!v info", restartNeeded: false },

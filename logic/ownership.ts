@@ -1,6 +1,7 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, BotResponseType } from "../types/events";
+import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
 import { UserStore as Users } from "@webpack/common";
@@ -9,7 +10,8 @@ import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
-import { GuildChannelStore, ChannelStore } from "@webpack/common";
+import { GuildChannelStore, ChannelStore, GuildStore } from "@webpack/common";
+import { NamingModule } from "./naming";
 
 export const OwnershipModule: SocializeModule = {
     name: "OwnershipModule",
@@ -83,13 +85,20 @@ export const OwnershipModule: SocializeModule = {
         // Specific handling for Ownership
         if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
             const isCreator = response.type === BotResponseType.CREATED;
-            stateManager.setOwnership(response.channelId, {
-                channelId: response.channelId,
-                creatorId: isCreator ? response.initiatorId : null,
-                claimantId: !isCreator ? response.initiatorId : null,
+            const channelId = response.channelId;
+            const userId = response.initiatorId;
+
+            const oldOwnership = stateManager.getOwnership(channelId);
+            const newOwnership = {
+                channelId: channelId,
+                creatorId: isCreator ? userId : null,
+                claimantId: !isCreator ? userId : null,
                 createdAt: isCreator ? response.timestamp : null,
                 claimedAt: !isCreator ? response.timestamp : null
-            });
+            };
+
+            stateManager.setOwnership(channelId, newOwnership);
+            this.handleOwnershipUpdate(channelId, userId, isCreator ? "creator" : "claimant", oldOwnership, newOwnership);
         }
 
         // Handle Info synchronization
@@ -162,9 +171,54 @@ export const OwnershipModule: SocializeModule = {
     },
 
     // Internal helpers
+    handleOwnershipUpdate(channelId: string, ownerId: string, type: "creator" | "claimant", oldOwnership: ChannelOwnership | null, newOwnership: ChannelOwnership | null) {
+        const meId = Users.getCurrentUser()?.id;
+
+        // Notify others if configured
+        this.notifyOwnership(channelId, ownerId, type);
+
+        // Dispatch typed event for other modules
+        moduleRegistry.dispatch(SocializeEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
+
+        // Manage naming rotation
+        if (ownerId === meId) {
+            NamingModule.startRotation(channelId);
+        } else {
+            NamingModule.stopRotation(channelId);
+        }
+    },
+
+    notifyOwnership(channelId: string, ownerId: string, type: string) {
+        const settings = moduleRegistry["settings"];
+        if (!settings) return;
+
+        const channel = ChannelStore.getChannel(channelId);
+        const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
+        const owner = Users.getUser(ownerId);
+        const ownerName = owner?.globalName || owner?.username || ownerId;
+
+        const formatted = settings.ownershipChangeMessage
+            .replace(/{reason}/g, type === "creator" ? "Created" : "Claimed")
+            .replace(/{channel_id}/g, channelId)
+            .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
+            .replace(/{guild_id}/g, channel?.guild_id || "")
+            .replace(/{guild_name}/g, guild?.name || "Unknown Guild")
+            .replace(/{user_id}/g, ownerId)
+            .replace(/{user_name}/g, ownerName);
+
+        // We use the action queue to send the notification to avoid race conditions with bot info requests
+        actionQueue.enqueue(formatted, channelId, true);
+    },
+
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
+
+            // Check if we are the owner, if so restart naming rotation
+            const ownership = stateManager.getOwnership(channelId);
+            if (ownership && (ownership.creatorId === userId || ownership.claimantId === userId)) {
+                NamingModule.startRotation(channelId);
+            }
         }
 
         // If this is an owned channel, dispatch an event
@@ -177,6 +231,7 @@ export const OwnershipModule: SocializeModule = {
     handleUserLeftChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
+            NamingModule.stopRotation(channelId);
         }
 
         const ownership = stateManager.getOwnership(channelId);
@@ -186,7 +241,11 @@ export const OwnershipModule: SocializeModule = {
             // Check if creator or claimant left
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
                 logger.info(`Owner ${userId} left channel ${channelId}`);
-                // Handle ownership transfer or loss logic here
+
+                // If the owner left and it was us, stop rotation
+                if (userId === currentUserId) {
+                    NamingModule.stopRotation(channelId);
+                }
             }
         }
     },

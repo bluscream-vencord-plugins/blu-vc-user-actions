@@ -3,6 +3,9 @@ import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { WhitelistingModule } from "./logic/whitelisting";
+import { NamingModule } from "./logic/naming";
+import { stateManager } from "./utils/stateManager";
+import { UserStore as Users } from "@webpack/common";
 
 import { CommandArgument, CommandContext } from "@vencord/discord-types";
 
@@ -96,6 +99,71 @@ export const socializeCommand = {
                 WhitelistingModule.permitUser(userId, ctx.channel.id);
                 return { content: `Permitted <@${userId}>` };
             }
+        },
+        {
+            name: "naming",
+            description: "Manage channel name rotation",
+            type: 1,
+            options: [
+                {
+                    name: "add",
+                    description: "Add a name to your rotation list",
+                    type: 1,
+                    options: [{ name: "name", description: "The name to add", type: 3, required: true }],
+                    execute: (args: CommandArgument[]) => {
+                        const name = args[0].value as string;
+                        const meId = Users.getCurrentUser()?.id || ""; // fallback
+                        if (NamingModule.addName(meId, name)) {
+                            return { content: `Added "${name}" to rotation list.` };
+                        }
+                        return { content: `"${name}" is already in the list.` };
+                    }
+                },
+                {
+                    name: "remove",
+                    description: "Remove a name from your rotation list",
+                    type: 1,
+                    options: [{ name: "name", description: "The name to remove", type: 3, required: true }],
+                    execute: (args: CommandArgument[]) => {
+                        const name = args[0].value as string;
+                        const meId = Users.getCurrentUser()?.id || "";
+                        if (NamingModule.removeName(meId, name)) {
+                            return { content: `Removed "${name}" from rotation list.` };
+                        }
+                        return { content: `"${name}" not found in list.` };
+                    }
+                },
+                {
+                    name: "list",
+                    description: "List your rotation names",
+                    type: 1,
+                    execute: () => {
+                        const meId = Users.getCurrentUser()?.id || "";
+                        const config = stateManager.getMemberConfig(meId);
+                        if (config.nameRotationList.length === 0) return { content: "Your rotation list is empty." };
+                        return { content: `**Rotation List:**\n${config.nameRotationList.map((n, i) => `${i + 1}. ${n}`).join("\n")}` };
+                    }
+                },
+                {
+                    name: "start",
+                    description: "Manually start name rotation for current channel",
+                    type: 1,
+                    execute: (args: any, ctx: CommandContext) => {
+                        if (!ctx.channel) return { content: "Join a channel first." };
+                        NamingModule.startRotation(ctx.channel.id);
+                        return { content: "Started name rotation." };
+                    }
+                },
+                {
+                    name: "stop",
+                    description: "Manually stop name rotation",
+                    type: 1,
+                    execute: () => {
+                        NamingModule.stopRotation();
+                        return { content: "Stopped name rotation." };
+                    }
+                }
+            ]
         }
     ],
     execute: (args: CommandArgument[], ctx: CommandContext) => {

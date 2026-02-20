@@ -11,15 +11,17 @@ export const CommandCleanupModule: SocializeModule = {
     init(settings: PluginSettings) {
         logger.info("CommandCleanupModule initializing");
 
+        const { MessageActions } = require("@webpack/common");
         moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: EventPayloads[SocializeEvent.ACTION_EXECUTED]) => {
             const item: ActionQueueItem = payload.item;
             if (!settings.commandCleanup) return;
 
-            // In a real Vencord plugin, we'd delete the message sent by the user locally
-            // Vencord provides `deleteMessage` through the MessageActions or similar APIs
-            // It could be complicated to cleanly intercept outgoing messages without patching `sendMessage`
-            // For now, it logs the intent
-            logger.debug(`Intercepted action execution for command cleanup: ${item.command}`);
+            // In Equicord/Vencord, we want to delete the command message we just sent
+            // payload.message could contain the message object if returned by actionQueue
+            if (payload.item.messageId) {
+                MessageActions.deleteMessage(item.channelId, payload.item.messageId);
+                logger.debug(`Cleaned up command message: ${item.command}`);
+            }
         });
     },
 

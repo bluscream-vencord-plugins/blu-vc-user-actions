@@ -24,6 +24,7 @@ export interface ActionQueueItem {
     channelId: string;
     priority: boolean;
     timestamp: number;
+    messageId?: string;
 }
 
 export interface PluginState {

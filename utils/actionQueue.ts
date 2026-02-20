@@ -10,13 +10,13 @@ export class ActionQueue {
     private delayMs: number = 2000;
 
     // Injected dependency to actually send commands
-    private sendCommandCallback: ((command: string, channelId: string) => Promise<void>) | null = null;
+    private sendCommandCallback: ((command: string, channelId: string) => Promise<any>) | null = null;
 
     public setDelay(ms: number) {
         this.delayMs = ms;
     }
 
-    public setCommandSender(callback: (command: string, channelId: string) => Promise<void>) {
+    public setCommandSender(callback: (command: string, channelId: string) => Promise<any>) {
         this.sendCommandCallback = callback;
     }
 
@@ -93,7 +93,20 @@ export class ActionQueue {
         if (item && this.sendCommandCallback) {
             try {
                 logger.debug("Executing queued command:", item.command);
-                await this.sendCommandCallback(item.command, item.channelId);
+                const result = await this.sendCommandCallback(item.command, item.channelId);
+
+                // If it's a message object from Discord
+                if (result && result.id) {
+                    item.messageId = result.id;
+                }
+
+                // Dispatch execution event for cleanup module
+                try {
+                    const { moduleRegistry } = require("../logic/moduleRegistry");
+                    const { SocializeEvent } = require("../types/events");
+                    moduleRegistry.dispatch(SocializeEvent.ACTION_EXECUTED, { item });
+                } catch (e) { }
+
             } catch (e) {
                 logger.error("Failed to execute command:", item.command, e);
             }

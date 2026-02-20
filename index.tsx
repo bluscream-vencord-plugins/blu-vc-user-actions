@@ -32,10 +32,10 @@ export default definePlugin({
         stateManager.init(this.settings.store || {});
         actionQueue.setDelay((this.settings.store.queueInterval || 2) * 1000);
 
-        // Setup command sender utilizing Vencord Message actions (mocked here)
+        // Setup command sender utilizing Vencord Message actions
+        const { MessageActions } = require("@webpack/common");
         actionQueue.setCommandSender(async (command, channelId) => {
-            // e.g. imported from vencord/api/messages: send(channelId, {content: command})
-            logger.debug(`[MOCK SEND] -> ${channelId}: ${command}`);
+            return MessageActions.sendMessage(channelId, { content: command });
         });
 
         // Register core logic modules
