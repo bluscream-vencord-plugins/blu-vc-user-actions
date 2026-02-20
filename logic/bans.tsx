@@ -1,5 +1,5 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
-import { PluginSettings } from "../types/settings";
+import { PluginSettings, RequiredRoleMode } from "../types/settings";
 import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
@@ -74,8 +74,19 @@ export const BansModule: SocializeModule = {
         if (this.settings.banNotInRoles && this.settings.requiredRoleIds?.trim().length > 0) {
             const requiredRoleList = getNewLineList(this.settings.requiredRoleIds);
             const member = GuildMemberStore.getMember(guildId, userId);
-            if (member && member.roles) {
-                isMissingRole = requiredRoleList.length > 0 && !member.roles.some((r: string) => requiredRoleList.includes(r));
+
+            if (member && member.roles && requiredRoleList.length > 0) {
+                if (this.settings.requiredRoleMode === RequiredRoleMode.ALL) {
+                    const hasAllRoles = requiredRoleList.every((r: string) => member.roles.includes(r));
+                    isMissingRole = !hasAllRoles;
+                } else if (this.settings.requiredRoleMode === RequiredRoleMode.NONE) {
+                    const hasAnyRole = member.roles.some((r: string) => requiredRoleList.includes(r));
+                    isMissingRole = hasAnyRole;
+                } else {
+                    // Default / ANY
+                    const hasAnyRole = member.roles.some((r: string) => requiredRoleList.includes(r));
+                    isMissingRole = !hasAnyRole;
+                }
             } else {
                 isMissingRole = true;
             }

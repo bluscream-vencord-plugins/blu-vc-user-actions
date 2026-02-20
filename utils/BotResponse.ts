@@ -67,9 +67,16 @@ export class BotResponse {
             return;
         }
 
+        // Specific exclusions
+        if (authorName.includes("voice help")) {
+            this.type = BotResponseType.UNKNOWN;
+            return;
+        }
+
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
         else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
-        else if (check("Channel Settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
+        // Be more specific with Settings to avoid matching "View your channel settings" in Help text
+        else if (authorName.includes("channel settings") || title.includes("channel settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
         else if (title.includes("unbanned successfully") || authorName.includes("unbanned successfully") || description.includes("__unbanned__")) this.type = BotResponseType.UNBANNED;
         else if (title.includes("banned successfully") || authorName.includes("banned successfully") || description.includes("__banned__")) this.type = BotResponseType.BANNED;
         else if (title.includes("unpermitted successfully") || authorName.includes("unpermitted successfully") || description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;

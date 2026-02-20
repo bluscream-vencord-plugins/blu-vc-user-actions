@@ -41,7 +41,7 @@ export const defaultSettings = definePluginSettings({
 
     // ── Vote Banning ──────────────────────────────────────────────────────
     voteBanCommandString: { type: OptionType.STRING, description: "Command users type to vote-ban someone (e.g. !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
-    voteBanRegex: { type: OptionType.STRING, description: "Regex to detect vote-ban commands (named groups: target, reason)", default: "^(?:!vote\\s+ban)\\s+<@!?(?<target>\\d+)>(?:\\s+(?<reason>.*))?", restartNeeded: false },
+    voteBanRegex: { type: OptionType.STRING, description: "Regex to detect vote-ban commands (named groups: target, reason)", default: "^(?:!(?:vote)\\s+ban)\\s+<@!?(?<target>\\d+)>(?:\\s+(?<reason>.*))?", restartNeeded: false },
     voteBanPercentage: { type: OptionType.SLIDER, description: "Percentage of channel occupants required to pass a vote ban", default: 50, markers: [10, 25, 50, 75, 100], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
     voteBanWindowSecs: { type: OptionType.SLIDER, description: "Seconds a vote-ban stays open before expiring", default: 5 * 60, markers: [30, 60, 120, 300, 600, 1800], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowSecs = Math.round(v); } },
 
@@ -58,6 +58,7 @@ export const defaultSettings = definePluginSettings({
     queueEnabled: { type: OptionType.BOOLEAN, description: "Enable Action Queue", default: true, restartNeeded: false },
     queueInterval: { type: OptionType.SLIDER, description: "Action Queue Interval (seconds)", default: 2, markers: [1, 2, 5, 10], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.queueInterval = Math.round(v); } },
     commandCleanup: { type: OptionType.BOOLEAN, description: "Delete command messages automatically after sending", default: true, restartNeeded: false },
+    commandCleanupDelay: { type: OptionType.SLIDER, description: "Delay before deleting command (ms)", default: 1000, markers: [0, 500, 1000, 2000, 5000], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.commandCleanupDelay = Math.round(v); } },
 
     // ── Commands ──────────────────────────────────────────────────────────
     claimCommand: { type: OptionType.STRING, description: "Claim Channel Command", default: "!v claim", restartNeeded: false },
@@ -65,7 +66,7 @@ export const defaultSettings = definePluginSettings({
     unlockCommand: { type: OptionType.STRING, description: "Unlock Channel Command", default: "!v unlock", restartNeeded: false },
     resetCommand: { type: OptionType.STRING, description: "Reset Channel Command", default: "!v reset", restartNeeded: false },
     infoCommand: { type: OptionType.STRING, description: "Info Command Template", default: "!v info", restartNeeded: false },
-    setSizeCommand: { type: OptionType.STRING, description: "Set Size Command Template (use {size})", default: "!v setsize {size}", restartNeeded: false },
+    setSizeCommand: { type: OptionType.STRING, description: "Set Size Command Template (use {size})", default: "!v size {size}", restartNeeded: false },
     setChannelNameCommand: { type: OptionType.STRING, description: "Set Channel Name Command (use {channel_name_new})", default: "!v name {channel_name_new}", restartNeeded: false },
     kickCommand: { type: OptionType.STRING, description: "Kick Command Template (use {user_id})", default: "!v kick {user_id}", restartNeeded: false },
     banCommand: { type: OptionType.STRING, description: "Ban Command Template (use {user_id})", default: "!v ban {user_id}", restartNeeded: false },

@@ -127,12 +127,12 @@ The plugin must send commands to the chat so the external bot executes actions. 
 
 - **Claim Command:** Claims ownership of the current channel. (!v claim)
 - **Info Command:** Requests the external bot to print the current channel's settings and member lists. (!v info)
-- **Set Size Command:** Sets the maximum occupant limit (requires a number placeholder). (!v setsize <number>)
+- **Set Size Command:** Sets the maximum occupant limit (requires a number placeholder). (!v size <number>)
 - **Lock / Unlock Commands:** Toggles the channel's general access status. (!v lock / !v unlock)
 - **Reset Command:** Reverts the channel name and settings to default. (!v reset)
 - **Kick / Ban / Unban Commands:** Moderation actions targeting a specific user (requires a user mention or ID placeholder). (!v kick / !v ban / !v unban <user>)
 - **Permit / Unpermit Commands:** Overrides granting or revoking access for a specific user. (!v permit / !v unpermit <user>)
-- **Rename Channel Command:** Changes the channel's name (requires a text placeholder). (!v rename <name>)
+- **Rename Channel Command:** Changes the channel's name (requires a text placeholder). (!v name <name>)
 
 ### 6.2 Inbound Responses (External Bot to Local Plugin)
 The plugin actively scans incoming messages (specifically embeds) sent by the configured external bot to stay synchronized.

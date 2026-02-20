@@ -124,16 +124,35 @@ export class ActionQueue {
                     ]);
 
                     // If it's a message object from Discord
-                    if (result && result.id) {
-                        item.messageId = result.id;
+                    let messageId = result?.id || result?.message?.id || result?.body?.id;
+
+                    // Fallback for wrapped responses where body might not have been fully parsed or is deeply nested
+                    if (!messageId && typeof result?.text === "string") {
+                        try {
+                            const parsed = JSON.parse(result.text);
+                            messageId = parsed?.id;
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    if (messageId) {
+                        item.messageId = messageId;
+                        logger.debug(`Command execution result has messageId: ${item.messageId}`);
+                    } else if (result) {
+                        const keys = Object.keys(result).join(", ");
+                        const bodyKeys = result.body ? Object.keys(result.body).join(", ") : "N/A";
+                        logger.warn(`Command execution result for "${item.command}" lacks messageId. Keys: [${keys}]. BodyKeys: [${bodyKeys}]`);
+                    } else {
+                        logger.warn(`Command execution result for "${item.command}" is null/undefined.`);
                     }
 
                     // Dispatch execution event for cleanup module
                     try {
-                        const { moduleRegistry } = require("../logic/moduleRegistry");
-                        const { SocializeEvent } = require("../types/events");
-                        moduleRegistry.dispatch(SocializeEvent.ACTION_EXECUTED, { item });
-                    } catch (e) { }
+                        const { moduleRegistry: registry } = require("../logic/moduleRegistry");
+                        const { SocializeEvent: events } = require("../types/events");
+                        registry.dispatch(events.ACTION_EXECUTED, { item });
+                    } catch (e) {
+                        logger.error("Failed to dispatch ACTION_EXECUTED:", e);
+                    }
 
                 } catch (e) {
                     logger.error("Failed to execute command:", item.command, e);

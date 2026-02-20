@@ -35,7 +35,7 @@ export default definePlugin({
         // Raw MessageActions.sendMessage crashes with 'nonce' TypeError without them.
         const { sendMessage } = require("@utils/discord");
         actionQueue.setCommandSender(async (command, channelId) => {
-            return sendMessage(channelId, { content: command }, false);
+            return sendMessage(channelId, { content: command }, true);
         });
 
         // Register core logic modules
@@ -85,13 +85,16 @@ export default definePlugin({
                 // Fast-path guild filter — ignore messages from other guilds
                 if (guildId && guildId !== s.guildId) return;
 
-                // Resolve the channel and check if it belongs to our managed category
+                // Resolve the channel
                 const channel = ChannelStore.getChannel(channelId);
                 if (!channel) return;
 
-                // Only handle messages from channels in our managed category.
-                // Voice channels in Discord get a linked text channel with the same parent_id.
-                if (channel.parent_id !== s.categoryId) return;
+                const isCommand = (message.content ?? "").trim().startsWith("!v");
+                const isInManagedCategory = channel.parent_id === s.categoryId;
+
+                // We must allow !v commands to pass through even if the category filter blocks them,
+                // otherwise the CommandCleanupModule won't see them.
+                if (!isCommand && !isInManagedCategory) return;
 
                 logger.debug(`MESSAGE_CREATE from ${message.author?.username} (${message.author?.id}) in #${channel.name} (${channelId})`);
 
