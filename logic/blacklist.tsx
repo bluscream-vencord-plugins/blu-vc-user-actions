@@ -36,12 +36,12 @@ export const BlacklistModule: SocializeModule = {
     blacklistUser(userId: string, channelId?: string) {
         if (!this.settings || this.isBlacklisted(userId)) return;
         this.setBlacklist([...this.getBlacklist(), userId]);
-        if (channelId) sendDebugMessage(channelId, `User <@${userId}> added to local blacklist.`);
+        sendDebugMessage(`User <@${userId}> added to local blacklist.`, channelId);
     },
 
     unblacklistUser(userId: string, channelId?: string) {
         if (!this.settings || !this.isBlacklisted(userId)) return;
         this.setBlacklist(this.getBlacklist().filter(id => id !== userId));
-        if (channelId) sendDebugMessage(channelId, `User <@${userId}> removed from local blacklist.`);
+        sendDebugMessage(`User <@${userId}> removed from local blacklist.`, channelId);
     }
 };

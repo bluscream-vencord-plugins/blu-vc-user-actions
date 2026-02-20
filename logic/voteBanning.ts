@@ -67,7 +67,7 @@ export const VoteBanningModule: SocializeModule = {
         const occupantCount = currentVoiceStates.length;
         const requiredVotes = Math.ceil(occupantCount * (this.settings.voteBanPercentage / 100));
 
-        sendDebugMessage(channelId, `Vote registered against ${targetUser} by ${voterId}. (${voteData.voters.size}/${requiredVotes})`);
+        sendDebugMessage(`Vote registered against ${targetUser} by ${voterId}. (${voteData.voters.size}/${requiredVotes})`, channelId);
 
         if (voteData.voters.size >= requiredVotes) {
             logger.info(`Vote threshold reached for ${targetUser}. Executing ban policy.`);

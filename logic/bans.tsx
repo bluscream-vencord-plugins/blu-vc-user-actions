@@ -92,7 +92,7 @@ export const BansModule: SocializeModule = {
                 hasRecentKick && "Repeat Join"
             ].filter(Boolean).join(", ");
 
-            sendDebugMessage(channelId, `User <@${userId}> join evaluation: **FAILED** (${reason}) [StateBan: ${stateBan}, Waitlist: ${hasRecentKick}]`);
+            sendDebugMessage(`User <@${userId}> join evaluation: **FAILED** (${reason}) [StateBan: ${stateBan}, Waitlist: ${hasRecentKick}]`, channelId);
             this.enforceBanPolicy(userId, channelId, true, reason);
             return true;
         }
@@ -115,7 +115,7 @@ export const BansModule: SocializeModule = {
             const shouldKick = !lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs);
 
             if (shouldKick) {
-                sendDebugMessage(channelId, `Phase 1: Kick-First applied for <@${userId}>`);
+                sendDebugMessage(`Phase 1: Kick-First applied for <@${userId}>`, channelId);
                 this.recentlyKickedWaitlist.set(userId, now);
                 actionQueue.enqueue(
                     formatCommand(this.settings.kickCommand, channelId, { userId, reason }),
@@ -125,11 +125,11 @@ export const BansModule: SocializeModule = {
                 );
                 return;
             } else {
-                sendDebugMessage(channelId, `Phase 2: User <@${userId}> rejoined within cooldown. Escalating to BAN.`);
+                sendDebugMessage(`Phase 2: User <@${userId}> rejoined within cooldown. Escalating to BAN.`, channelId);
             }
         }
 
-        sendDebugMessage(channelId, `Executing ban rotation sequence for ${userId}`);
+        sendDebugMessage(`Executing ban rotation sequence for ${userId}`, channelId);
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
@@ -138,7 +138,7 @@ export const BansModule: SocializeModule = {
         if (this.settings.banRotateEnabled && config.bannedUsers.length >= this.settings.banLimit) {
             const oldestBannedUser = config.bannedUsers.shift();
             if (oldestBannedUser) {
-                sendDebugMessage(channelId, `Ban list full. Unbanning ${oldestBannedUser} to make room...`);
+                sendDebugMessage(`Ban list full. Unbanning ${oldestBannedUser} to make room...`, channelId);
                 actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser }), channelId, true);
 
                 if (this.settings.banRotationMessage) {

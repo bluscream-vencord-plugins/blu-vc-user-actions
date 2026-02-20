@@ -36,7 +36,7 @@ export const ChannelNameRotationModule: SocializeModule = {
             this.stopRotation();
         }
 
-        sendDebugMessage(channelId, `Starting name rotation for channel <#${channelId}>`);
+        sendDebugMessage(`Starting name rotation for channel <#${channelId}>`, channelId);
 
         const intervalMs = this.settings.channelNameRotationInterval * 60 * 1000;
         if (!intervalMs) {
@@ -53,7 +53,7 @@ export const ChannelNameRotationModule: SocializeModule = {
         if (this.rotationIntervalId) {
             clearInterval(this.rotationIntervalId);
             this.rotationIntervalId = null;
-            sendDebugMessage("", "Name rotation stopped.");
+            sendDebugMessage("Name rotation stopped.");
         }
     },
 
@@ -73,7 +73,7 @@ export const ChannelNameRotationModule: SocializeModule = {
         const nextIndex = (currentIndex + 1) % nameList.length;
         const nextName = nameList[nextIndex];
 
-        sendDebugMessage(channelId, `Rotating name to: **${nextName}**`);
+        sendDebugMessage(`Rotating name to: **${nextName}**`, channelId);
         const renameCmd = formatCommand(this.settings.setChannelNameCommand, channelId, { newChannelName: nextName });
         actionQueue.enqueue(renameCmd, channelId, false);
     },

@@ -50,7 +50,7 @@ export class ActionQueue {
             this.queue.push(item);
         }
 
-        sendDebugMessage(channelId, `Enqueued command: \`${command.substring(0, 50)}${command.length > 50 ? "..." : ""}\` (Priority: ${priority})`);
+        sendDebugMessage(`Enqueued command: \`${command.substring(0, 50)}${command.length > 50 ? "..." : ""}\` (Priority: ${priority})`, channelId);
 
         this.emitQueuedEvent(item);
         this.processQueue();
@@ -101,7 +101,7 @@ export class ActionQueue {
 
         if (item) {
             if (item.executeCondition && !item.executeCondition()) {
-                sendDebugMessage(item.channelId, `Pre-flight condition failed for \`${item.command}\`. Skipping.`);
+                sendDebugMessage(`Pre-flight condition failed for \`${item.command}\`. Skipping.`, item.channelId);
                 this.isProcessing = false;
                 this.processQueue();
                 return;
@@ -109,10 +109,10 @@ export class ActionQueue {
 
             if (!this.sendCommandCallback) {
                 logger.error("actionQueue error: sendCommandCallback is null. Queue will process but messages won't send.");
-                sendDebugMessage(item.channelId, `actionQueue Error: sendCommandCallback is null for \`${item.command}\``);
+                sendDebugMessage(`actionQueue Error: sendCommandCallback is null for \`${item.command}\``, item.channelId);
             } else {
                 try {
-                    sendDebugMessage(item.channelId, `Executing command: \`${item.command}\``);
+                    sendDebugMessage(`Executing command: \`${item.command}\``, item.channelId);
 
                     const timeoutPromise = new Promise<any>((_, reject) =>
                         setTimeout(() => reject(new Error("Timeout after 10s waiting for sendCommandCallback")), 10000)

@@ -668,8 +668,8 @@ export const OwnershipModule: SocializeModule = {
             return;
         }
 
-        const targetStr = response.targetId ? ` target <@${response.targetId}> ` : " ";
-        sendDebugMessage(message.channel_id, `Bot Response: **${response.type}**${targetStr}from <@${response.initiatorId || "Unknown"}>`);
+        const targetStr = response.targetId ? ` target <@${response.targetId}>` : "";
+        sendDebugMessage(`Bot Response: **${response.type}**${targetStr} from <@${response.initiatorId || "Unknown"}>`, message.channel_id);
 
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
@@ -703,7 +703,7 @@ export const OwnershipModule: SocializeModule = {
             const result = parseBotInfoMessage(response);
             if (result?.info.userId) {
                 stateManager.updateMemberConfig(result.info.userId, result.info);
-                sendDebugMessage(message.channel_id, `Synchronized info for <@${result.info.userId}>`);
+                sendDebugMessage(`Synchronized info for <@${result.info.userId}>`, message.channel_id);
             }
         }
 
@@ -765,7 +765,7 @@ export const OwnershipModule: SocializeModule = {
         const meId = Users.getCurrentUser()?.id;
 
         this.notifyOwnership(channelId, ownerId, type);
-        sendDebugMessage(channelId, `Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`);
+        sendDebugMessage(`Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`, channelId);
 
         moduleRegistry.dispatch(SocializeEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
 
@@ -805,7 +805,7 @@ export const OwnershipModule: SocializeModule = {
         logger.debug(`handleUserJoinedChannel: user ${userId}, channel ${channelId}, hasOwnership: ${!!ownership}`);
 
         if (userId === currentUserId) {
-            sendDebugMessage(channelId, `You joined managed channel <#${channelId}>`);
+            sendDebugMessage(`You joined managed channel <#${channelId}>`, channelId);
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
             if (ownership) {
@@ -813,14 +813,14 @@ export const OwnershipModule: SocializeModule = {
                     ChannelNameRotationModule.startRotation(channelId);
                 }
             } else if (channelId !== settings.creationChannelId) {
-                sendDebugMessage(channelId, `Unknown channel <#${channelId}> joined. Requesting info.`);
+                sendDebugMessage(`Unknown channel <#${channelId}> joined. Requesting info.`, channelId);
                 this.requestChannelInfo(channelId);
             }
         }
 
         if (ownership) {
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
-            sendDebugMessage(channelId, `<@${userId}> joined owned channel`);
+            sendDebugMessage(`<@${userId}> joined owned channel`, channelId);
             moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
         }
     },
@@ -835,7 +835,7 @@ export const OwnershipModule: SocializeModule = {
         if (ownership) {
             moduleRegistry.dispatch(SocializeEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
-                sendDebugMessage(channelId, `Owner <@${userId}> left channel`);
+                sendDebugMessage(`Owner <@${userId}> left channel`, channelId);
                 if (userId === currentUserId) {
                     ChannelNameRotationModule.stopRotation(channelId);
                 }

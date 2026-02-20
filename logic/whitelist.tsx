@@ -26,7 +26,7 @@ export const WhitelistModule: SocializeModule = {
             if (this.isWhitelisted(payload.userId)) {
                 payload.isAllowed = true;
                 payload.reason = "Whitelisted";
-                sendDebugMessage(payload.channelId, `Whitelisted user <@${payload.userId}> join: **ALLOWED**`);
+                sendDebugMessage(`Whitelisted user <@${payload.userId}> join: **ALLOWED**`, payload.channelId);
             }
         });
     },
@@ -53,13 +53,13 @@ export const WhitelistModule: SocializeModule = {
     whitelistUser(userId: string, channelId?: string) {
         if (!this.settings || this.isWhitelisted(userId)) return;
         this.setWhitelist([...this.getWhitelist(), userId]);
-        if (channelId) sendDebugMessage(channelId, `User <@${userId}> added to local whitelist.`);
+        sendDebugMessage(`User <@${userId}> added to local whitelist.`, channelId);
     },
 
     unwhitelistUser(userId: string, channelId?: string) {
         if (!this.settings || !this.isWhitelisted(userId)) return;
         this.setWhitelist(this.getWhitelist().filter(id => id !== userId));
-        if (channelId) sendDebugMessage(channelId, `User <@${userId}> removed from local whitelist.`);
+        sendDebugMessage(`User <@${userId}> removed from local whitelist.`, channelId);
     },
 
     // ── Permit rotation ───────────────────────────────────────────────────
@@ -79,14 +79,14 @@ export const WhitelistModule: SocializeModule = {
         const rotateEnabled: boolean = s.permitRotateEnabled ?? false;
 
         if (config.permittedUsers.includes(userId)) {
-            sendDebugMessage(channelId, `<@${userId}> is already permitted, skipping duplicate.`);
+            sendDebugMessage(`<@${userId}> is already permitted, skipping duplicate.`, channelId);
             return; // Already in list
         }
 
         if (rotateEnabled && config.permittedUsers.length >= permitLimit) {
             const oldest = config.permittedUsers.shift();
             if (oldest) {
-                sendDebugMessage(channelId, `Permit list full (${permitLimit}). Unpermitting oldest: <@${oldest}>`);
+                sendDebugMessage(`Permit list full (${permitLimit}). Unpermitting oldest: <@${oldest}>`, channelId);
                 actionQueue.enqueue(
                     formatCommand(this.settings.unpermitCommand, channelId, { userId: oldest }),
                     channelId, true
@@ -115,7 +115,7 @@ export const WhitelistModule: SocializeModule = {
             this.applyPermitRotation(userId, channelId);
             // Queue the actual bot command
             const cmd = formatCommand(this.settings.permitCommand, channelId, { userId });
-            sendDebugMessage(channelId, `Permitting user <@${userId}>`);
+            sendDebugMessage(`Permitting user <@${userId}>`, channelId);
             actionQueue.enqueue(cmd, channelId);
         }
     },
@@ -131,7 +131,7 @@ export const WhitelistModule: SocializeModule = {
             const userId = extractId(member);
             if (!userId) continue;
             const cmd = formatCommand(this.settings.unpermitCommand, channelId, { userId });
-            sendDebugMessage(channelId, `Unpermitting user <@${userId}>`);
+            sendDebugMessage(`Unpermitting user <@${userId}>`, channelId);
             actionQueue.enqueue(cmd, channelId);
             // Remove from tracked list
             if (meId) {

@@ -51,7 +51,7 @@ export const RoleEnforcementModule: SocializeModule = {
                 }
 
                 if (shouldKick) {
-                    sendDebugMessage(channelId, `<@${userId}> matched role enforcement conditions (${settings.requiredRoleMode}). Kicking.`);
+                    sendDebugMessage(`<@${userId}> matched role enforcement conditions (${settings.requiredRoleMode}). Kicking.`, channelId);
 
                     const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
 

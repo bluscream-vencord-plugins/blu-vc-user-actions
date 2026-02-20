@@ -1,25 +1,28 @@
 import { moduleRegistry } from "../logic/moduleRegistry";
 import { logger } from "./logger";
-import { MessageActions } from "@webpack/common";
+import { SelectedChannelStore } from "@webpack/common";
 
 /**
- * Sends an ephemeral debug message to the specified channel if enableDebug setting is on.
+ * Sends an ephemeral debug message.
+ * @param content The message content.
+ * @param channelId Optional channel ID. Defaults to current voice channel or current text channel.
  */
-export function sendDebugMessage(channelId: string, ...args: any[]) {
-    logger.debug(...args);
-    const content = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+export function sendDebugMessage(content: any, channelId?: string) {
+    logger.debug(content);
     const settings = moduleRegistry["settings"];
     if (!settings || !settings.enableDebug) return;
 
+    const targetChannelId = channelId || SelectedChannelStore.getVoiceChannelId() || SelectedChannelStore.getChannelId();
+    if (!targetChannelId) {
+        logger.warn("sendDebugMessage: No target channel found and none provided.");
+        return;
+    }
+
     try {
-        // Vencord's way of sending ephemeral "bot" messages (Clyde-like)
-        // Usually it's MessageActions.sendBotMessage or similar.
-        // We'll use a direct call if available or find the right one.
-        // Based on common.ts, MessageActions has sendMessage.
-        // Often there is a dedicated ephemeral helper.
         const { sendBotMessage } = require("@api/Commands");
         if (sendBotMessage) {
-            sendBotMessage(channelId, { content: `${content}` });
+            const text = typeof content === "object" ? JSON.stringify(content) : String(content);
+            sendBotMessage(targetChannelId, { content: text });
         }
     } catch (e) {
         console.warn("[SocializeGuild] Failed to send debug message:", e);
