@@ -48,6 +48,16 @@ export const WhitelistModule: SocializeModule = {
         return this.getWhitelist().includes(userId);
     },
 
+    whitelistUser(userId: string) {
+        if (!this.settings || this.isWhitelisted(userId)) return;
+        this.setWhitelist([...this.getWhitelist(), userId]);
+    },
+
+    unwhitelistUser(userId: string) {
+        if (!this.settings || !this.isWhitelisted(userId)) return;
+        this.setWhitelist(this.getWhitelist().filter(id => id !== userId));
+    },
+
     // ── Permit rotation ───────────────────────────────────────────────────
     // Mirrors the ban rotation in bans.tsx. When the permit list for the current
     // user reaches permitLimit and permitRotateEnabled is on, the oldest permitted

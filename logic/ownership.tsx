@@ -21,6 +21,7 @@ import { ChannelNameRotationModule } from "./channelNameRotation";
 import { WhitelistModule } from "./whitelist";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
+import { sendBotMessage } from "@api/Commands";
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -184,7 +185,9 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     const ownerConfig = myChannelId
         ? stateManager.getMemberConfig(ownership?.claimantId || ownership?.creatorId || "")
         : null;
-    const isBanned = ownerConfig?.bannedUsers.includes(user.id) ?? false;
+    const { BlacklistModule } = require("./blacklist");
+    const isBlacklisted = BlacklistModule.isBlacklisted(user.id);
+    const isBanned = (ownerConfig?.bannedUsers.includes(user.id) ?? false) || isBlacklisted;
 
     const items: React.ReactElement[] = [];
 
@@ -259,7 +262,7 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     // Permit/Unpermit (only if I'm owner)
     if (amOwner && myChannelId) {
         const ownerCfg = stateManager.getMemberConfig(meId);
-        const isPermitted = ownerCfg.permittedUsers.includes(user.id);
+        const isPermitted = ownerCfg.permittedUsers.includes(user.id) || isWhitelisted;
         items.push(
             <Menu.MenuItem
                 id="socialize-permit-user"
@@ -270,8 +273,12 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                     const { WhitelistModule } = require("./whitelist");
                     if (isPermitted) {
                         WhitelistModule.unpermitUser(user.id, myChannelId!);
+                        WhitelistModule.unwhitelistUser(user.id);
+                        showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
                     } else {
+                        WhitelistModule.whitelistUser(user.id);
                         WhitelistModule.permitUser(user.id, myChannelId!);
+                        showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
                     }
                 }}
             />
@@ -744,7 +751,7 @@ export const OwnershipModule: SocializeModule = {
             .replace(/{user_id}/g, ownerId)
             .replace(/{user_name}/g, ownerName);
 
-        actionQueue.enqueue(formatted, channelId, true);
+        sendBotMessage(channelId, { content: formatted });
     },
 
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {

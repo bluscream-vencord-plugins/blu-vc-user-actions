@@ -14,7 +14,7 @@ export const CommandCleanupModule: SocializeModule = {
         const { MessageActions } = require("@webpack/common");
         moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: EventPayloads[SocializeEvent.ACTION_EXECUTED]) => {
             const item: ActionQueueItem = payload.item;
-            if (!settings.commandCleanup) return;
+            if (!moduleRegistry.settings?.commandCleanup) return;
 
             // In Equicord/Vencord, we want to delete the command message we just sent
             // payload.message could contain the message object if returned by actionQueue
