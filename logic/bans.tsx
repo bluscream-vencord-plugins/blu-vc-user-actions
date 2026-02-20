@@ -4,7 +4,7 @@ import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
-import { UserStore as Users, RelationshipStore, GuildMemberStore } from "@webpack/common";
+import { UserStore as Users, RelationshipStore, GuildMemberStore, VoiceStateStore } from "@webpack/common";
 import { VoiceState } from "@vencord/discord-types";
 import { formatCommand } from "../utils/formatting";
 import { MemberLike, extractId } from "../utils/parsing";
@@ -92,7 +92,12 @@ export const BansModule: SocializeModule = {
 
             if (!lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs)) {
                 sendDebugMessage(channelId, `Kick-First applied. Kicking user ${userId}`);
-                actionQueue.enqueue(formatCommand(this.settings.kickCommand, channelId, { userId, reason }), channelId, true);
+                actionQueue.enqueue(
+                    formatCommand(this.settings.kickCommand, channelId, { userId, reason }),
+                    channelId,
+                    true,
+                    () => !!VoiceStateStore.getVoiceStatesForChannel(channelId)?.[userId]
+                );
                 this.recentlyKickedWaitlist.set(userId, now);
                 return;
             }

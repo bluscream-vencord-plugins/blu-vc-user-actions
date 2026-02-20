@@ -29,7 +29,7 @@ export class ActionQueue {
         } catch (e) { }
     }
 
-    public enqueue(command: string, channelId: string, priority: boolean = false) {
+    public enqueue(command: string, channelId: string, priority: boolean = false, executeCondition?: () => boolean) {
         // Auto-prioritize specific high value bot actions
         if (command.includes(" claim") || command.includes(" info")) {
             priority = true;
@@ -40,7 +40,8 @@ export class ActionQueue {
             command,
             channelId,
             priority,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            executeCondition
         };
 
         if (priority) {
@@ -55,13 +56,14 @@ export class ActionQueue {
         this.processQueue();
     }
 
-    public unshift(command: string, channelId: string) {
+    public unshift(command: string, channelId: string, executeCondition?: () => boolean) {
         const item: ActionQueueItem = {
             id: Math.random().toString(36).substring(7),
             command,
             channelId,
             priority: true,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            executeCondition
         };
 
         // Push directly to front of priority queue
@@ -98,13 +100,28 @@ export class ActionQueue {
         const item = this.priorityQueue.shift() || this.queue.shift();
 
         if (item) {
+            if (item.executeCondition && !item.executeCondition()) {
+                sendDebugMessage(item.channelId, `Pre-flight condition failed for \`${item.command}\`. Skipping.`);
+                this.isProcessing = false;
+                this.processQueue();
+                return;
+            }
+
             if (!this.sendCommandCallback) {
                 logger.error("actionQueue error: sendCommandCallback is null. Queue will process but messages won't send.");
                 sendDebugMessage(item.channelId, `actionQueue Error: sendCommandCallback is null for \`${item.command}\``);
             } else {
                 try {
                     sendDebugMessage(item.channelId, `Executing command: \`${item.command}\``);
-                    const result = await this.sendCommandCallback(item.command, item.channelId);
+
+                    const timeoutPromise = new Promise<any>((_, reject) =>
+                        setTimeout(() => reject(new Error("Timeout after 10s waiting for sendCommandCallback")), 10000)
+                    );
+
+                    const result = await Promise.race([
+                        this.sendCommandCallback(item.command, item.channelId),
+                        timeoutPromise
+                    ]);
 
                     // If it's a message object from Discord
                     if (result && result.id) {

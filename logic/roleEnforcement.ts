@@ -3,7 +3,7 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
-import { UserStore as Users, GuildMemberStore } from "@webpack/common";
+import { UserStore as Users, GuildMemberStore, VoiceStateStore } from "@webpack/common";
 import { SocializeEvent } from "../types/events";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
@@ -40,7 +40,12 @@ export const RoleEnforcementModule: SocializeModule = {
                 const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
 
                 // Action taken
-                actionQueue.enqueue(kickCmd, channelId, true);
+                actionQueue.enqueue(
+                    kickCmd,
+                    channelId,
+                    true,
+                    () => !!VoiceStateStore.getVoiceStatesForChannel(channelId)?.[userId]
+                );
                 payload.isHandled = true;
                 payload.reason = "Missing Required Roles";
             }

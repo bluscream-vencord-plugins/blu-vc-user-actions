@@ -62,16 +62,21 @@ export class BotResponse {
             return authorName.includes(s) || title.includes(s) || description.includes(s) || content.includes(s);
         };
 
+        if (title.includes("error") || authorName.includes("error")) {
+            this.type = BotResponseType.UNKNOWN;
+            return;
+        }
+
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
         else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
         else if (check("Channel Settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
-        else if (description.includes("__banned__")) this.type = BotResponseType.BANNED;
-        else if (description.includes("__unbanned__")) this.type = BotResponseType.UNBANNED;
-        else if (description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
-        else if (description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;
-        else if (description.includes("__channel size__")) this.type = BotResponseType.SIZE_SET;
-        else if (description.includes("__locked__")) this.type = BotResponseType.LOCKED;
-        else if (description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
+        else if (title.includes("banned successfully") || authorName.includes("banned successfully") || description.includes("__banned__")) this.type = BotResponseType.BANNED;
+        else if (title.includes("unbanned successfully") || authorName.includes("unbanned successfully") || description.includes("__unbanned__")) this.type = BotResponseType.UNBANNED;
+        else if (title.includes("permitted successfully") || authorName.includes("permitted successfully") || description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
+        else if (title.includes("unpermitted successfully") || authorName.includes("unpermitted successfully") || description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;
+        else if (description.includes("__channel size__") || check("size set")) this.type = BotResponseType.SIZE_SET;
+        else if (check("locked") || description.includes("__locked__")) this.type = BotResponseType.LOCKED;
+        else if (check("unlocked") || description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
 
         // logger.debug(`BotResponse: Parsed type ${this.type} from embed (Author: ${authorName}, Title: ${title})`);
     }
@@ -128,11 +133,14 @@ export class BotResponse {
     }
 
     private findTargetId(): string | undefined {
+        const rawDesc = this.getRawDescription();
+        const content = this.msg.content || "";
+
         // Many action responses (Ban/Permit) mention the target in the description
-        const descMatch = this.getRawDescription().match(/<@!?(\d+)>/);
+        const descMatch = rawDesc.match(/<@!?(\d+)>/);
         if (descMatch) return descMatch[1];
 
-        const contentMatch = this.msg.content?.match(/<@!?(\d+)>/);
+        const contentMatch = content.match(/<@!?(\d+)>/);
         if (contentMatch) return contentMatch[1];
 
         // Also check if any raw mentions array is populated
@@ -141,6 +149,13 @@ export class BotResponse {
             const mentionedUser = mentions[mentions.length - 1]; // Assume the last mention might be the target if initiator is first
             if (mentionedUser) return typeof mentionedUser === "string" ? mentionedUser : (mentionedUser as any).id;
         }
+
+        // Fallback: If it's a raw username with an @ like "@meow"
+        const usernameMatchDesc = rawDesc.match(/@([a-zA-Z0-9_\.]+)/);
+        if (usernameMatchDesc) return `@${usernameMatchDesc[1]}`;
+
+        const usernameMatchContent = content.match(/@([a-zA-Z0-9_\.]+)/);
+        if (usernameMatchContent) return `@${usernameMatchContent[1]}`;
 
         return undefined;
     }

@@ -35,7 +35,7 @@ export default definePlugin({
         // Raw MessageActions.sendMessage crashes with 'nonce' TypeError without them.
         const { sendMessage } = require("@utils/discord");
         actionQueue.setCommandSender(async (command, channelId) => {
-            return sendMessage(channelId, { content: command });
+            return sendMessage(channelId, { content: command }, false);
         });
 
         // Register core logic modules

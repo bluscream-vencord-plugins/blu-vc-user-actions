@@ -25,6 +25,7 @@ export interface ActionQueueItem {
     priority: boolean;
     timestamp: number;
     messageId?: string;
+    executeCondition?: () => boolean;
 }
 
 export interface PluginState {

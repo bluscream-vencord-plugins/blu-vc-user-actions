@@ -121,7 +121,12 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                 const ids = Object.keys(states).filter(id => id !== me?.id);
                 if (!ids.length) { showToast("No other users in VC."); return; }
                 for (const uid of ids) {
-                    actionQueue.enqueue(formatCommand(settings.kickCommand, channel.id, { userId: uid }), channel.id);
+                    actionQueue.enqueue(
+                        formatCommand(settings.kickCommand, channel.id, { userId: uid }),
+                        channel.id,
+                        false,
+                        () => !!VoiceStateStore.getVoiceStatesForChannel(channel.id)?.[uid]
+                    );
                 }
                 showToast(`Queued kicks for ${ids.length} users.`);
             }}
@@ -136,7 +141,12 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                 let n = 0;
                 for (const uid in states) {
                     if (config.bannedUsers.includes(uid)) {
-                        actionQueue.enqueue(formatCommand(settings.kickCommand, channel.id, { userId: uid }), channel.id);
+                        actionQueue.enqueue(
+                            formatCommand(settings.kickCommand, channel.id, { userId: uid }),
+                            channel.id,
+                            false,
+                            () => !!VoiceStateStore.getVoiceStatesForChannel(channel.id)?.[uid]
+                        );
                         n++;
                     }
                 }
@@ -207,7 +217,9 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 action={() => {
                     actionQueue.enqueue(
                         formatCommand(settings.kickCommand, myChannelId!, { userId: user.id }),
-                        myChannelId!
+                        myChannelId!,
+                        false,
+                        () => !!VoiceStateStore.getVoiceStatesForChannel(myChannelId!)?.[user.id]
                     );
                 }}
             />
