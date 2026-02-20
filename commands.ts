@@ -2,8 +2,10 @@
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
 import { VoteBanningModule } from "./logic/voteBanning";
-import { WhitelistingModule } from "./logic/whitelisting";
-import { NamingModule } from "./logic/naming";
+import { WhitelistModule } from "./logic/whitelist";
+import { ChannelNameRotationModule } from "./logic/channelNameRotation";
+import { BlacklistModule } from "./logic/blacklist";
+import { BansModule } from "./logic/bans";
 import { stateManager } from "./utils/stateManager";
 import { UserStore as Users } from "@webpack/common";
 
@@ -59,7 +61,7 @@ export const socializeCommand = {
                 if (!settings || !ctx.channel) return;
 
                 // Pass into the smart logic module instead of blindly queueing
-                VoteBanningModule.enforceBanPolicy(userId, ctx.channel.id, false);
+                BansModule.enforceBanPolicy(userId, ctx.channel.id, false);
 
                 return { content: `Triggered ban sequence for <@${userId}>` };
             }
@@ -79,10 +81,10 @@ export const socializeCommand = {
             execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
 
-                const whitelist = WhitelistingModule.getWhitelist();
+                const whitelist = WhitelistModule.getWhitelist();
                 if (!whitelist.includes(userId)) {
                     whitelist.push(userId);
-                    WhitelistingModule.setWhitelist(whitelist);
+                    WhitelistModule.setWhitelist(whitelist);
                 }
 
                 return { content: `Whitelisted <@${userId}> locally.` };
@@ -96,7 +98,7 @@ export const socializeCommand = {
             execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
                 if (!ctx.channel) return;
-                WhitelistingModule.permitUser(userId, ctx.channel.id);
+                WhitelistModule.permitUser(userId, ctx.channel.id);
                 return { content: `Permitted <@${userId}>` };
             }
         },
@@ -113,7 +115,7 @@ export const socializeCommand = {
                     execute: (args: CommandArgument[]) => {
                         const name = args[0].value as string;
                         const meId = Users.getCurrentUser()?.id || ""; // fallback
-                        if (NamingModule.addName(meId, name)) {
+                        if (ChannelNameRotationModule.addName(meId, name)) {
                             return { content: `Added "${name}" to rotation list.` };
                         }
                         return { content: `"${name}" is already in the list.` };
@@ -127,7 +129,7 @@ export const socializeCommand = {
                     execute: (args: CommandArgument[]) => {
                         const name = args[0].value as string;
                         const meId = Users.getCurrentUser()?.id || "";
-                        if (NamingModule.removeName(meId, name)) {
+                        if (ChannelNameRotationModule.removeName(meId, name)) {
                             return { content: `Removed "${name}" from rotation list.` };
                         }
                         return { content: `"${name}" not found in list.` };
@@ -150,7 +152,7 @@ export const socializeCommand = {
                     type: 1,
                     execute: (args: any, ctx: CommandContext) => {
                         if (!ctx.channel) return { content: "Join a channel first." };
-                        NamingModule.startRotation(ctx.channel.id);
+                        ChannelNameRotationModule.startRotation(ctx.channel.id);
                         return { content: "Started name rotation." };
                     }
                 },
@@ -159,7 +161,7 @@ export const socializeCommand = {
                     description: "Manually stop name rotation",
                     type: 1,
                     execute: () => {
-                        NamingModule.stopRotation();
+                        ChannelNameRotationModule.stopRotation();
                         return { content: "Stopped name rotation." };
                     }
                 }

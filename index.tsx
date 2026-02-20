@@ -9,9 +9,11 @@ import { actionQueue } from "./utils/actionQueue";
 
 // Modules
 import { OwnershipModule } from "./logic/ownership";
-import { WhitelistingModule } from "./logic/whitelisting";
-import { NamingModule } from "./logic/naming";
+import { WhitelistModule } from "./logic/whitelist";
+import { BlacklistModule } from "./logic/blacklist";
+import { ChannelNameRotationModule } from "./logic/channelNameRotation";
 import { RoleEnforcementModule } from "./logic/roleEnforcement";
+import { BansModule } from "./logic/bans";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { CommandCleanupModule } from "./logic/commandCleanup";
 import { contextMenuHandlers } from "./components/menus";
@@ -35,9 +37,11 @@ export default definePlugin({
 
         // Register core logic modules
         moduleRegistry.register(OwnershipModule);
-        moduleRegistry.register(WhitelistingModule);
-        moduleRegistry.register(NamingModule);
+        moduleRegistry.register(WhitelistModule);
+        moduleRegistry.register(BlacklistModule);
+        moduleRegistry.register(ChannelNameRotationModule);
         moduleRegistry.register(RoleEnforcementModule);
+        moduleRegistry.register(BansModule);
         moduleRegistry.register(VoteBanningModule);
         moduleRegistry.register(CommandCleanupModule);
 

@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { SocializeModule } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
@@ -7,17 +7,17 @@ import { MemberLike, extractId } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
 
-export const WhitelistingModule: SocializeModule = {
-    name: "WhitelistingModule",
+export const WhitelistModule: SocializeModule = {
+    name: "WhitelistModule",
     settings: undefined as PluginSettings | undefined,
 
     init(settings: PluginSettings) {
         this.settings = settings;
-        logger.info("WhitelistingModule initializing");
+        logger.info("WhitelistModule initializing");
     },
 
     stop() {
-        logger.info("WhitelistingModule stopping");
+        logger.info("WhitelistModule stopping");
     },
 
     getWhitelist(): string[] {

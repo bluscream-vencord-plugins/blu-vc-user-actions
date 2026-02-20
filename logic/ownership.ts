@@ -12,7 +12,7 @@ import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { GuildChannelStore, ChannelStore, GuildStore } from "@webpack/common";
-import { NamingModule } from "./naming";
+import { ChannelNameRotationModule } from "./channelNameRotation";
 
 export const OwnershipModule: SocializeModule = {
     name: "OwnershipModule",
@@ -184,10 +184,10 @@ export const OwnershipModule: SocializeModule = {
 
         // Manage naming rotation
         if (ownerId === meId) {
-            NamingModule.startRotation(channelId);
+            ChannelNameRotationModule.startRotation(channelId);
             this.requestChannelInfo(channelId);
         } else {
-            NamingModule.stopRotation(channelId);
+            ChannelNameRotationModule.stopRotation(channelId);
         }
     },
 
@@ -221,7 +221,7 @@ export const OwnershipModule: SocializeModule = {
             // Check if we are the owner, if so restart naming rotation
             const ownership = stateManager.getOwnership(channelId);
             if (ownership && (ownership.creatorId === userId || ownership.claimantId === userId)) {
-                NamingModule.startRotation(channelId);
+                ChannelNameRotationModule.startRotation(channelId);
             }
         }
 
@@ -236,7 +236,7 @@ export const OwnershipModule: SocializeModule = {
     handleUserLeftChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
-            NamingModule.stopRotation(channelId);
+            ChannelNameRotationModule.stopRotation(channelId);
         }
 
         const ownership = stateManager.getOwnership(channelId);
@@ -249,7 +249,7 @@ export const OwnershipModule: SocializeModule = {
 
                 // If the owner left and it was us, stop rotation
                 if (userId === currentUserId) {
-                    NamingModule.stopRotation(channelId);
+                    ChannelNameRotationModule.stopRotation(channelId);
                 }
             }
         }

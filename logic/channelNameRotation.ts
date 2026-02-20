@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { SocializeModule } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
@@ -6,19 +6,20 @@ import { stateManager } from "../utils/stateManager";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { UserStore as Users } from "@webpack/common";
-export const NamingModule: SocializeModule = {
-    name: "NamingModule",
+
+export const ChannelNameRotationModule: SocializeModule = {
+    name: "ChannelNameRotationModule",
     settings: null as unknown as PluginSettings,
     rotationIntervalId: null as unknown as number,
 
     init(settings: PluginSettings) {
         this.settings = settings;
-        logger.info("NamingModule initializing");
+        logger.info("ChannelNameRotationModule initializing");
     },
 
     stop() {
         this.stopRotation();
-        logger.info("NamingModule stopping");
+        logger.info("ChannelNameRotationModule stopping");
     },
 
     startRotation(channelId: string) {
@@ -53,13 +54,12 @@ export const NamingModule: SocializeModule = {
         if (this.rotationIntervalId) {
             clearInterval(this.rotationIntervalId);
             this.rotationIntervalId = null;
-            sendDebugMessage("", "Name rotation stopped."); // No channelId context easily available here unless stored
-
+            sendDebugMessage("", "Name rotation stopped.");
         }
     },
 
     rotateNextName(channelId: string, userId: string) {
-        if (!this.settings) return; // Added undefined check for settings
+        if (!this.settings) return;
         const config = stateManager.getMemberConfig(userId);
         if (config.nameRotationList.length === 0) return;
 

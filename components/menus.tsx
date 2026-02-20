@@ -4,8 +4,8 @@ import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChan
 import { User, Channel, Guild } from "@vencord/discord-types";
 import { moduleRegistry } from "../logic/moduleRegistry";
 import { actionQueue } from "../utils/actionQueue";
-import { VoteBanningModule } from "../logic/voteBanning";
-import { WhitelistingModule } from "../logic/whitelisting";
+import { BansModule } from "../logic/bans";
+import { WhitelistModule } from "../logic/whitelist";
 import { OwnershipModule } from "../logic/ownership";
 import { formatCommand } from "../utils/formatting";
 import { logger } from "../utils/logger";
@@ -37,7 +37,7 @@ function buildUserContextMenuItems(user: User, channel?: Channel) {
             id="socialize-ban-user"
             label="Ban from Channel"
             action={() => {
-                if (channel) VoteBanningModule.enforceBanPolicy(user.id, channel.id, false);
+                if (channel) BansModule.enforceBanPolicy(user.id, channel.id, false);
             }}
         />,
         <Menu.MenuItem
@@ -50,15 +50,15 @@ function buildUserContextMenuItems(user: User, channel?: Channel) {
         />,
         <Menu.MenuItem
             id="socialize-whitelist-user"
-            label={WhitelistingModule.isWhitelisted(user.id) ? "Unwhitelist User" : "Whitelist User"}
+            label={WhitelistModule.isWhitelisted(user.id) ? "Unwhitelist User" : "Whitelist User"}
             action={() => {
-                const isWhite = WhitelistingModule.isWhitelisted(user.id);
-                const list = WhitelistingModule.getWhitelist();
+                const isWhite = WhitelistModule.isWhitelisted(user.id);
+                const list = WhitelistModule.getWhitelist();
                 if (isWhite) {
-                    WhitelistingModule.setWhitelist(list.filter(id => id !== user.id));
+                    WhitelistModule.setWhitelist(list.filter(id => id !== user.id));
                 } else {
                     list.push(user.id);
-                    WhitelistingModule.setWhitelist(list);
+                    WhitelistModule.setWhitelist(list);
                 }
             }}
         />
