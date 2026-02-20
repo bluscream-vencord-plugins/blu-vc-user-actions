@@ -71,12 +71,15 @@ export class BotResponse {
         else if (description.includes("__channel size__")) this.type = BotResponseType.SIZE_SET;
         else if (description.includes("__locked__")) this.type = BotResponseType.LOCKED;
         else if (description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
+
+        // logger.debug(`BotResponse: Parsed type ${this.type} from embed (Author: ${authorName}, Title: ${title})`);
     }
 
     private findInitiatorId(): string | undefined {
         // 1. Mentions (Created)
         if (this.type === BotResponseType.CREATED) {
             const mentionedUser = this.msg.mentions?.[0];
+            // logger.debug(`BotResponse: findInitiatorId(CREATED) - Mentions: ${JSON.stringify(this.msg.mentions)}`);
             if (mentionedUser) return typeof mentionedUser === "string" ? mentionedUser : (mentionedUser as any).id;
 
             const contentMatch = this.msg.content?.match(/<@!?(\d+)>/);

@@ -1,7 +1,7 @@
+import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
-import { VoteBanningModule } from "./logic/voteBanning";
 import { WhitelistModule } from "./logic/whitelist";
 import { ChannelNameRotationModule } from "./logic/channelNameRotation";
 import { BlacklistModule } from "./logic/blacklist";
@@ -9,167 +9,170 @@ import { BansModule } from "./logic/bans";
 import { stateManager } from "./utils/stateManager";
 import { UserStore as Users } from "@webpack/common";
 
-import { CommandArgument, CommandContext } from "@vencord/discord-types";
-
-// Mocking Vencord's command registration.
-// Vencord uses a specific structure for ApplicationCommands for plugins.
-
-export const socializeCommand = {
-    name: "socialize",
-    description: "SocializeGuild Control Command",
-    options: [
-        {
-            name: "stats",
-            description: "View memory statistics",
-            type: 1, // Subcommand
-            execute: (args: CommandArgument[], ctx: CommandContext) => {
-                const settings = moduleRegistry["settings"];
-                if (!settings) return;
-
-                return {
-                    content: `**SocializeStats**\nAction Delay: ${settings.queueInterval}s\nBan Pool: ${settings.banLimit}\nVoteBan %: ${settings.voteBanPercentage}%`
-                };
-            }
-        },
-        {
-            name: "sync",
-            description: "Force manual sync of channel info and ownership",
-            type: 1, // Subcommand
-            execute: (args: CommandArgument[], ctx: CommandContext) => {
-                const settings = moduleRegistry["settings"];
-                if (!settings || !ctx.channel) return;
-
-                actionQueue.enqueue(settings.infoCommand, ctx.channel.id, true);
-                return { content: "Information sync requested." };
-            }
-        },
-        {
-            name: "ban",
-            description: "Add a user to the local ban list",
-            type: 1, // Subcommand
-            options: [
-                {
-                    name: "user",
-                    description: "The user to ban",
-                    type: 6, // User
-                    required: true
-                }
-            ],
-            execute: (args: CommandArgument[], ctx: CommandContext) => {
-                const userId = args[0].value;
-                const settings = moduleRegistry["settings"];
-                if (!settings || !ctx.channel) return;
-
-                // Pass into the smart logic module instead of blindly queueing
-                BansModule.enforceBanPolicy(userId, ctx.channel.id, false);
-
-                return { content: `Triggered ban sequence for <@${userId}>` };
-            }
-        },
-        {
-            name: "whitelist",
-            description: "Add user to whitelist",
-            type: 1, // Subcommand
-            options: [
-                {
-                    name: "user",
-                    description: "The user to whitelist",
-                    type: 6, // User
-                    required: true
-                }
-            ],
-            execute: (args: CommandArgument[], ctx: CommandContext) => {
-                const userId = args[0].value;
-
-                const whitelist = WhitelistModule.getWhitelist();
-                if (!whitelist.includes(userId)) {
-                    whitelist.push(userId);
-                    WhitelistModule.setWhitelist(whitelist);
-                }
-
-                return { content: `Whitelisted <@${userId}> locally.` };
-            }
-        },
-        {
-            name: "permit",
-            description: "Permit user into managed channel",
-            type: 1,
-            options: [{ name: "user", description: "The user to permit", type: 6, required: true }],
-            execute: (args: CommandArgument[], ctx: CommandContext) => {
-                const userId = args[0].value;
-                if (!ctx.channel) return;
-                WhitelistModule.permitUser(userId, ctx.channel.id);
-                return { content: `Permitted <@${userId}>` };
-            }
-        },
-        {
-            name: "naming",
-            description: "Manage channel name rotation",
-            type: 1,
-            options: [
-                {
-                    name: "add",
-                    description: "Add a name to your rotation list",
-                    type: 1,
-                    options: [{ name: "name", description: "The name to add", type: 3, required: true }],
-                    execute: (args: CommandArgument[]) => {
-                        const name = args[0].value as string;
-                        const meId = Users.getCurrentUser()?.id || ""; // fallback
-                        if (ChannelNameRotationModule.addName(meId, name)) {
-                            return { content: `Added "${name}" to rotation list.` };
-                        }
-                        return { content: `"${name}" is already in the list.` };
-                    }
-                },
-                {
-                    name: "remove",
-                    description: "Remove a name from your rotation list",
-                    type: 1,
-                    options: [{ name: "name", description: "The name to remove", type: 3, required: true }],
-                    execute: (args: CommandArgument[]) => {
-                        const name = args[0].value as string;
-                        const meId = Users.getCurrentUser()?.id || "";
-                        if (ChannelNameRotationModule.removeName(meId, name)) {
-                            return { content: `Removed "${name}" from rotation list.` };
-                        }
-                        return { content: `"${name}" not found in list.` };
-                    }
-                },
-                {
-                    name: "list",
-                    description: "List your rotation names",
-                    type: 1,
-                    execute: () => {
-                        const meId = Users.getCurrentUser()?.id || "";
-                        const config = stateManager.getMemberConfig(meId);
-                        if (config.nameRotationList.length === 0) return { content: "Your rotation list is empty." };
-                        return { content: `**Rotation List:**\n${config.nameRotationList.map((n, i) => `${i + 1}. ${n}`).join("\n")}` };
-                    }
-                },
-                {
-                    name: "start",
-                    description: "Manually start name rotation for current channel",
-                    type: 1,
-                    execute: (args: any, ctx: CommandContext) => {
-                        if (!ctx.channel) return { content: "Join a channel first." };
-                        ChannelNameRotationModule.startRotation(ctx.channel.id);
-                        return { content: "Started name rotation." };
-                    }
-                },
-                {
-                    name: "stop",
-                    description: "Manually stop name rotation",
-                    type: 1,
-                    execute: () => {
-                        ChannelNameRotationModule.stopRotation();
-                        return { content: "Stopped name rotation." };
-                    }
-                }
-            ]
+// All commands use flat names with spaces — Vencord's preferred approach for "subcommands"
+export const socializeCommands = [
+    {
+        name: "socialize stats",
+        description: "View SocializeGuild memory statistics",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            const settings = moduleRegistry["settings"];
+            if (!settings) return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
+            sendBotMessage(ctx.channel.id, {
+                content: `**SocializeGuild Stats**\nAction Delay: ${settings.queueInterval}s\nBan Pool: ${settings.banLimit}\nVoteBan %: ${settings.voteBanPercentage}%`
+            });
         }
-    ],
-    execute: (args: CommandArgument[], ctx: CommandContext) => {
-        // Fallback or help text
-        return { content: "Use subcommands like `/socialize stats` or `/socialize ban`." };
-    }
-};
+    },
+    {
+        name: "socialize sync",
+        description: "Force manual sync of channel info and ownership",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            const settings = moduleRegistry["settings"];
+            if (!settings || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
+            actionQueue.enqueue(settings.infoCommand, ctx.channel.id, true);
+            sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
+        }
+    },
+    {
+        name: "socialize ban",
+        description: "Add a user to the local ban list",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to ban",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            BansModule.enforceBanPolicy(userId, ctx.channel.id, false);
+            sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for <@${userId}>` });
+        }
+    },
+    {
+        name: "socialize whitelist",
+        description: "Add a user to the local whitelist",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to whitelist",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            const whitelist = WhitelistModule.getWhitelist();
+            if (!whitelist.includes(userId)) {
+                whitelist.push(userId);
+                WhitelistModule.setWhitelist(whitelist);
+            }
+            sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
+        }
+    },
+    {
+        name: "socialize permit",
+        description: "Permit a user into managed channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to permit",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            WhitelistModule.permitUser(userId, ctx.channel.id);
+            sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
+        }
+    },
+    {
+        name: "socialize naming add",
+        description: "Add a name to your channel name rotation list",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "name",
+                description: "The name to add",
+                type: ApplicationCommandOptionType.STRING,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const name = args.find(a => a.name === "name")?.value as string;
+            if (!name) return sendBotMessage(ctx.channel.id, { content: "Missing name." });
+            const meId = Users.getCurrentUser()?.id || "";
+            if (ChannelNameRotationModule.addName(meId, name)) {
+                sendBotMessage(ctx.channel.id, { content: `Added **"${name}"** to rotation list.` });
+            } else {
+                sendBotMessage(ctx.channel.id, { content: `**"${name}"** is already in the list.` });
+            }
+        }
+    },
+    {
+        name: "socialize naming remove",
+        description: "Remove a name from your channel name rotation list",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "name",
+                description: "The name to remove",
+                type: ApplicationCommandOptionType.STRING,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const name = args.find(a => a.name === "name")?.value as string;
+            if (!name) return sendBotMessage(ctx.channel.id, { content: "Missing name." });
+            const meId = Users.getCurrentUser()?.id || "";
+            if (ChannelNameRotationModule.removeName(meId, name)) {
+                sendBotMessage(ctx.channel.id, { content: `Removed **"${name}"** from rotation list.` });
+            } else {
+                sendBotMessage(ctx.channel.id, { content: `**"${name}"** not found in list.` });
+            }
+        }
+    },
+    {
+        name: "socialize naming list",
+        description: "List your channel name rotation names",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            const meId = Users.getCurrentUser()?.id || "";
+            const config = stateManager.getMemberConfig(meId);
+            if (!config.nameRotationList.length) {
+                return sendBotMessage(ctx.channel.id, { content: "Your rotation list is empty." });
+            }
+            sendBotMessage(ctx.channel.id, {
+                content: `**Rotation List:**\n${config.nameRotationList.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
+            });
+        }
+    },
+    {
+        name: "socialize naming start",
+        description: "Manually start name rotation for current channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            ChannelNameRotationModule.startRotation(ctx.channel.id);
+            sendBotMessage(ctx.channel.id, { content: "Started name rotation." });
+        }
+    },
+    {
+        name: "socialize naming stop",
+        description: "Manually stop name rotation",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            ChannelNameRotationModule.stopRotation();
+            sendBotMessage(ctx.channel.id, { content: "Stopped name rotation." });
+        }
+    },
+];

@@ -19,7 +19,11 @@ export const OwnershipModule: SocializeModule = {
     // Menu Item Hooks
     getToolboxMenuItems(channel?: Channel) {
         if (!channel) return null;
-        return this.getChannelMenuItems(channel);
+        // logger.debug(`OwnershipModule: getToolboxMenuItems called for ${channel.name}`);
+        if (typeof this.getChannelMenuItems === "function") {
+            return this.getChannelMenuItems(channel);
+        }
+        return null;
     },
 
     getChannelMenuItems(channel: Channel) {
@@ -162,10 +166,18 @@ export const OwnershipModule: SocializeModule = {
 
     onMessageCreate(message: Message) {
         const settings = moduleRegistry["settings"];
-        if (!settings || message.author.id !== settings.botId) return;
+        if (!settings) return;
+
+        if (message.author.id !== settings.botId) {
+            // logger.debug(`Message from non-bot author: ${message.author.id} (Expected: ${settings.botId})`);
+            return;
+        }
 
         const response = new BotResponse(message, settings.botId);
-        if (response.type === BotResponseType.UNKNOWN) return;
+        if (response.type === BotResponseType.UNKNOWN) {
+            logger.debug(`Unknown bot response type. Author: ${message.author.username}, Content: ${message.content?.substring(0, 50)}`);
+            return;
+        }
 
         sendDebugMessage(message.channel_id, `Received Bot Response: **${response.type}** from <@${response.initiatorId || "Unknown"}>`);
 
@@ -191,6 +203,7 @@ export const OwnershipModule: SocializeModule = {
             };
 
             stateManager.setOwnership(channelId, newOwnership);
+            // logger.info(`Ownership updated for channel ${channelId}. New Owner: ${userId} (${isCreator ? "Creator" : "Claimant"})`);
             this.handleOwnershipUpdate(channelId, userId, isCreator ? "creator" : "claimant", oldOwnership, stateManager.getOwnership(channelId));
         }
 

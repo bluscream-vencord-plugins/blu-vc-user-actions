@@ -97,17 +97,27 @@ export class ModuleRegistry {
 
     // Discord Event Dispatchers
     public dispatchVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
+        // logger.debug(`Dispatching voice state update for user ${newState?.userId || oldState?.userId}`);
         for (const mod of this.modules) {
             if (mod.onVoiceStateUpdate) {
-                mod.onVoiceStateUpdate(oldState, newState);
+                try {
+                    mod.onVoiceStateUpdate(oldState, newState);
+                } catch (e) {
+                    console.error(`Error in module ${mod.name} onVoiceStateUpdate:`, e);
+                }
             }
         }
     }
 
     public dispatchMessageCreate(message: Message) {
+        // logger.debug(`Dispatching message create from ${message.author.username} in ${message.channel_id}`);
         for (const mod of this.modules) {
             if (mod.onMessageCreate) {
-                mod.onMessageCreate(message);
+                try {
+                    mod.onMessageCreate(message);
+                } catch (e) {
+                    console.error(`Error in module ${mod.name} onMessageCreate:`, e);
+                }
             }
         }
     }

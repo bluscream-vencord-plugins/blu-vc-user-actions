@@ -5,7 +5,7 @@ import { PluginSettings } from "./types/settings";
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { stateManager } from "./utils/stateManager";
 import { logger } from "./utils/logger";
-import { socializeCommand } from "./commands";
+import { socializeCommands } from "./commands";
 import { actionQueue } from "./utils/actionQueue";
 
 // Modules
@@ -23,16 +23,19 @@ export default definePlugin({
     ...pluginInfo,
     settings: defaultSettings,
 
-    onStart() {
+    start() {
+        const { FluxDispatcher } = require("@webpack/common");
         logger.info("Starting SocializeGuild Plugin...");
 
         stateManager.init(this.settings.store || {});
         actionQueue.setDelay((this.settings.store.queueInterval || 2) * 1000);
 
-        // Setup command sender utilizing Vencord Message actions
-        const { MessageActions } = require("@webpack/common");
+        // Use Vencord's sendMessage wrapper from @utils/discord which properly fills
+        // in all required Discord message fields (invalidEmojis, tts, validNonShortcutEmojis)
+        // Raw MessageActions.sendMessage crashes with 'nonce' TypeError without them.
+        const { sendMessage } = require("@utils/discord");
         actionQueue.setCommandSender(async (command, channelId) => {
-            return MessageActions.sendMessage(channelId, { content: command });
+            return sendMessage(channelId, { content: command });
         });
 
         // Register core logic modules
@@ -48,11 +51,39 @@ export default definePlugin({
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as PluginSettings);
 
-        logger.info("SocializeGuild started successfully.");
+        logger.info(`Initialized with Bot ID: ${this.settings.store.botId}`);
+
+        // Hook into Discord events via Flux
+        this.voiceListener = (event: any) => {
+            try {
+                moduleRegistry.dispatchVoiceStateUpdate(event.oldState, event.newState);
+            } catch (e) {
+                logger.error("Error in VOICE_STATE_UPDATE listener:", e);
+            }
+        };
+        this.messageListener = (event: any) => {
+            try {
+                if (event.message) {
+                    moduleRegistry.dispatchMessageCreate(event.message);
+                }
+            } catch (e) {
+                logger.error("Error in MESSAGE_CREATE listener:", e);
+            }
+        };
+
+        FluxDispatcher.subscribe("VOICE_STATE_UPDATE", this.voiceListener);
+        FluxDispatcher.subscribe("MESSAGE_CREATE", this.messageListener);
+
+        logger.info(`SocializeGuild started successfully. ${moduleRegistry["modules"].length} modules registered.`);
     },
 
-    onStop() {
+    stop() {
+        const { FluxDispatcher } = require("@webpack/common");
         logger.info("Stopping SocializeGuild Plugin...");
+
+        if (this.voiceListener) FluxDispatcher.unsubscribe("VOICE_STATE_UPDATE", this.voiceListener);
+        if (this.messageListener) FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.messageListener);
+
         moduleRegistry.stop();
         actionQueue.clear();
     },
@@ -62,9 +93,19 @@ export default definePlugin({
     toolboxActions() {
         const { SelectedChannelStore, ChannelStore, Menu } = require("@webpack/common");
         const channelId = SelectedChannelStore.getChannelId();
-        if (!channelId) return null;
+        if (!channelId) {
+            logger.debug("toolboxActions: No channelId selected.");
+            return null;
+        }
         const channel = ChannelStore.getChannel(channelId);
+        if (!channel) {
+            logger.debug(`toolboxActions: Channel ${channelId} not found in store.`);
+            return null;
+        }
+
         const items = moduleRegistry.collectToolboxItems(channel);
+        logger.debug(`toolboxActions: Collected ${items.length} items for channel ${channel.name} (${channelId})`);
+
         if (!items.length) return null;
 
         return (
@@ -74,9 +115,7 @@ export default definePlugin({
         );
     },
 
-    commands: [
-        socializeCommand
-    ],
+    commands: socializeCommands,
 
     patches: [
         // Example: Inject into context menus
