@@ -14,10 +14,13 @@ import { NamingModule } from "./logic/naming";
 import { RoleEnforcementModule } from "./logic/roleEnforcement";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { CommandCleanupModule } from "./logic/commandCleanup";
+import { setupContextMenus } from "./components/menus";
 
 export default definePlugin({
     ...pluginInfo,
     settings: defaultSettings,
+
+    _stopContextMenus: undefined as (() => void) | undefined,
 
     onStart() {
         logger.info("Starting SocializeGuild Plugin...");
@@ -46,6 +49,9 @@ export default definePlugin({
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as PluginSettings);
 
+        // Setup UI context menus
+        this._stopContextMenus = setupContextMenus();
+
         logger.info("SocializeGuild started successfully.");
     },
 
@@ -53,6 +59,11 @@ export default definePlugin({
         logger.info("Stopping SocializeGuild Plugin...");
         moduleRegistry.stop();
         actionQueue.clear();
+
+        if (this._stopContextMenus) {
+            this._stopContextMenus();
+            this._stopContextMenus = undefined;
+        }
     },
 
     commands: [

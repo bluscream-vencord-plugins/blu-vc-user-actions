@@ -59,3 +59,85 @@ export function parseVoiceUserFromInput(input: string, channelId: string): strin
 
     return undefined; // No matches found
 }
+import { MemberChannelInfo } from "../types/state";
+import { BotResponse } from "./BotResponse";
+
+const Patterns = {
+    CHANNEL_ID: [
+        /<#(\d+)>/,
+        /\*\*Channel ID:\*\* `(\d+)`/,
+    ],
+    NAME: /\*\*Name:\*\* (.*)/,
+    LIMIT: /\*\*Limit:\*\* (\d+)/,
+    STATUS: /\*\*Status:\*\* (.*)/,
+    PERMITTED_HEADER: /\*\*Permitted\*\*/,
+    BANNED_HEADER: /\*\*Banned\*\*/,
+    USER_MENTION: /<@!?(\d+)>/
+};
+
+export function parseBotInfoMessage(response: BotResponse): { info: MemberChannelInfo, channelId: string } | null {
+    if (!response.embed) return null;
+    const rawDescription = response.getRawDescription();
+
+    const info: MemberChannelInfo = {
+        userId: response.initiatorId || "",
+        customName: null,
+        userLimit: null,
+        permittedUsers: [],
+        bannedUsers: [],
+        whitelistedUsers: [],
+        nameRotationList: [],
+        nameRotationIndex: 0,
+        isLocked: false
+    };
+
+    let targetChannelId = response.channelId;
+
+    try {
+        // Parse Channel ID
+        for (const pattern of Patterns.CHANNEL_ID) {
+            const match = rawDescription.match(pattern) || (response.embed.title || "").match(pattern);
+            if (match) {
+                targetChannelId = match[1];
+                break;
+            }
+        }
+
+        // Parse fields
+        const nameMatch = rawDescription.match(Patterns.NAME);
+        if (nameMatch) info.customName = nameMatch[1].trim();
+
+        const limitMatch = rawDescription.match(Patterns.LIMIT);
+        if (limitMatch) info.userLimit = parseInt(limitMatch[1]);
+
+        const statusMatch = rawDescription.match(Patterns.STATUS);
+        if (statusMatch) info.isLocked = statusMatch[1].toLowerCase().includes("locked");
+
+        // Parse lists (Permitted / Banned)
+        const lines = rawDescription.split("\n");
+        let currentSection: "permitted" | "banned" | null = null;
+
+        for (let line of lines) {
+            line = line.trim();
+            if (Patterns.PERMITTED_HEADER.test(line)) {
+                currentSection = "permitted";
+                continue;
+            } else if (Patterns.BANNED_HEADER.test(line)) {
+                currentSection = "banned";
+                continue;
+            }
+
+            if (currentSection && line.startsWith(">")) {
+                const idMatch = line.match(Patterns.USER_MENTION);
+                if (idMatch) {
+                    if (currentSection === "permitted") info.permittedUsers.push(idMatch[1]);
+                    else info.bannedUsers.push(idMatch[1]);
+                }
+            }
+        }
+
+        return { info, channelId: targetChannelId };
+    } catch (e) {
+        return null;
+    }
+}

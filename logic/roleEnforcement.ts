@@ -3,7 +3,9 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
-import { UserStore as Users, GuildMemberStore } from "@webpack/common"; import { SocializeEvent } from "../types/events";
+import { UserStore as Users, GuildMemberStore } from "@webpack/common";
+import { SocializeEvent } from "../types/events";
+import { getNewLineList } from "../utils/settingsHelpers";
 
 export const RoleEnforcementModule: SocializeModule = {
     name: "RoleEnforcementModule",
@@ -19,15 +21,16 @@ export const RoleEnforcementModule: SocializeModule = {
             const currentUserId = Users.getCurrentUser()?.id;
             if (!currentUserId || (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId)) return;
 
-            // For now, let's assume we want to enforce a specific hardcoded role ID for testing
-            // Real implementation would pull this from user settings stored in MemberChannelInfo
-            const requiredRoleId = "SOME_ROLE_ID"; // TODO Make this configurable
+            // Check required roles from settings if enforced
+            if (!settings.enforceRequiredRoles || !settings.requiredRoleIds || settings.requiredRoleIds.trim() === "") return;
+
+            const requiredRoleList = getNewLineList(settings.requiredRoleIds);
             const guildId = settings.guildId;
 
             const member = GuildMemberStore.getMember(guildId, userId);
 
-            if (member && !member.roles.includes(requiredRoleId)) {
-                logger.info(`User ${userId} missing role ${requiredRoleId}, kicking...`);
+            if (member && requiredRoleList.length > 0 && !member.roles.some((r: string) => requiredRoleList.includes(r))) {
+                logger.info(`User ${userId} missing required roles, kicking...`);
                 const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
 
                 // Check if they are whitelisted before kicking

@@ -1,50 +1,92 @@
-import { UserStore as Users } from "@webpack/common";
-
-/**
- * Format string replacing {user_id}, {channel_id}, {user} etc.
- */
-export function formatCommand(template: string, channelId: string, options?: { userId?: string, size?: string, reason?: string, name?: string }): string {
-    let result = template;
-
-    // Replace current user
-    const currentUserId = Users.getCurrentUser()?.id || "";
-    result = result.replace(/{me}/g, `<@${currentUserId}>`);
-
-    // Replace channel
-    result = result.replace(/{channel}/g, `<#${channelId}>`);
-    result = result.replace(/{channel_id}/g, channelId);
-
-    if (options) {
-        if (options.userId) {
-            result = result.replace(/{user}/g, `<@${options.userId}>`);
-            result = result.replace(/{user_id}/g, options.userId);
-
-            const targetUser = Users.getUser(options.userId);
-            if (targetUser) {
-                result = result.replace(/{user_name}/g, targetUser.username);
-            }
-        }
-
-        if (options.size) {
-            result = result.replace(/{size}/g, options.size);
-        }
-
-        if (options.reason) {
-            result = result.replace(/{reason}/g, options.reason);
-        }
-
-        if (options.name) {
-            result = result.replace(/{name}/g, options.name);
-        }
-    }
-
-    return result;
-}
+import { UserStore, ChannelStore, GuildStore } from "@webpack/common";
 
 /**
  * Common formatter for basic messages like Skip Whitelist
  */
-export function formatMessageCommon(msg: string): string {
-    // Add additional base formatting here if strictly needed
-    return msg;
+export function formatMessageCommon(text: string): string {
+    const me = UserStore.getCurrentUser();
+    const now = new Date();
+
+    return text
+        .replace(/{now(?::([^}]+))?}/g, (match, format) => {
+            if (!format) return now.toLocaleString();
+            const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
+            return format
+                .replace(/YYYY/g, String(now.getFullYear()))
+                .replace(/YY/g, String(now.getFullYear()).slice(-2))
+                .replace(/MMM/g, now.toLocaleString("default", { month: "short" }))
+                .replace(/MM/g, pad(now.getMonth() + 1))
+                .replace(/DD/g, pad(now.getDate()))
+                .replace(/HH/g, pad(now.getHours()))
+                .replace(/mm/g, pad(now.getMinutes()))
+                .replace(/ss/g, pad(now.getSeconds()))
+                .replace(/ms/g, pad(now.getMilliseconds(), 3));
+        })
+        .replace(/{my_id}|{me_id}|{me}/g, (match) => {
+            if (match === "{me}") return `<@${me?.id || ""}>`;
+            return me?.id || "";
+        })
+        .replace(/{my_name}|{me_name}/g, me?.globalName || me?.username || "");
+}
+
+/**
+ * Format string replacing {user_id}, {channel_id}, {user} etc.
+ */
+export function formatCommand(
+    template: string,
+    channelId: string,
+    options?: {
+        userId?: string;
+        newChannelName?: string;
+        reason?: string;
+        size?: string;
+        name?: string;
+    }
+): string {
+    const channel = ChannelStore.getChannel(channelId);
+    const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
+
+    let formatted = template
+        .replace(/{channel_id}/g, channelId)
+        .replace(/{channel}/g, `<#${channelId}>`)
+        .replace(/{channel_name}/g, channel?.name || "Unknown Channel")
+        .replace(/{guild_id}/g, channel?.guild_id || "")
+        .replace(/{guild_name}/g, guild?.name || "Unknown Guild");
+
+    // Handle optional user placeholders
+    if (options?.userId) {
+        const user = UserStore.getUser(options.userId);
+        const userName = user?.globalName || user?.username || options.userId;
+        formatted = formatted
+            .replace(/{user_id}/g, options.userId)
+            .replace(/{user}/g, `<@${options.userId}>`)
+            .replace(/{user_name}/g, userName);
+    }
+
+    // Handle optional channel name
+    if (options?.newChannelName || options?.name) {
+        const name = options?.newChannelName || options?.name || "";
+        formatted = formatted.replace(/{channel_name_new}|{name}/g, name);
+    }
+
+    // Handle optional reason
+    if (options?.reason) {
+        formatted = formatted.replace(/{reason}/g, options.reason);
+    }
+
+    // Handle optional size
+    if (options?.size) {
+        formatted = formatted.replace(/{size}/g, options.size);
+    }
+
+    return formatMessageCommon(formatted);
+}
+
+/**
+ * Converts a timestamp to Discord's relative/absolute time format.
+ */
+export function toDiscordTime(datetime: number | Date, relative = false): string {
+    const timestamp = typeof datetime === 'number' ? datetime : datetime.getTime();
+    const seconds = Math.floor(timestamp / 1000);
+    return `<t:${seconds}${relative ? ":R" : ""}>`;
 }

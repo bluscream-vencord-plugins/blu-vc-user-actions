@@ -8,6 +8,7 @@ import { UserStore as Users, VoiceStateStore, RelationshipStore, GuildMemberStor
 import { Message, VoiceState } from "@vencord/discord-types";
 import { formatCommand } from "../utils/formatting";
 import { parseVoiceUserFromInput, MemberLike, extractId } from "../utils/parsing";
+import { getNewLineList } from "../utils/settingsHelpers";
 import { WhitelistingModule } from "./whitelisting";
 export const VoteBanningModule: SocializeModule = {
     name: "VoteBanningModule",
@@ -80,7 +81,7 @@ export const VoteBanningModule: SocializeModule = {
         if (WhitelistingModule.isWhitelisted(userId)) return;
 
         // 1. Is user locally blacklisted?
-        const isLocallyBlacklisted = this.settings.banInLocalBlacklist && (this.settings.localUserBlacklist?.split(/\r?\n/) || []).some(s => s.trim() === userId);
+        const isLocallyBlacklisted = this.settings.banInLocalBlacklist && getNewLineList(this.settings.localUserBlacklist).some(s => s === userId);
 
         // 2. Is user blocked by the channel owner (us)?
         // RelationshipStore types: 1 = Friend, 2 = Blocked
@@ -89,7 +90,7 @@ export const VoteBanningModule: SocializeModule = {
         // 3. Are they missing required roles?
         let isMissingRole = false;
         if (this.settings.enforceRequiredRoles && this.settings.banNotInRoles && this.settings.requiredRoleIds && this.settings.requiredRoleIds.trim().length > 0) {
-            const requiredRoleList = this.settings.requiredRoleIds.split(/\r?\n/).map(s => s.trim());
+            const requiredRoleList = getNewLineList(this.settings.requiredRoleIds);
             const member = GuildMemberStore.getMember(guildId, userId);
             if (member && member.roles) {
                 // Return true if they do NOT have ANY of the required roles

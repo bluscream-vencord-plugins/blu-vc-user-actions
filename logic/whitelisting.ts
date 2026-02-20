@@ -4,6 +4,7 @@ import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../utils/actionQueue";
 import { MemberLike, extractId } from "../utils/parsing";
+import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
 
 export const WhitelistingModule: SocializeModule = {
     name: "WhitelistingModule",
@@ -19,16 +20,12 @@ export const WhitelistingModule: SocializeModule = {
     },
 
     getWhitelist(): string[] {
-        if (!this.settings?.localUserWhitelist) return [];
-        return this.settings.localUserWhitelist
-            .split(/\r?\n/)
-            .map(s => s.trim())
-            .filter(id => /^\d{17,19}$/.test(id));
+        return getUserIdList(this.settings?.localUserWhitelist);
     },
 
     setWhitelist(newList: string[]) {
         if (!this.settings) return;
-        this.settings.localUserWhitelist = newList.join("\n");
+        this.settings.localUserWhitelist = setNewLineList(newList);
     },
 
     isWhitelisted(userId: string): boolean {
