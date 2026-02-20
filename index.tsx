@@ -91,28 +91,23 @@ export default definePlugin({
     contextMenus: contextMenuHandlers,
 
     toolboxActions() {
-        const { SelectedChannelStore, ChannelStore, Menu } = require("@webpack/common");
-        const channelId = SelectedChannelStore.getChannelId();
-        if (!channelId) {
-            logger.debug("toolboxActions: No channelId selected.");
-            return null;
-        }
-        const channel = ChannelStore.getChannel(channelId);
-        if (!channel) {
-            logger.debug(`toolboxActions: Channel ${channelId} not found in store.`);
-            return null;
-        }
+        const { SelectedChannelStore, ChannelStore } = require("@webpack/common");
 
+        // Use voice channel first, fall back to selected text channel
+        const voiceChannelId = SelectedChannelStore.getVoiceChannelId();
+        const textChannelId = SelectedChannelStore.getChannelId();
+        const channelId = voiceChannelId || textChannelId;
+
+        const channel = channelId ? ChannelStore.getChannel(channelId) : undefined;
+
+        // collectToolboxItems works fine with undefined channel — always returns status items
         const items = moduleRegistry.collectToolboxItems(channel);
-        logger.debug(`toolboxActions: Collected ${items.length} items for channel ${channel.name} (${channelId})`);
+        logger.debug(`toolboxActions: ${items.length} items (voiceChannel=${voiceChannelId ?? "none"}, textChannel=${textChannelId ?? "none"})`);
 
         if (!items.length) return null;
 
-        return (
-            <Menu.MenuGroup label="SocializeGuild">
-                {items}
-            </Menu.MenuGroup>
-        );
+        // Return flat array — equicordToolbox wraps in its own MenuGroup already
+        return items;
     },
 
     commands: socializeCommands,
