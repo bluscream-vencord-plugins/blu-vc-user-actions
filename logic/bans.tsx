@@ -14,6 +14,7 @@ import { isUserInVoiceChannel } from "../utils/channels";
 import { BlacklistModule } from "./blacklist";
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
+import { sendBotMessage } from "@api/Commands";
 
 export const BansModule: SocializeModule = {
     name: "BansModule",
@@ -61,7 +62,9 @@ export const BansModule: SocializeModule = {
         logger.debug(`Evaluating join for ${userId} in ${channelId}`);
 
         const currentUserId = Users.getCurrentUser()?.id;
-        const config = currentUserId ? stateManager.getMemberConfig(currentUserId) : null;
+        const config = (currentUserId && stateManager.hasMemberConfig(currentUserId))
+            ? stateManager.getMemberConfig(currentUserId)
+            : null;
         const isBannedInState = config?.bannedUsers.includes(userId) ?? false;
 
         const isLocallyBlacklisted = this.settings.banInLocalBlacklist && BlacklistModule.isBlacklisted(userId);
@@ -145,7 +148,7 @@ export const BansModule: SocializeModule = {
                     const rotationStr = this.settings.banRotationMessage
                         .replace(/{user_id}/g, oldestBannedUser)
                         .replace(/{user_id_new}/g, userId);
-                    actionQueue.enqueue(rotationStr, channelId);
+                    sendBotMessage(channelId, { content: rotationStr });
                 }
             }
         }

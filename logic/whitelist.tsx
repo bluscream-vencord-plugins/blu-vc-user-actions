@@ -134,7 +134,7 @@ export const WhitelistModule: SocializeModule = {
             sendDebugMessage(`Unpermitting user <@${userId}>`, channelId);
             actionQueue.enqueue(cmd, channelId);
             // Remove from tracked list
-            if (meId) {
+            if (meId && stateManager.hasMemberConfig(meId)) {
                 const config = stateManager.getMemberConfig(meId);
                 const filtered = config.permittedUsers.filter(id => id !== userId);
                 if (filtered.length !== config.permittedUsers.length) {

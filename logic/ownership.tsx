@@ -172,6 +172,10 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                 color="danger"
                 action={() => {
                     const states = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+                    if (!stateManager.hasMemberConfig(meId)) {
+                        showToast("No banned users in VC (no personal ban list found).");
+                        return;
+                    }
                     const config = stateManager.getMemberConfig(meId);
                     let n = 0;
                     for (const uid in states) {
@@ -217,8 +221,9 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     const isWhitelisted = WhitelistModule.isWhitelisted(user.id);
 
     // Ban check: check the current owner's ban list
-    const ownerConfig = myChannelId
-        ? stateManager.getMemberConfig(ownership?.claimantId || ownership?.creatorId || "")
+    const ownerId = (ownership?.claimantId || ownership?.creatorId || "");
+    const ownerConfig = (myChannelId && ownerId && stateManager.hasMemberConfig(ownerId))
+        ? stateManager.getMemberConfig(ownerId)
         : null;
     const { BlacklistModule } = require("./blacklist");
     const isBlacklisted = BlacklistModule.isBlacklisted(user.id);
@@ -296,8 +301,9 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
 
     // Permit/Unpermit (only if I'm owner)
     if (amOwner && myChannelId) {
-        const ownerCfg = stateManager.getMemberConfig(meId);
-        const isPermitted = ownerCfg.permittedUsers.includes(user.id) || isWhitelisted;
+        const hasOwnerCfg = stateManager.hasMemberConfig(meId);
+        const ownerCfg = hasOwnerCfg ? stateManager.getMemberConfig(meId) : null;
+        const isPermitted = ownerCfg?.permittedUsers.includes(user.id) || isWhitelisted;
         items.push(
             <Menu.MenuItem
                 id="socialize-permit-user"
@@ -668,9 +674,6 @@ export const OwnershipModule: SocializeModule = {
             return;
         }
 
-        const targetStr = response.targetId ? ` target <@${response.targetId}>` : "";
-        sendDebugMessage(`Bot Response: **${response.type}**${targetStr} from <@${response.initiatorId || "Unknown"}>`, message.channel_id);
-
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
             channelId: message.channel_id,
@@ -716,6 +719,8 @@ export const OwnershipModule: SocializeModule = {
             userId = ownership?.claimantId || ownership?.creatorId || undefined;
         }
 
+        const configExisted = userId ? stateManager.hasMemberConfig(userId) : false;
+
         if (userId) {
             const description = response.getRawDescription().toLowerCase();
             const targetMatch = description.match(/<@!?(\d+)>/);
@@ -757,6 +762,19 @@ export const OwnershipModule: SocializeModule = {
                     break;
             }
         }
+
+        let banSuffix = "";
+        if (userId && (response.type === BotResponseType.BANNED || response.type === BotResponseType.UNBANNED)) {
+            const updatedCfg = stateManager.getMemberConfig(userId);
+            let count = updatedCfg.bannedUsers.length;
+            if (!configExisted) {
+                count = (response.type === BotResponseType.BANNED) ? 1 : 4;
+            }
+            banSuffix = ` (Bans: ${count})`;
+        }
+
+        const targetStr = response.targetId ? ` target <@${response.targetId}>` : "";
+        sendDebugMessage(`Bot Response: **${response.type}**${targetStr} from <@${userId || "Unknown"}>${banSuffix}`, message.channel_id);
     },
 
     // ── Internal Helpers ─────────────────────────────────────
@@ -819,6 +837,10 @@ export const OwnershipModule: SocializeModule = {
         }
 
         if (ownership) {
+            // Only handle joins for others if we are actually in the channel to manage it
+            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) {
+                return;
+            }
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
             sendDebugMessage(`<@${userId}> joined owned channel`, channelId);
             moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
@@ -833,6 +855,10 @@ export const OwnershipModule: SocializeModule = {
 
         const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
+            // Only handle leaves for others if we are actually in the channel
+            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) {
+                return;
+            }
             moduleRegistry.dispatch(SocializeEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
                 sendDebugMessage(`Owner <@${userId}> left channel`, channelId);

@@ -114,4 +114,37 @@ export const socializeCommands = [
             sendBotMessage(ctx.channel.id, { content: "Stopped name rotation." });
         }
     },
+    {
+        name: "socialize config",
+        description: "View cached MemberChannelInfo for a user",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to lookup",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+
+            if (!stateManager.hasMemberConfig(userId)) {
+                return sendBotMessage(ctx.channel.id, { content: `No cached configuration found for <@${userId}>.` });
+            }
+
+            const config = stateManager.getMemberConfig(userId);
+            const content = [
+                `**Configuration for <@${userId}>**`,
+                `Custom Name: \`${config.customName || "None"}\``,
+                `User Limit: \`${config.userLimit || "Default"}\``,
+                `Is Locked: \`${config.isLocked}\``,
+                `Banned Users: ${config.bannedUsers.length > 0 ? config.bannedUsers.map(id => `<@${id}>`).join(", ") : "_None_"}`,
+                `Permitted Users: ${config.permittedUsers.length > 0 ? config.permittedUsers.map(id => `<@${id}>`).join(", ") : "_None_"}`
+            ].join("\n");
+
+            sendBotMessage(ctx.channel.id, { content });
+        }
+    },
 ];

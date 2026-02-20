@@ -92,6 +92,10 @@ export class StateManager {
         return this.store.memberConfigs[userId];
     }
 
+    public hasMemberConfig(userId: string): boolean {
+        return !!this.store?.memberConfigs[userId];
+    }
+
     public updateMemberConfig(userId: string, update: Partial<MemberChannelInfo>) {
         const config = this.getMemberConfig(userId);
         Object.assign(config, update);
@@ -102,14 +106,15 @@ export class StateManager {
         return this.store?.activeChannelOwnerships || {};
     }
 
-    public getChannelOwnershipForUser(userId: string): ChannelOwnership | null {
+    public getChannelOwnershipsForUser(userId: string): ChannelOwnership[] {
+        const ownerships: ChannelOwnership[] = [];
         for (const channelId in this.store?.activeChannelOwnerships) {
             const ownership = this.store.activeChannelOwnerships[channelId];
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
-                return ownership;
+                ownerships.push(ownership);
             }
         }
-        return null;
+        return ownerships;
     }
 }
 
