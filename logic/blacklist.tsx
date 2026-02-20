@@ -10,30 +10,6 @@ export const BlacklistModule: SocializeModule = {
     name: "BlacklistModule",
     settings: undefined as PluginSettings | undefined,
 
-    // Menu Item Hooks
-    getUserMenuItems(user: User, channel?: Channel) {
-        const settings = moduleRegistry.settings;
-        if (!settings || !channel) return null;
-
-        return [
-            <Menu.MenuItem
-                id="socialize-ban-user"
-                label="Socialize Ban"
-                key="socialize-ban-user"
-                action={() => {
-                    actionQueue.enqueue(settings.banCommand.replace("{user}", user.id), channel.id, true);
-                }}
-            />,
-            <Menu.MenuItem
-                id="socialize-kick-user"
-                label="Socialize Kick"
-                key="socialize-kick-user"
-                action={() => {
-                    actionQueue.enqueue(settings.kickCommand.replace("{user}", user.id), channel.id, true);
-                }}
-            />
-        ];
-    },
 
     init(settings: PluginSettings) {
         this.settings = settings;

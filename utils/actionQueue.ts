@@ -85,34 +85,42 @@ export class ActionQueue {
             settings = moduleRegistry["settings"];
         } catch (e) { }
 
-        if (settings && settings.queueEnabled === false) return; // Paused
+        if (settings && settings.queueEnabled === false) {
+            logger.debug("actionQueue paused via settings.");
+            return; // Paused
+        }
 
-        const delay = settings ? (settings.queueInterval * 1000) : this.delayMs;
+        const delay = settings && typeof settings.queueInterval === "number" ?
+            (settings.queueInterval * 1000) : this.delayMs;
 
         this.isProcessing = true;
 
         const item = this.priorityQueue.shift() || this.queue.shift();
 
-        if (item && this.sendCommandCallback) {
-            try {
-
-                sendDebugMessage(item.channelId, `Executing command: \`${item.command}\``);
-                const result = await this.sendCommandCallback(item.command, item.channelId);
-
-                // If it's a message object from Discord
-                if (result && result.id) {
-                    item.messageId = result.id;
-                }
-
-                // Dispatch execution event for cleanup module
+        if (item) {
+            if (!this.sendCommandCallback) {
+                logger.error("actionQueue error: sendCommandCallback is null. Queue will process but messages won't send.");
+                sendDebugMessage(item.channelId, `actionQueue Error: sendCommandCallback is null for \`${item.command}\``);
+            } else {
                 try {
-                    const { moduleRegistry } = require("../logic/moduleRegistry");
-                    const { SocializeEvent } = require("../types/events");
-                    moduleRegistry.dispatch(SocializeEvent.ACTION_EXECUTED, { item });
-                } catch (e) { }
+                    sendDebugMessage(item.channelId, `Executing command: \`${item.command}\``);
+                    const result = await this.sendCommandCallback(item.command, item.channelId);
 
-            } catch (e) {
-                logger.error("Failed to execute command:", item.command, e);
+                    // If it's a message object from Discord
+                    if (result && result.id) {
+                        item.messageId = result.id;
+                    }
+
+                    // Dispatch execution event for cleanup module
+                    try {
+                        const { moduleRegistry } = require("../logic/moduleRegistry");
+                        const { SocializeEvent } = require("../types/events");
+                        moduleRegistry.dispatch(SocializeEvent.ACTION_EXECUTED, { item });
+                    } catch (e) { }
+
+                } catch (e) {
+                    logger.error("Failed to execute command:", item.command, e);
+                }
             }
         }
 

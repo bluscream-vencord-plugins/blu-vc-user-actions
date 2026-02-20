@@ -223,14 +223,16 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isBanned ? "Unban from VC" : "Ban from VC"}
                 color={isBanned ? "success" : "danger"}
                 action={() => {
-                    const cmd = isBanned
-                        ? formatCommand(settings.unbanCommand, myChannelId!, { userId: user.id })
-                        : formatCommand(settings.banCommand, myChannelId!, { userId: user.id });
-                    actionQueue.enqueue(cmd, myChannelId!);
-                    showToast(isBanned
-                        ? `Queued unban for ${getUserDisplayName(user.id)}`
-                        : `Queued ban for ${getUserDisplayName(user.id)}`
-                    );
+                    const { BansModule } = require("./bans");
+                    if (isBanned) {
+                        actionQueue.enqueue(formatCommand(settings.unbanCommand, myChannelId!, { userId: user.id }), myChannelId!);
+                        const ownerCfg = stateManager.getMemberConfig(meId);
+                        stateManager.updateMemberConfig(meId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== user.id) });
+                        showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
+                    } else {
+                        BansModule.enforceBanPolicy(user.id, myChannelId!, true, "Manual Ban");
+                        showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
+                    }
                 }}
             />
         );
@@ -244,40 +246,19 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
             <Menu.MenuItem
                 id="socialize-permit-user"
                 key="socialize-permit-user"
-                label={isPermitted ? "Unpermit User" : "Permit User"}
+                label={isPermitted ? "Unpermit" : "Permit"}
                 color={isPermitted ? "default" : "success"}
                 action={() => {
-                    const cmd = isPermitted
-                        ? formatCommand(settings.unpermitCommand || "!v unpermit {user_id}", myChannelId!, { userId: user.id })
-                        : formatCommand(settings.permitCommand || "!v permit {user_id}", myChannelId!, { userId: user.id });
-                    actionQueue.enqueue(cmd, myChannelId!);
+                    const { WhitelistModule } = require("./whitelist");
+                    if (isPermitted) {
+                        WhitelistModule.unpermitUser(user.id, myChannelId!);
+                    } else {
+                        WhitelistModule.permitUser(user.id, myChannelId!);
+                    }
                 }}
             />
         );
     }
-
-    // Whitelist toggle (always visible)
-    items.push(
-        <Menu.MenuItem
-            id="socialize-whitelist-user"
-            key="socialize-whitelist-user"
-            label={isWhitelisted ? "Remove from Whitelist" : "Add to Whitelist"}
-            action={() => {
-                const cfg = stateManager.getMemberConfig(meId);
-                if (isWhitelisted) {
-                    stateManager.updateMemberConfig(meId, {
-                        whitelistedUsers: cfg.whitelistedUsers.filter(id => id !== user.id)
-                    });
-                    showToast(`Removed ${getUserDisplayName(user.id)} from whitelist.`);
-                } else {
-                    stateManager.updateMemberConfig(meId, {
-                        whitelistedUsers: [...cfg.whitelistedUsers, user.id]
-                    });
-                    showToast(`Added ${getUserDisplayName(user.id)} to whitelist.`);
-                }
-            }}
-        />
-    );
 
     return items.filter(Boolean);
 }
@@ -626,13 +607,15 @@ export const OwnershipModule: SocializeModule = {
             return;
         }
 
-        sendDebugMessage(message.channel_id, `Bot Response: **${response.type}** from <@${response.initiatorId || "Unknown"}>`);
+        const targetStr = response.targetId ? ` target <@${response.targetId}> ` : " ";
+        sendDebugMessage(message.channel_id, `Bot Response: **${response.type}**${targetStr}from <@${response.initiatorId || "Unknown"}>`);
 
         moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
             channelId: message.channel_id,
             type: response.type,
             initiatorId: response.initiatorId,
+            targetUserId: response.targetId,
             embed: response.embed
         });
 

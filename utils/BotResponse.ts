@@ -34,6 +34,7 @@ interface Embed {
 export class BotResponse {
     public type: BotResponseType = BotResponseType.UNKNOWN;
     public initiatorId?: string;
+    public targetId?: string;
     public channelId: string;
     public timestamp: number;
     public embed: Embed | undefined;
@@ -43,22 +44,22 @@ export class BotResponse {
         this.timestamp = msg.timestamp ? new Date(msg.timestamp as any).getTime() : Date.now();
         this.embed = msg.embeds?.[0] as Embed | undefined;
 
-        if (msg.author.id === botId && this.embed) {
+        if (msg.author.id === botId) {
             this.parseType();
             this.initiatorId = this.findInitiatorId();
+            this.targetId = this.findTargetId();
         }
     }
 
     private parseType() {
-        if (!this.embed) return;
-
-        const authorName = this.embed.author?.name?.toLowerCase() || "";
-        const title = this.embed.title?.toLowerCase() || "";
+        const authorName = this.embed?.author?.name?.toLowerCase() || "";
+        const title = this.embed?.title?.toLowerCase() || "";
         const description = this.getRawDescription().toLowerCase();
+        const content = this.msg.content?.toLowerCase() || "";
 
         const check = (str: string) => {
             const s = str.toLowerCase();
-            return authorName.includes(s) || title.includes(s) || description.includes(s);
+            return authorName.includes(s) || title.includes(s) || description.includes(s) || content.includes(s);
         };
 
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
@@ -121,6 +122,24 @@ export class BotResponse {
 
             const cachedRef = MessageStore.getMessage(ref.channel_id || this.msg.channel_id, ref.message_id);
             if (cachedRef) return cachedRef.author?.id;
+        }
+
+        return undefined;
+    }
+
+    private findTargetId(): string | undefined {
+        // Many action responses (Ban/Permit) mention the target in the description
+        const descMatch = this.getRawDescription().match(/<@!?(\d+)>/);
+        if (descMatch) return descMatch[1];
+
+        const contentMatch = this.msg.content?.match(/<@!?(\d+)>/);
+        if (contentMatch) return contentMatch[1];
+
+        // Also check if any raw mentions array is populated
+        const mentions = this.msg.mentions;
+        if (mentions && mentions.length > 0) {
+            const mentionedUser = mentions[mentions.length - 1]; // Assume the last mention might be the target if initiator is first
+            if (mentionedUser) return typeof mentionedUser === "string" ? mentionedUser : (mentionedUser as any).id;
         }
 
         return undefined;

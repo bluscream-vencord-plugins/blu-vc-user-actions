@@ -16,29 +16,6 @@ export const WhitelistModule: SocializeModule = {
     name: "WhitelistModule",
     settings: undefined as PluginSettings | undefined,
 
-    // Menu Item Hooks
-    getUserMenuItems(user: User, channel?: Channel) {
-        if (!channel) return null;
-
-        return [
-            <Menu.MenuItem
-                id="socialize-permit-user"
-                label="Permit"
-                key="socialize-permit-user"
-                action={() => {
-                    this.permitUser(user.id, channel.id);
-                }}
-            />,
-            <Menu.MenuItem
-                id="socialize-unpermit-user"
-                label="Unpermit"
-                key="socialize-unpermit-user"
-                action={() => {
-                    this.unpermitUser(user.id, channel.id);
-                }}
-            />
-        ];
-    },
 
     init(settings: PluginSettings) {
         this.settings = settings;

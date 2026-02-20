@@ -19,21 +19,6 @@ export const BansModule: SocializeModule = {
     settings: null as unknown as PluginSettings,
     recentlyKickedWaitlist: new Map<string, number>(),
 
-    // Menu Item Hooks
-    getUserMenuItems(user: User, channel?: Channel) {
-        if (!channel) return null;
-
-        return [
-            <Menu.MenuItem
-                id="socialize-ban-user-policy"
-                label="Socialize Ban (Policy)"
-                key="socialize-ban-user-policy"
-                action={() => {
-                    this.enforceBanPolicy(user.id, channel.id, false);
-                }}
-            />
-        ];
-    },
 
     init(settings: PluginSettings) {
         this.settings = settings;
