@@ -1,4 +1,5 @@
-import definePlugin from "@utils/types"; import { pluginInfo } from "./info";
+import definePlugin from "@utils/types";
+import { pluginInfo } from "./info";
 import { defaultSettings } from "./types/settings";
 import { PluginSettings } from "./types/settings";
 import { moduleRegistry } from "./logic/moduleRegistry";
@@ -17,7 +18,6 @@ import { BansModule } from "./logic/bans";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { CommandCleanupModule } from "./logic/commandCleanup";
 import { contextMenuHandlers } from "./components/menus";
-import SocializeToolbox from "./components/toolbox";
 
 export default definePlugin({
     ...pluginInfo,
@@ -60,10 +60,18 @@ export default definePlugin({
     contextMenus: contextMenuHandlers,
 
     toolboxActions() {
-        const { SelectedChannelStore } = require("@webpack/common");
+        const { SelectedChannelStore, ChannelStore, Menu } = require("@webpack/common");
         const channelId = SelectedChannelStore.getChannelId();
         if (!channelId) return null;
-        return <SocializeToolbox channelId={channelId} />;
+        const channel = ChannelStore.getChannel(channelId);
+        const items = moduleRegistry.collectToolboxItems(channel);
+        if (!items.length) return null;
+
+        return (
+            <Menu.MenuGroup label="SocializeGuild">
+                {items}
+            </Menu.MenuGroup>
+        );
     },
 
     commands: [

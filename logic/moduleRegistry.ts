@@ -1,6 +1,7 @@
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
-import { Message, VoiceState } from "@vencord/discord-types";
+import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
+import { React } from "@webpack/common";
 
 export interface SocializeModule {
     name: string;
@@ -14,15 +15,21 @@ export interface SocializeModule {
     onCustomEvent?<K extends SocializeEvent>(event: K, payload: EventPayloads[K]): void;
 
     [key: string]: any;
+
+    // Menu Item Hooks
+    getToolboxMenuItems?(channel?: Channel): React.ReactElement[] | null;
+    getChannelMenuItems?(channel: Channel): React.ReactElement[] | null;
+    getUserMenuItems?(user: User, channel?: Channel): React.ReactElement[] | null;
+    getGuildMenuItems?(guild: Guild): React.ReactElement[] | null;
 }
 
 export class ModuleRegistry {
     private modules: SocializeModule[] = [];
-    private settings!: PluginSettings;
+    private _settings!: PluginSettings;
     private eventListeners: Map<SocializeEvent, Array<(payload: unknown) => void>> = new Map();
 
     public init(settings: PluginSettings) {
-        this.settings = settings;
+        this._settings = settings;
         for (const mod of this.modules) {
             mod.init(settings);
         }
@@ -38,6 +45,10 @@ export class ModuleRegistry {
         }
         this.eventListeners.clear();
         this.modules = [];
+    }
+
+    public get settings(): PluginSettings {
+        return this._settings;
     }
 
     // Custom Event Bus
@@ -65,6 +76,23 @@ export class ModuleRegistry {
                 mod.onCustomEvent(event, payload);
             }
         }
+    }
+
+    // Menu Item Collection
+    public collectToolboxItems(channel?: Channel): React.ReactElement[] {
+        return this.modules.flatMap(m => m.getToolboxMenuItems?.(channel) || []).filter(Boolean);
+    }
+
+    public collectChannelItems(channel: Channel): React.ReactElement[] {
+        return this.modules.flatMap(m => m.getChannelMenuItems?.(channel) || []).filter(Boolean);
+    }
+
+    public collectUserItems(user: User, channel?: Channel): React.ReactElement[] {
+        return this.modules.flatMap(m => m.getUserMenuItems?.(user, channel) || []).filter(Boolean);
+    }
+
+    public collectGuildItems(guild: Guild): React.ReactElement[] {
+        return this.modules.flatMap(m => m.getGuildMenuItems?.(guild) || []).filter(Boolean);
     }
 
     // Discord Event Dispatchers

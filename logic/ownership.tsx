@@ -4,17 +4,92 @@ import { SocializeEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
-import { Message, VoiceState } from "@vencord/discord-types";
+import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
-import { GuildChannelStore, ChannelStore, GuildStore, SelectedChannelStore, UserStore as Users } from "@webpack/common";
+import { GuildChannelStore, ChannelStore, GuildStore, SelectedChannelStore, UserStore as Users, Menu, React } from "@webpack/common";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 
 export const OwnershipModule: SocializeModule = {
     name: "OwnershipModule",
+
+    // Menu Item Hooks
+    getToolboxMenuItems(channel?: Channel) {
+        if (!channel) return null;
+        return this.getChannelMenuItems(channel);
+    },
+
+    getChannelMenuItems(channel: Channel) {
+        const settings = moduleRegistry.settings;
+        if (!settings) return null;
+
+        return [
+            <Menu.MenuItem
+                id="socialize-claim-channel"
+                label="Claim Channel"
+                key="socialize-claim-channel"
+                action={() => {
+                    actionQueue.enqueue(settings.claimCommand, channel.id, true);
+                }}
+            />,
+            <Menu.MenuItem
+                id="socialize-lock-channel"
+                label="Lock Channel"
+                key="socialize-lock-channel"
+                action={() => {
+                    actionQueue.enqueue(settings.lockCommand, channel.id, true);
+                }}
+            />,
+            <Menu.MenuItem
+                id="socialize-unlock-channel"
+                label="Unlock Channel"
+                key="socialize-unlock-channel"
+                action={() => {
+                    actionQueue.enqueue(settings.unlockCommand, channel.id, true);
+                }}
+            />,
+            <Menu.MenuItem
+                id="socialize-reset-channel"
+                label="Reset Channel"
+                key="socialize-reset-channel"
+                action={() => {
+                    actionQueue.enqueue(settings.resetCommand, channel.id, false);
+                }}
+            />,
+            <Menu.MenuItem
+                id="socialize-info-channel"
+                label="Channel Info"
+                key="socialize-info-channel"
+                action={() => {
+                    this.requestChannelInfo(channel.id);
+                }}
+            />
+        ];
+    },
+
+    getGuildMenuItems(guild: Guild) {
+        return [
+            <Menu.MenuItem
+                id="socialize-guild-fetch-owners"
+                label="Fetch All Owners"
+                key="socialize-guild-fetch-owners"
+                action={() => {
+                    this.fetchAllOwners();
+                }}
+            />,
+            <Menu.MenuItem
+                id="socialize-guild-status"
+                label="Socialize Status"
+                key="socialize-guild-status"
+                action={() => {
+                    logger.info(`Socialize status for guild ${guild.name}`);
+                }}
+            />
+        ];
+    },
 
     init(settings: PluginSettings) {
         logger.info("OwnershipModule initializing");

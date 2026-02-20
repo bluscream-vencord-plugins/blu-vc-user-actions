@@ -3,11 +3,6 @@ import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChan
 // Vencord types
 import { User, Channel, Guild } from "@vencord/discord-types";
 import { moduleRegistry } from "../logic/moduleRegistry";
-import { actionQueue } from "../utils/actionQueue";
-import { BansModule } from "../logic/bans";
-import { WhitelistModule } from "../logic/whitelist";
-import { OwnershipModule } from "../logic/ownership";
-import { formatCommand } from "../utils/formatting";
 import { logger } from "../utils/logger";
 
 export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[]) {
@@ -16,6 +11,10 @@ export function addToSubmenu(children: any[], menuId: string, menuLabel: string,
             {newItems}
         </Menu.MenuItem>
     );
+
+    // Filter out null/undefined items
+    const validItems = newItems.filter(Boolean);
+    if (!validItems.length) return;
 
     const lastGroup = [...children].reverse().find(c => c?.type?.displayName === "MenuGroup" || (c?.props && c.props.children));
     if (lastGroup) {
@@ -28,98 +27,6 @@ export function addToSubmenu(children: any[], menuId: string, menuLabel: string,
     }
 }
 
-function buildUserContextMenuItems(user: User, channel?: Channel) {
-    const settings = moduleRegistry["settings"];
-    if (!settings) return null;
-
-    return [
-        <Menu.MenuItem
-            id="socialize-ban-user"
-            label="Ban from Channel"
-            action={() => {
-                if (channel) BansModule.enforceBanPolicy(user.id, channel.id, false);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-kick-user"
-            label="Kick from Channel"
-            action={() => {
-                const cmd = formatCommand(settings.kickCommand, channel?.id || "", { userId: user.id });
-                if (channel) actionQueue.enqueue(cmd, channel.id, true);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-whitelist-user"
-            label={WhitelistModule.isWhitelisted(user.id) ? "Unwhitelist User" : "Whitelist User"}
-            action={() => {
-                const isWhite = WhitelistModule.isWhitelisted(user.id);
-                const list = WhitelistModule.getWhitelist();
-                if (isWhite) {
-                    WhitelistModule.setWhitelist(list.filter(id => id !== user.id));
-                } else {
-                    list.push(user.id);
-                    WhitelistModule.setWhitelist(list);
-                }
-            }}
-        />
-    ];
-}
-
-function buildChannelContextMenuItems(channel: Channel) {
-    const settings = moduleRegistry["settings"];
-    if (!settings) return null;
-
-    return [
-        <Menu.MenuItem
-            id="socialize-claim-channel"
-            label="Claim Channel"
-            action={() => {
-                actionQueue.enqueue(settings.claimCommand, channel.id, true);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-lock-channel"
-            label="Lock Channel"
-            action={() => {
-                actionQueue.enqueue(settings.lockCommand, channel.id, true);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-unlock-channel"
-            label="Unlock Channel"
-            action={() => {
-                actionQueue.enqueue(settings.unlockCommand, channel.id, true);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-reset-channel"
-            label="Reset Channel"
-            action={() => {
-                actionQueue.enqueue(settings.resetCommand, channel.id, false);
-            }}
-        />
-    ];
-}
-
-function buildGuildContextMenuItems(guild: Guild) {
-    return [
-        <Menu.MenuItem
-            id="socialize-guild-fetch-owners"
-            label="Fetch All Owners"
-            action={() => {
-                OwnershipModule.fetchAllOwners?.();
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-guild-status"
-            label="Socialize Status"
-            action={() => {
-                logger.debug(`Viewing status for guild: ${guild.name}`);
-            }}
-        />
-    ];
-}
-
 export const contextMenuHandlers = {
     "user-context": (children: any[], props: any) => {
         if (!props) return;
@@ -129,18 +36,27 @@ export const contextMenuHandlers = {
         const channelId = props.channelId || props.channel?.id || SelectedChannelStore.getChannelId();
         const channel = props.channel || (channelId ? Channels.getChannel(channelId) : null);
 
-        const items = buildUserContextMenuItems(user, channel);
-        if (items) addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items);
+        const items = moduleRegistry.collectUserItems(user, channel);
+        if (items.length > 0) {
+            addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items);
+        }
     },
     "channel-context": (children: any[], props: any) => {
         const channel = props?.channel;
         if (!channel) return;
-        const items = buildChannelContextMenuItems(channel);
-        if (items) addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items);
+
+        const items = moduleRegistry.collectChannelItems(channel);
+        if (items.length > 0) {
+            addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items);
+        }
     },
     "guild-context": (children: any[], props: any) => {
-        if (!props || !props.guild) return;
-        const items = buildGuildContextMenuItems(props.guild);
-        if (items) addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items);
+        const guild = props?.guild;
+        if (!guild) return;
+
+        const items = moduleRegistry.collectGuildItems(guild);
+        if (items.length > 0) {
+            addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items);
+        }
     }
 };
