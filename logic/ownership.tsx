@@ -236,13 +236,19 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 color={isBanned ? "success" : "danger"}
                 action={() => {
                     const { BansModule } = require("./bans");
+                    const { BlacklistModule } = require("./blacklist");
                     if (isBanned) {
                         actionQueue.enqueue(formatCommand(settings.unbanCommand, myChannelId!, { userId: user.id }), myChannelId!);
                         const ownerCfg = stateManager.getMemberConfig(meId);
                         stateManager.updateMemberConfig(meId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== user.id) });
+                        BlacklistModule.unblacklistUser(user.id);
                         showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
                     } else {
-                        BansModule.enforceBanPolicy(user.id, myChannelId!, true, "Manual Ban");
+                        const useKickFirst = !!settings.banInLocalBlacklist;
+                        if (useKickFirst) {
+                            BlacklistModule.blacklistUser(user.id);
+                        }
+                        BansModule.enforceBanPolicy(user.id, myChannelId!, useKickFirst, "Manual Ban");
                         showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
                     }
                 }}
@@ -654,7 +660,7 @@ export const OwnershipModule: SocializeModule = {
             const result = parseBotInfoMessage(response);
             if (result?.info.userId) {
                 stateManager.updateMemberConfig(result.info.userId, result.info);
-                sendDebugMessage(message.channel_id, `Synchronized info for user ${result.info.userId}`);
+                sendDebugMessage(message.channel_id, `Synchronized info for <@${result.info.userId}>`);
             }
         }
 

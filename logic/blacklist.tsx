@@ -31,5 +31,15 @@ export const BlacklistModule: SocializeModule = {
 
     isBlacklisted(userId: string): boolean {
         return this.getBlacklist().includes(userId);
+    },
+
+    blacklistUser(userId: string) {
+        if (!this.settings || this.isBlacklisted(userId)) return;
+        this.setBlacklist([...this.getBlacklist(), userId]);
+    },
+
+    unblacklistUser(userId: string) {
+        if (!this.settings || !this.isBlacklisted(userId)) return;
+        this.setBlacklist(this.getBlacklist().filter(id => id !== userId));
     }
 };

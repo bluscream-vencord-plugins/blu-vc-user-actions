@@ -75,8 +75,8 @@ export class BotResponse {
         else if (title.includes("permitted successfully") || authorName.includes("permitted successfully") || description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
         else if (title.includes("unpermitted successfully") || authorName.includes("unpermitted successfully") || description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;
         else if (description.includes("__channel size__") || check("size set")) this.type = BotResponseType.SIZE_SET;
-        else if (check("locked") || description.includes("__locked__")) this.type = BotResponseType.LOCKED;
         else if (check("unlocked") || description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
+        else if (check("locked") || description.includes("__locked__")) this.type = BotResponseType.LOCKED;
 
         // logger.debug(`BotResponse: Parsed type ${this.type} from embed (Author: ${authorName}, Title: ${title})`);
     }
