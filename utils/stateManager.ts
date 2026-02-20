@@ -1,7 +1,10 @@
 import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
 import { PluginSettings } from "../types/settings";
 import { logger } from "./logger";
+import * as DataStore from "@api/DataStore";
 
+const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v2";
+const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v2";
 
 // Helper generic store interface
 interface Store<T> {
@@ -16,17 +19,36 @@ type StoreWithState = PluginSettings & {
 };
 
 export class StateManager {
-    private store!: StoreWithState; // Vencord plugin store definition
+    private store!: StoreWithState;
 
-    public init(vencordStore: PluginSettings) {
+    public async init(vencordStore: PluginSettings) {
         this.store = vencordStore as StoreWithState;
 
-        // Ensure default state exists
-        if (!this.store.activeChannelOwnerships) {
-            this.store.activeChannelOwnerships = {};
+        this.store.activeChannelOwnerships = {};
+        this.store.memberConfigs = {};
+
+        try {
+            const owners = await DataStore.get(STORAGE_KEY_OWNERS);
+            if (owners) {
+                this.store.activeChannelOwnerships = owners as Record<string, ChannelOwnership>;
+            }
+
+            const members = await DataStore.get(STORAGE_KEY_MEMBERS);
+            if (members) {
+                this.store.memberConfigs = members as Record<string, MemberChannelInfo>;
+            }
+            logger.info(`Loaded state: ${Object.keys(this.store.activeChannelOwnerships).length} ownerships, ${Object.keys(this.store.memberConfigs).length} members`);
+        } catch (e) {
+            logger.error("Failed to load plugin state:", e);
         }
-        if (!this.store.memberConfigs) {
-            this.store.memberConfigs = {};
+    }
+
+    public async saveState() {
+        try {
+            await DataStore.set(STORAGE_KEY_OWNERS, this.store.activeChannelOwnerships);
+            await DataStore.set(STORAGE_KEY_MEMBERS, this.store.memberConfigs);
+        } catch (e) {
+            logger.error("Failed to save plugin state:", e);
         }
     }
 
@@ -40,6 +62,7 @@ export class StateManager {
         } else {
             this.store.activeChannelOwnerships[channelId] = ownership;
         }
+        this.saveState();
     }
 
     public getMemberConfig(userId: string): MemberChannelInfo {
@@ -63,6 +86,7 @@ export class StateManager {
     public updateMemberConfig(userId: string, update: Partial<MemberChannelInfo>) {
         const config = this.getMemberConfig(userId);
         Object.assign(config, update);
+        this.saveState();
     }
 
     public getAllActiveOwnerships(): Record<string, ChannelOwnership> {

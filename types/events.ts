@@ -25,6 +25,9 @@ export enum SocializeEvent {
     // Fired before a command is sent by the action queue
     ACTION_EXECUTED = "SOCIALIZE_ACTION_EXECUTED",
 
+    // Fired when a command is added to the action queue
+    ACTION_QUEUED = "SOCIALIZE_ACTION_QUEUED",
+
     // Fired when our local user joins or leaves a managed channel
     LOCAL_USER_JOINED_MANAGED_CHANNEL = "SOCIALIZE_LOCAL_USER_JOINED_MANAGED_CHANNEL",
     LOCAL_USER_LEFT_MANAGED_CHANNEL = "SOCIALIZE_LOCAL_USER_LEFT_MANAGED_CHANNEL",
@@ -49,6 +52,9 @@ export interface EventPayloads {
         embed: unknown; // Ideally Discord Embed type
     };
     [SocializeEvent.ACTION_EXECUTED]: {
+        item: ActionQueueItem;
+    };
+    [SocializeEvent.ACTION_QUEUED]: {
         item: ActionQueueItem;
     };
     [SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL]: {

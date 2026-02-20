@@ -22,7 +22,7 @@ export const socializeCommand = {
                 if (!settings) return;
 
                 return {
-                    content: `**SocializeStats**\nAction Delay: ${settings.actionDelayMs}ms\nMax Bans: ${settings.maxBans}\nVoteBan %: ${settings.voteBanPercentage}%`
+                    content: `**SocializeStats**\nAction Delay: ${settings.queueInterval}s\nBan Pool: ${settings.banLimit}\nVoteBan %: ${settings.voteBanPercentage}%`
                 };
             }
         },
@@ -93,7 +93,7 @@ export const socializeCommand = {
             execute: (args: CommandArgument[], ctx: CommandContext) => {
                 const userId = args[0].value;
                 if (!ctx.channel) return;
-                WhitelistingModule.bulkPermit([userId], ctx.channel.id);
+                WhitelistingModule.permitUser(userId, ctx.channel.id);
                 return { content: `Permitted <@${userId}>` };
             }
         }

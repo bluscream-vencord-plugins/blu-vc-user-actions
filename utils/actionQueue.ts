@@ -20,6 +20,14 @@ export class ActionQueue {
         this.sendCommandCallback = callback;
     }
 
+    private emitQueuedEvent(item: ActionQueueItem) {
+        try {
+            const { moduleRegistry } = require("../logic/moduleRegistry");
+            const { SocializeEvent } = require("../types/events");
+            moduleRegistry.dispatch(SocializeEvent.ACTION_QUEUED, { item });
+        } catch (e) { }
+    }
+
     public enqueue(command: string, channelId: string, priority: boolean = false) {
         // Auto-prioritize specific high value bot actions
         if (command.includes(" claim") || command.includes(" info")) {
@@ -40,6 +48,7 @@ export class ActionQueue {
             this.queue.push(item);
         }
 
+        this.emitQueuedEvent(item);
         this.processQueue();
     }
 
@@ -54,6 +63,7 @@ export class ActionQueue {
 
         // Push directly to front of priority queue
         this.priorityQueue.unshift(item);
+        this.emitQueuedEvent(item);
         this.processQueue();
     }
 
@@ -65,6 +75,16 @@ export class ActionQueue {
     private async processQueue() {
         if (this.isProcessing) return;
         if (this.queue.length === 0 && this.priorityQueue.length === 0) return;
+
+        let settings;
+        try {
+            const { moduleRegistry } = require("../logic/moduleRegistry");
+            settings = moduleRegistry["settings"];
+        } catch (e) { }
+
+        if (settings && settings.queueEnabled === false) return; // Paused
+
+        const delay = settings ? (settings.queueInterval * 1000) : this.delayMs;
 
         this.isProcessing = true;
 
@@ -82,7 +102,7 @@ export class ActionQueue {
         setTimeout(() => {
             this.isProcessing = false;
             this.processQueue();
-        }, this.delayMs);
+        }, delay);
     }
 }
 

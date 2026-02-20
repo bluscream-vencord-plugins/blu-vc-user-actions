@@ -7,6 +7,7 @@ import { stateManager } from "../utils/stateManager";
 import { UserStore as Users, VoiceStateStore, RelationshipStore, GuildMemberStore } from "@webpack/common";
 import { Message, VoiceState } from "@vencord/discord-types";
 import { formatCommand } from "../utils/formatting";
+import { parseVoiceUserFromInput, MemberLike, extractId } from "../utils/parsing";
 import { WhitelistingModule } from "./whitelisting";
 export const VoteBanningModule: SocializeModule = {
     name: "VoteBanningModule",
@@ -55,17 +56,20 @@ export const VoteBanningModule: SocializeModule = {
     },
 
     onMessageCreate(message: Message) {
-        if (!this.settings || !this.settings.botId) return;
+        if (!this.settings || !this.settings.botId || !this.settings.voteBanCommandString) return;
 
-        if (message.content.startsWith("!voteban")) {
-            const mentions = message.mentions;
-            if (!mentions || mentions.length === 0) return;
+        const cmdPrefix = this.settings.voteBanCommandString.split("{user}")[0].trim().toLowerCase();
 
-            const targetUser = mentions[0] as unknown as string;
+        if (message.content.toLowerCase().startsWith(cmdPrefix)) {
+            const inputArg = message.content.substring(cmdPrefix.length).trim();
+            if (!inputArg) return;
+
             const voterId = message.author.id;
-
             const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
             if (!voterVoiceState || !voterVoiceState.channelId) return;
+
+            const targetUser = parseVoiceUserFromInput(inputArg, voterVoiceState.channelId);
+            if (!targetUser) return;
 
             this.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId);
         }
@@ -76,15 +80,15 @@ export const VoteBanningModule: SocializeModule = {
         if (WhitelistingModule.isWhitelisted(userId)) return;
 
         // 1. Is user locally blacklisted?
-        const isLocallyBlacklisted = (this.settings.localUserBlacklist?.split(/\r?\n/) || []).some(s => s.trim() === userId);
+        const isLocallyBlacklisted = this.settings.banInLocalBlacklist && (this.settings.localUserBlacklist?.split(/\r?\n/) || []).some(s => s.trim() === userId);
 
         // 2. Is user blocked by the channel owner (us)?
         // RelationshipStore types: 1 = Friend, 2 = Blocked
-        const isBlocked = RelationshipStore.isBlocked(userId);
+        const isBlocked = this.settings.banBlockedUsers && RelationshipStore.isBlocked(userId);
 
         // 3. Are they missing required roles?
         let isMissingRole = false;
-        if (this.settings.requiredRoleIds && this.settings.requiredRoleIds.trim().length > 0) {
+        if (this.settings.enforceRequiredRoles && this.settings.banNotInRoles && this.settings.requiredRoleIds && this.settings.requiredRoleIds.trim().length > 0) {
             const requiredRoleList = this.settings.requiredRoleIds.split(/\r?\n/).map(s => s.trim());
             const member = GuildMemberStore.getMember(guildId, userId);
             if (member && member.roles) {
@@ -195,5 +199,18 @@ export const VoteBanningModule: SocializeModule = {
                 this.activeVotes.delete(key);
             }
         }
+    },
+
+    banUsers(members: (MemberLike | string)[], channelId: string) {
+        if (!this.settings) return;
+        for (const member of members) {
+            const userId = extractId(member);
+            if (!userId) continue;
+            this.enforceBanPolicy(userId, channelId, false);
+        }
+    },
+
+    banUser(member: MemberLike | string, channelId: string) {
+        this.banUsers([member], channelId);
     }
 };

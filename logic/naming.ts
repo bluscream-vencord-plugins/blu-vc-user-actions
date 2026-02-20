@@ -41,7 +41,7 @@ export const NamingModule: SocializeModule = {
         // If rotationIntervalMin is intended, it should be part of PluginSettings.
         // For now, I'll add the check and use the existing namingIntervalMs.
         // If the intent was to use rotationIntervalMin, the settings type would need to be updated.
-        const intervalMs = this.settings.namingIntervalMs; // Using existing setting
+        const intervalMs = this.settings.channelNameRotationInterval * 1000; // Using existing setting
         if (!intervalMs) { // Added check for intervalMs
             logger.error("Naming interval is not defined in settings.");
             return;

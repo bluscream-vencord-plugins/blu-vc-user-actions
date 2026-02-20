@@ -20,9 +20,12 @@ export const defaultSettings = definePluginSettings({
     unpermitCommand: { type: OptionType.STRING, description: "Unpermit Command Template", default: "!v unpermit {user}", restartNeeded: false },
     renameCommand: { type: OptionType.STRING, description: "Rename Command Template", default: "!v rename {name}", restartNeeded: false },
 
-    maxBans: { type: OptionType.SLIDER, description: "Max Bans", default: 5, markers: [1, 2, 3, 4, 5, 10, 20], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.maxBans = Math.round(v); } },
-    actionDelayMs: { type: OptionType.SLIDER, description: "Action Delay (ms)", default: 2000, markers: [500, 1000, 2000, 5000], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.actionDelayMs = Math.round(v); } },
-    namingIntervalMs: { type: OptionType.SLIDER, description: "Naming Interval (ms)", default: 11 * 60 * 1000, markers: [60000, 300000, 660000, 1800000], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.namingIntervalMs = Math.round(v); } },
+    voteBanCommandString: { type: OptionType.STRING, description: "VoteBan Command Template (e.g., !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
+
+    channelNameRotationInterval: { type: OptionType.SLIDER, description: "Channel Name Rotation Interval (seconds)", default: 11 * 60, markers: [60, 300, 600, 1800], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.channelNameRotationInterval = Math.round(v); } },
+    queueInterval: { type: OptionType.SLIDER, description: "Action Queue Interval (seconds)", default: 2, markers: [1, 2, 5, 10], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.queueInterval = Math.round(v); } },
+    queueEnabled: { type: OptionType.BOOLEAN, description: "Enable Action Queue", default: true, restartNeeded: false },
+
     voteBanPercentage: { type: OptionType.SLIDER, description: "Vote Ban Percentage", default: 50, markers: [10, 25, 50, 75, 100], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
     voteBanWindowMs: { type: OptionType.SLIDER, description: "Vote Ban Window (ms)", default: 5 * 60 * 1000, markers: [60000, 300000, 600000], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowMs = Math.round(v); } },
     commandCleanup: { type: OptionType.BOOLEAN, description: "Command Cleanup", default: true, restartNeeded: false },
@@ -36,12 +39,16 @@ export const defaultSettings = definePluginSettings({
     banRotationMessage: { type: OptionType.STRING, description: "Ban Rotation Message", default: "♻️ Ban rotated: <@{user_id}> was unbanned to make room for <@{user_id_new}>", restartNeeded: false },
     banRotateCooldown: { type: OptionType.NUMBER, description: "Ban Rotation Cooldown (s) (0=infinite)", default: 0, restartNeeded: false },
     localUserBlacklist: { type: OptionType.STRING, description: "Local User Blacklist (one ID per line)", default: "", multiline: true, restartNeeded: false },
+    banInLocalBlacklist: { type: OptionType.BOOLEAN, description: "Ban Users in Local Blacklist", default: true, restartNeeded: false },
+    banBlockedUsers: { type: OptionType.BOOLEAN, description: "Ban Blocked Users", default: true, restartNeeded: false },
+    banNotInRoles: { type: OptionType.BOOLEAN, description: "Ban Users without Required Roles", default: true, restartNeeded: false },
 
     // Feature: Whitelisting
     whitelistSkipMessage: { type: OptionType.STRING, description: "Whitelist Skip Message", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
     localUserWhitelist: { type: OptionType.STRING, description: "Local User Whitelist (one ID per line)", default: "", multiline: true, restartNeeded: false },
 
     // Feature: Roles
+    enforceRequiredRoles: { type: OptionType.BOOLEAN, description: "Enforce Required Roles", default: false, restartNeeded: false },
     requiredRoleIds: { type: OptionType.STRING, description: "Required Role IDs (one ID per line)", default: "", multiline: true, restartNeeded: false }
 });
 

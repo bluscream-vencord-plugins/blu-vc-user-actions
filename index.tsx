@@ -27,7 +27,7 @@ export default definePlugin({
         // We'll mock it via empty object if undefined, though real Vencord persists automatically per plugin via `this.settings`?
         // Wait, Vencord's definePlugin gives `useSettings` and `settings`. Using them.
         stateManager.init(this.settings.store || {});
-        actionQueue.setDelay(this.settings.store.actionDelayMs || 2000);
+        actionQueue.setDelay((this.settings.store.queueInterval || 2) * 1000);
 
         // Setup command sender utilizing Vencord Message actions (mocked here)
         actionQueue.setCommandSender(async (command, channelId) => {

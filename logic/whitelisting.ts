@@ -1,8 +1,9 @@
 import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
-import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
+import { actionQueue } from "../utils/actionQueue";
+import { MemberLike, extractId } from "../utils/parsing";
 
 export const WhitelistingModule: SocializeModule = {
     name: "WhitelistingModule",
@@ -34,19 +35,31 @@ export const WhitelistingModule: SocializeModule = {
         return this.getWhitelist().includes(userId);
     },
 
-    bulkPermit(userIds: string[], channelId: string) {
+    permitUsers(members: (MemberLike | string)[], channelId: string) {
         if (!this.settings) return;
-        for (const userId of userIds) {
+        for (const member of members) {
+            const userId = extractId(member);
+            if (!userId) continue;
             const cmd = formatCommand(this.settings.permitCommand, channelId, { userId });
             actionQueue.enqueue(cmd, channelId);
         }
     },
 
-    bulkUnpermit(userIds: string[], channelId: string) {
+    permitUser(member: MemberLike | string, channelId: string) {
+        this.permitUsers([member], channelId);
+    },
+
+    unpermitUsers(members: (MemberLike | string)[], channelId: string) {
         if (!this.settings) return;
-        for (const userId of userIds) {
+        for (const member of members) {
+            const userId = extractId(member);
+            if (!userId) continue;
             const cmd = formatCommand(this.settings.unpermitCommand, channelId, { userId });
             actionQueue.enqueue(cmd, channelId);
         }
+    },
+
+    unpermitUser(member: MemberLike | string, channelId: string) {
+        this.unpermitUsers([member], channelId);
     }
 };
