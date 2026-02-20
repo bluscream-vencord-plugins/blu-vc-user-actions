@@ -11,6 +11,7 @@ import { sendDebugMessage } from "../utils/debug";
 
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React, UserStore as Users } from "@webpack/common";
+import { sendBotMessage } from "@api/Commands";
 
 export const WhitelistModule: SocializeModule = {
     name: "WhitelistModule",
@@ -25,6 +26,7 @@ export const WhitelistModule: SocializeModule = {
             if (this.isWhitelisted(payload.userId)) {
                 payload.isAllowed = true;
                 payload.reason = "Whitelisted";
+                sendDebugMessage(payload.channelId, `Whitelisted user <@${payload.userId}> join: **ALLOWED**`);
             }
         });
     },
@@ -48,14 +50,16 @@ export const WhitelistModule: SocializeModule = {
         return this.getWhitelist().includes(userId);
     },
 
-    whitelistUser(userId: string) {
+    whitelistUser(userId: string, channelId?: string) {
         if (!this.settings || this.isWhitelisted(userId)) return;
         this.setWhitelist([...this.getWhitelist(), userId]);
+        if (channelId) sendDebugMessage(channelId, `User <@${userId}> added to local whitelist.`);
     },
 
-    unwhitelistUser(userId: string) {
+    unwhitelistUser(userId: string, channelId?: string) {
         if (!this.settings || !this.isWhitelisted(userId)) return;
         this.setWhitelist(this.getWhitelist().filter(id => id !== userId));
+        if (channelId) sendDebugMessage(channelId, `User <@${userId}> removed from local whitelist.`);
     },
 
     // ── Permit rotation ───────────────────────────────────────────────────
@@ -92,7 +96,7 @@ export const WhitelistModule: SocializeModule = {
                 const msg = rotMsg
                     .replace(/{user_id}/g, oldest)
                     .replace(/{user_id_new}/g, userId);
-                actionQueue.enqueue(msg, channelId);
+                sendBotMessage(channelId, { content: msg });
             }
         }
 

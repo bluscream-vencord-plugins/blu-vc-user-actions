@@ -59,10 +59,14 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
     const settings = getSettings();
     if (!settings) return [];
 
+    const meId = Users.getCurrentUser()?.id || "";
+    const ownership = stateManager.getOwnership(channel.id);
+    const amOwner = ownership?.creatorId === meId || ownership?.claimantId === meId;
+
     const enqueue = (cmd: string, priority = false) =>
         actionQueue.enqueue(formatCommand(cmd, channel.id), channel.id, priority);
 
-    return [
+    const items: React.ReactElement[] = [
         <Menu.MenuItem
             id="socialize-claim-channel"
             label="Claim Channel"
@@ -112,51 +116,82 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                 />
             ))}
         </Menu.MenuItem>,
-        <Menu.MenuSeparator key="socialize-channel-sep" />,
-        <Menu.MenuItem
-            id="socialize-ban-all-vc"
-            label="Ban All in VC"
-            key="socialize-ban-all-vc"
-            color="danger"
-            action={() => {
-                const me = Users.getCurrentUser();
-                const states = VoiceStateStore.getVoiceStatesForChannel(channel.id);
-                const ids = Object.keys(states).filter(id => id !== me?.id);
-                if (!ids.length) { showToast("No other users in VC."); return; }
-                for (const uid of ids) {
-                    actionQueue.enqueue(
-                        formatCommand(settings.kickCommand, channel.id, { userId: uid }),
-                        channel.id,
-                        false,
-                        () => isUserInVoiceChannel(uid, channel.id)
-                    );
-                }
-                showToast(`Queued kicks for ${ids.length} users.`);
-            }}
-        />,
-        <Menu.MenuItem
-            id="socialize-kick-banned"
-            label="Kick Banned Users"
-            key="socialize-kick-banned"
-            action={() => {
-                const states = VoiceStateStore.getVoiceStatesForChannel(channel.id);
-                const config = stateManager.getMemberConfig(Users.getCurrentUser()?.id || "");
-                let n = 0;
-                for (const uid in states) {
-                    if (config.bannedUsers.includes(uid)) {
-                        actionQueue.enqueue(
-                            formatCommand(settings.kickCommand, channel.id, { userId: uid }),
-                            channel.id,
-                            false,
-                            () => isUserInVoiceChannel(uid, channel.id)
-                        );
-                        n++;
-                    }
-                }
-                showToast(n > 0 ? `Kicked ${n} banned user(s).` : "No banned users in VC.");
-            }}
-        />,
     ];
+
+    if (amOwner) {
+        items.push(<Menu.MenuSeparator key="socialize-owner-items-sep" />);
+
+        items.push(
+            <Menu.MenuItem
+                id="socialize-guild-rename-channel"
+                key="socialize-guild-rename-channel"
+                label="Rename Channel"
+                color="brand"
+                action={() => {
+                    let newNameValue = channel.name;
+                    const { TextInput, Alerts, React: R } = require("@webpack/common");
+
+                    const RenameBody = ({ initialValue, onUpdate }: { initialValue: string, onUpdate: (v: string) => void }) => {
+                        const [val, setVal] = R.useState(initialValue);
+                        return (
+                            <div style={{ marginTop: "1rem" }}>
+                                <TextInput
+                                    value={val}
+                                    onChange={(v: string) => { setVal(v); onUpdate(v); }}
+                                    placeholder="Enter new channel name..."
+                                    autoFocus
+                                />
+                            </div>
+                        );
+                    };
+
+                    Alerts.show({
+                        title: "Rename Channel",
+                        confirmText: "Rename",
+                        cancelText: "Cancel",
+                        onConfirm: () => {
+                            if (newNameValue && newNameValue !== channel.name) {
+                                actionQueue.enqueue(
+                                    formatCommand(settings.setChannelNameCommand || "!v name {name}", channel.id, { name: newNameValue }),
+                                    channel.id,
+                                    true
+                                );
+                            }
+                        },
+                        body: <RenameBody initialValue={channel.name} onUpdate={(v) => newNameValue = v} />
+                    });
+                }}
+            />
+        );
+
+        items.push(
+            <Menu.MenuItem
+                id="socialize-kick-banned"
+                label="Kick Banned Users"
+                key="socialize-kick-banned"
+                color="danger"
+                action={() => {
+                    const states = VoiceStateStore.getVoiceStatesForChannel(channel.id);
+                    const config = stateManager.getMemberConfig(meId);
+                    let n = 0;
+                    for (const uid in states) {
+                        if (config.bannedUsers.includes(uid)) {
+                            actionQueue.enqueue(
+                                formatCommand(settings.kickCommand, channel.id, { userId: uid }),
+                                channel.id,
+                                false,
+                                () => isUserInVoiceChannel(uid, channel.id)
+                            );
+                            n++;
+                        }
+                    }
+                    showToast(n > 0 ? `Kicked ${n} banned user(s).` : "No banned users in VC.");
+                }}
+            />
+        );
+    }
+
+    return items;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -244,12 +279,12 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                         actionQueue.enqueue(formatCommand(settings.unbanCommand, myChannelId!, { userId: user.id }), myChannelId!);
                         const ownerCfg = stateManager.getMemberConfig(meId);
                         stateManager.updateMemberConfig(meId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== user.id) });
-                        BlacklistModule.unblacklistUser(user.id);
+                        BlacklistModule.unblacklistUser(user.id, myChannelId!);
                         showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
                     } else {
                         const useKickFirst = !!settings.banInLocalBlacklist;
                         if (useKickFirst) {
-                            BlacklistModule.blacklistUser(user.id);
+                            BlacklistModule.blacklistUser(user.id, myChannelId!);
                         }
                         BansModule.enforceBanPolicy(user.id, myChannelId!, useKickFirst, "Manual Ban");
                         showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
@@ -273,10 +308,10 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                     const { WhitelistModule } = require("./whitelist");
                     if (isPermitted) {
                         WhitelistModule.unpermitUser(user.id, myChannelId!);
-                        WhitelistModule.unwhitelistUser(user.id);
+                        WhitelistModule.unwhitelistUser(user.id, myChannelId!);
                         showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
                     } else {
-                        WhitelistModule.whitelistUser(user.id);
+                        WhitelistModule.whitelistUser(user.id, myChannelId!);
                         WhitelistModule.permitUser(user.id, myChannelId!);
                         showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
                     }
@@ -603,6 +638,7 @@ export const OwnershipModule: SocializeModule = {
         if (!settings) return;
 
         const currentUserId = Users.getCurrentUser()?.id;
+        logger.debug(`onVoiceStateUpdate: user ${newState.userId} (oldId: ${oldState.channelId}, newId: ${newState.channelId})`);
 
         if (oldState.channelId !== newState.channelId) {
             if (newState.channelId) {
@@ -672,8 +708,15 @@ export const OwnershipModule: SocializeModule = {
         }
 
         // Dynamic state updates for ban/permit/lock actions
-        if (response.initiatorId) {
-            const userId = response.initiatorId;
+        let userId = response.initiatorId;
+        const channelId = response.channelId || message.channel_id;
+
+        if (!userId) { // Fallback: If we can't find an initiator, assume it's the owner of the channel
+            const ownership = stateManager.getOwnership(channelId);
+            userId = ownership?.claimantId || ownership?.creatorId || undefined;
+        }
+
+        if (userId) {
             const description = response.getRawDescription().toLowerCase();
             const targetMatch = description.match(/<@!?(\d+)>/);
             const targetUserId = targetMatch?.[1];
@@ -758,11 +801,13 @@ export const OwnershipModule: SocializeModule = {
         const settings = getSettings();
         if (!settings) return;
 
+        const ownership = stateManager.getOwnership(channelId);
+        logger.debug(`handleUserJoinedChannel: user ${userId}, channel ${channelId}, hasOwnership: ${!!ownership}`);
+
         if (userId === currentUserId) {
             sendDebugMessage(channelId, `You joined managed channel <#${channelId}>`);
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
-            const ownership = stateManager.getOwnership(channelId);
             if (ownership) {
                 if (ownership.creatorId === userId || ownership.claimantId === userId) {
                     ChannelNameRotationModule.startRotation(channelId);
@@ -773,7 +818,6 @@ export const OwnershipModule: SocializeModule = {
             }
         }
 
-        const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
             sendDebugMessage(channelId, `<@${userId}> joined owned channel`);

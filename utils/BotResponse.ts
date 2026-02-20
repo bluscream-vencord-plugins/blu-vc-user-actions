@@ -70,10 +70,10 @@ export class BotResponse {
         if (check("Channel Created")) this.type = BotResponseType.CREATED;
         else if (check("Channel Claimed")) this.type = BotResponseType.CLAIMED;
         else if (check("Channel Settings") || check("Channel Info Updated")) this.type = BotResponseType.INFO;
-        else if (title.includes("banned successfully") || authorName.includes("banned successfully") || description.includes("__banned__")) this.type = BotResponseType.BANNED;
         else if (title.includes("unbanned successfully") || authorName.includes("unbanned successfully") || description.includes("__unbanned__")) this.type = BotResponseType.UNBANNED;
-        else if (title.includes("permitted successfully") || authorName.includes("permitted successfully") || description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
+        else if (title.includes("banned successfully") || authorName.includes("banned successfully") || description.includes("__banned__")) this.type = BotResponseType.BANNED;
         else if (title.includes("unpermitted successfully") || authorName.includes("unpermitted successfully") || description.includes("__unpermitted")) this.type = BotResponseType.UNPERMITTED;
+        else if (title.includes("permitted successfully") || authorName.includes("permitted successfully") || description.includes("__permitted")) this.type = BotResponseType.PERMITTED;
         else if (description.includes("__channel size__") || check("size set")) this.type = BotResponseType.SIZE_SET;
         else if (check("unlocked") || description.includes("__unlocked__")) this.type = BotResponseType.UNLOCKED;
         else if (check("locked") || description.includes("__locked__")) this.type = BotResponseType.LOCKED;

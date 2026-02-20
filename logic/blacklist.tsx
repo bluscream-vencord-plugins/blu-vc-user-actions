@@ -4,7 +4,7 @@ import { logger } from "../utils/logger";
 import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
-import { actionQueue } from "../utils/actionQueue";
+import { sendDebugMessage } from "../utils/debug";
 
 export const BlacklistModule: SocializeModule = {
     name: "BlacklistModule",
@@ -33,13 +33,15 @@ export const BlacklistModule: SocializeModule = {
         return this.getBlacklist().includes(userId);
     },
 
-    blacklistUser(userId: string) {
+    blacklistUser(userId: string, channelId?: string) {
         if (!this.settings || this.isBlacklisted(userId)) return;
         this.setBlacklist([...this.getBlacklist(), userId]);
+        if (channelId) sendDebugMessage(channelId, `User <@${userId}> added to local blacklist.`);
     },
 
-    unblacklistUser(userId: string) {
+    unblacklistUser(userId: string, channelId?: string) {
         if (!this.settings || !this.isBlacklisted(userId)) return;
         this.setBlacklist(this.getBlacklist().filter(id => id !== userId));
+        if (channelId) sendDebugMessage(channelId, `User <@${userId}> removed from local blacklist.`);
     }
 };

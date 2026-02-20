@@ -58,6 +58,11 @@ export const BansModule: SocializeModule = {
 
     evaluateUserJoin(userId: string, channelId: string, guildId: string): boolean {
         if (!this.settings) return false;
+        logger.debug(`Evaluating join for ${userId} in ${channelId}`);
+
+        const currentUserId = Users.getCurrentUser()?.id;
+        const config = currentUserId ? stateManager.getMemberConfig(currentUserId) : null;
+        const isBannedInState = config?.bannedUsers.includes(userId) ?? false;
 
         const isLocallyBlacklisted = this.settings.banInLocalBlacklist && BlacklistModule.isBlacklisted(userId);
         const isBlocked = this.settings.banBlockedUsers && RelationshipStore.isBlocked(userId);
@@ -72,13 +77,27 @@ export const BansModule: SocializeModule = {
                 isMissingRole = true;
             }
         }
+        const stateBan = config?.bannedUsers.includes(userId) ?? false;
+        const lastKickTime = this.recentlyKickedWaitlist.get(userId);
+        const hasRecentKick = !!lastKickTime;
 
-        if (isLocallyBlacklisted || isBlocked || isMissingRole) {
-            const reason = [isLocallyBlacklisted && "Blacklisted", isBlocked && "Blocked", isMissingRole && "Missing Role"].filter(Boolean).join(", ");
-            sendDebugMessage(channelId, `User <@${userId}> failed join check: ${reason}`);
+        logger.debug(`[BansModule] Evaluation details for ${userId}: blacklisted=${isLocallyBlacklisted}, blocked=${isBlocked}, missingRole=${isMissingRole}, stateBan=${stateBan}, recentKick=${hasRecentKick}`);
+
+        if (isLocallyBlacklisted || isBlocked || isMissingRole || stateBan || hasRecentKick) {
+            const reason = [
+                isLocallyBlacklisted && "Blacklisted",
+                isBlocked && "Blocked",
+                isMissingRole && "Missing Role",
+                stateBan && "Already Banned",
+                hasRecentKick && "Repeat Join"
+            ].filter(Boolean).join(", ");
+
+            sendDebugMessage(channelId, `User <@${userId}> join evaluation: **FAILED** (${reason}) [StateBan: ${stateBan}, Waitlist: ${hasRecentKick}]`);
             this.enforceBanPolicy(userId, channelId, true, reason);
             return true;
         }
+
+        logger.debug(`[BansModule] User ${userId} passed join evaluation`);
 
         return false;
     },
@@ -86,21 +105,27 @@ export const BansModule: SocializeModule = {
     enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false, reason?: string) {
         if (!this.settings) return;
 
-        if (kickFirst) {
-            const lastKickTime = this.recentlyKickedWaitlist.get(userId);
-            const now = Date.now();
-            const cooldownMs = this.settings.banRotateCooldown * 1000;
+        const lastKickTime = this.recentlyKickedWaitlist.get(userId);
+        const now = Date.now();
+        const cooldownMs = (this.settings.banRotateCooldown || 0) * 1000;
 
-            if (!lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs)) {
-                sendDebugMessage(channelId, `Kick-First applied. Kicking user ${userId}`);
+        logger.debug(`[BansModule] enforceBanPolicy for ${userId}: kickFirst=${kickFirst}, lastKick=${lastKickTime}, now=${now}, cooldown=${cooldownMs}`);
+
+        if (kickFirst) {
+            const shouldKick = !lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs);
+
+            if (shouldKick) {
+                sendDebugMessage(channelId, `Phase 1: Kick-First applied for <@${userId}>`);
+                this.recentlyKickedWaitlist.set(userId, now);
                 actionQueue.enqueue(
                     formatCommand(this.settings.kickCommand, channelId, { userId, reason }),
                     channelId,
                     true,
                     () => isUserInVoiceChannel(userId, channelId)
                 );
-                this.recentlyKickedWaitlist.set(userId, now);
                 return;
+            } else {
+                sendDebugMessage(channelId, `Phase 2: User <@${userId}> rejoined within cooldown. Escalating to BAN.`);
             }
         }
 
@@ -126,11 +151,15 @@ export const BansModule: SocializeModule = {
         }
 
         if (!config.bannedUsers.includes(userId)) {
-            config.bannedUsers.push(userId);
-            stateManager.updateMemberConfig(currentUserId, { bannedUsers: config.bannedUsers });
+            stateManager.updateMemberConfig(currentUserId, { bannedUsers: [...config.bannedUsers, userId] });
         }
 
-        actionQueue.enqueue(formatCommand(this.settings.banCommand, channelId, { userId, reason }), channelId, true);
+        actionQueue.enqueue(
+            formatCommand(this.settings.banCommand, channelId, { userId, reason }),
+            channelId,
+            true,
+            () => isUserInVoiceChannel(userId, channelId)
+        );
         this.recentlyKickedWaitlist.delete(userId);
     },
 
