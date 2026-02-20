@@ -32,7 +32,10 @@ export const BansModule: SocializeModule = {
 
             if (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId) return;
 
-            this.evaluateUserJoin(payload.userId, payload.channelId, payload.guildId);
+            if (this.evaluateUserJoin(payload.userId, payload.channelId, payload.guildId)) {
+                payload.isHandled = true;
+                payload.reason = "Ban Policy Violation";
+            }
         });
 
         moduleRegistry.on(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, () => {
@@ -49,14 +52,14 @@ export const BansModule: SocializeModule = {
         // Voice state updates are now handled via USER_JOINED_OWNED_CHANNEL in OwnershipModule -> BansModule
     },
 
-    evaluateUserJoin(userId: string, channelId: string, guildId: string) {
-        if (!this.settings) return;
+    evaluateUserJoin(userId: string, channelId: string, guildId: string): boolean {
+        if (!this.settings) return false;
 
         const isLocallyBlacklisted = this.settings.banInLocalBlacklist && BlacklistModule.isBlacklisted(userId);
         const isBlocked = this.settings.banBlockedUsers && RelationshipStore.isBlocked(userId);
 
         let isMissingRole = false;
-        if (this.settings.enforceRequiredRoles && this.settings.banNotInRoles && this.settings.requiredRoleIds?.trim().length > 0) {
+        if (this.settings.banNotInRoles && this.settings.requiredRoleIds?.trim().length > 0) {
             const requiredRoleList = getNewLineList(this.settings.requiredRoleIds);
             const member = GuildMemberStore.getMember(guildId, userId);
             if (member && member.roles) {
@@ -70,7 +73,10 @@ export const BansModule: SocializeModule = {
             const reason = [isLocallyBlacklisted && "Blacklisted", isBlocked && "Blocked", isMissingRole && "Missing Role"].filter(Boolean).join(", ");
             sendDebugMessage(channelId, `User <@${userId}> failed join check: ${reason}`);
             this.enforceBanPolicy(userId, channelId, true, reason);
+            return true;
         }
+
+        return false;
     },
 
     enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false, reason?: string) {

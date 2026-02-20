@@ -24,8 +24,11 @@ export const RoleEnforcementModule: SocializeModule = {
             const currentUserId = Users.getCurrentUser()?.id;
             if (!currentUserId || (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId)) return;
 
-            // Check required roles from settings if enforced
-            if (!settings.enforceRequiredRoles || !settings.requiredRoleIds || settings.requiredRoleIds.trim() === "") return;
+            // If we are banning for missing roles, BansModule should handle it.
+            if (settings.banNotInRoles) return;
+
+            // Check required roles from settings
+            if (!settings.requiredRoleIds || settings.requiredRoleIds.trim() === "") return;
 
             const requiredRoleList = getNewLineList(settings.requiredRoleIds);
 

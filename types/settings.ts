@@ -22,7 +22,7 @@ export const defaultSettings = definePluginSettings({
     setChannelNameCommand: { type: OptionType.STRING, description: "Set Channel Name Command Template", default: "!v name {channel_name_new}", restartNeeded: false },
 
     voteBanCommandString: { type: OptionType.STRING, description: "VoteBan Command Template (e.g., !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
-    voteBanRegex: { type: OptionType.STRING, description: "Regex to detect vote ban commands", default: "^(?:vk|!vote\\s+ban)\\s+<@!?(?<target>\\d+)>(?:\\s+(?<reason>.*))?", restartNeeded: false },
+    voteBanRegex: { type: OptionType.STRING, description: "Regex to detect vote ban commands", default: "^(?:!vote\\s+ban)\\s+<@!?(?<target>\\d+)>(?:\\s+(?<reason>.*))?", restartNeeded: false },
 
     channelNameRotationInterval: { type: OptionType.SLIDER, description: "Channel Name Rotation Interval (seconds)", default: 11 * 60, markers: [60, 300, 600, 1800], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.channelNameRotationInterval = Math.round(v); } },
     queueInterval: { type: OptionType.SLIDER, description: "Action Queue Interval (seconds)", default: 2, markers: [1, 2, 5, 10], restartNeeded: false, onChange: (v: number) => { defaultSettings.store.queueInterval = Math.round(v); } },
@@ -50,7 +50,6 @@ export const defaultSettings = definePluginSettings({
     localUserWhitelist: { type: OptionType.STRING, description: "Local User Whitelist (one ID per line)", default: "", multiline: true, restartNeeded: false },
 
     // Feature: Roles
-    enforceRequiredRoles: { type: OptionType.BOOLEAN, description: "Enforce Required Roles", default: false, restartNeeded: false },
     requiredRoleIds: { type: OptionType.STRING, description: "Required Role IDs (one ID per line)", default: "", multiline: true, restartNeeded: false }
 });
 

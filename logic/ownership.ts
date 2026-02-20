@@ -4,14 +4,13 @@ import { SocializeEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
-import { UserStore as Users } from "@webpack/common";
 import { Message, VoiceState } from "@vencord/discord-types";
 import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
-import { GuildChannelStore, ChannelStore, GuildStore } from "@webpack/common";
+import { GuildChannelStore, ChannelStore, GuildStore, SelectedChannelStore, UserStore as Users } from "@webpack/common";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 
 export const OwnershipModule: SocializeModule = {
@@ -19,6 +18,18 @@ export const OwnershipModule: SocializeModule = {
 
     init(settings: PluginSettings) {
         logger.info("OwnershipModule initializing");
+
+        // Check if we are already in a voice channel
+        const currentUserId = Users.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        const channelId = SelectedChannelStore.getVoiceChannelId();
+        if (channelId) {
+            const channel = ChannelStore.getChannel(channelId);
+            if (channel?.parent_id === settings.categoryId || channelId === settings.creationChannelId) {
+                this.handleUserJoinedChannel(currentUserId, channelId, currentUserId);
+            }
+        }
     },
 
     async fetchAllOwners() {
@@ -49,20 +60,27 @@ export const OwnershipModule: SocializeModule = {
     },
 
     onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
-        // Here we track when users join/leave the creation channel or owned channels
-        // Since we don't have exact Vencord types right now, we use Any
+        const settings = moduleRegistry["settings"];
+        if (!settings) return;
+
         const currentUserId = Users.getCurrentUser()?.id;
 
         // Check if a user joined or left a voice channel
         if (oldState.channelId !== newState.channelId) {
+            // Check if the joined channel is in our managed category
             if (newState.channelId) {
-                // User Joined a channel
-                this.handleUserJoinedChannel(newState.userId, newState.channelId, currentUserId);
+                const newChannel = ChannelStore.getChannel(newState.channelId);
+                if (newChannel?.parent_id === settings.categoryId || newState.channelId === settings.creationChannelId) {
+                    this.handleUserJoinedChannel(newState.userId, newState.channelId, currentUserId);
+                }
             }
 
+            // Check if the left channel was in our managed category
             if (oldState.channelId) {
-                // User Left a channel
-                this.handleUserLeftChannel(oldState.userId, oldState.channelId, currentUserId);
+                const oldChannel = ChannelStore.getChannel(oldState.channelId);
+                if (oldChannel?.parent_id === settings.categoryId || oldState.channelId === settings.creationChannelId) {
+                    this.handleUserLeftChannel(oldState.userId, oldState.channelId, currentUserId);
+                }
             }
         }
     },
@@ -221,14 +239,21 @@ export const OwnershipModule: SocializeModule = {
             sendDebugMessage(channelId, `You joined managed channel <#${channelId}>`);
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
-            // Check if we are the owner, if so restart naming rotation
+            // Check if we already know the ownership for this channel
             const ownership = stateManager.getOwnership(channelId);
-            if (ownership && (ownership.creatorId === userId || ownership.claimantId === userId)) {
-                ChannelNameRotationModule.startRotation(channelId);
+            if (ownership) {
+                // If we are the owner, restart naming rotation
+                if (ownership.creatorId === userId || ownership.claimantId === userId) {
+                    ChannelNameRotationModule.startRotation(channelId);
+                }
+            } else if (channelId !== settings.creationChannelId) {
+                // Unknown channel join - Proactively sync state
+                sendDebugMessage(channelId, `Unknown managed channel <#${channelId}> joined. Proactively requesting ownership info.`);
+                this.requestChannelInfo(channelId);
             }
         }
 
-        // If this is an owned channel, dispatch an event
+        // If this is a known owned channel, dispatch an event
         const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;

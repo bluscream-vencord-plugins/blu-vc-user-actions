@@ -40,8 +40,8 @@ export default definePlugin({
         moduleRegistry.register(WhitelistModule);
         moduleRegistry.register(BlacklistModule);
         moduleRegistry.register(ChannelNameRotationModule);
-        moduleRegistry.register(RoleEnforcementModule);
         moduleRegistry.register(BansModule);
+        moduleRegistry.register(RoleEnforcementModule);
         moduleRegistry.register(VoteBanningModule);
         moduleRegistry.register(CommandCleanupModule);
 
