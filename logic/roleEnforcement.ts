@@ -15,7 +15,9 @@ export const RoleEnforcementModule: SocializeModule = {
         logger.info("RoleEnforcementModule initializing");
 
         moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
-            const { channelId, userId } = payload;
+            if (payload.isAllowed || payload.isHandled) return;
+
+            const { channelId, userId, guildId } = payload;
             const ownership = stateManager.getOwnership(channelId);
             if (!ownership) return;
 
@@ -26,7 +28,6 @@ export const RoleEnforcementModule: SocializeModule = {
             if (!settings.enforceRequiredRoles || !settings.requiredRoleIds || settings.requiredRoleIds.trim() === "") return;
 
             const requiredRoleList = getNewLineList(settings.requiredRoleIds);
-            const guildId = settings.guildId;
 
             const member = GuildMemberStore.getMember(guildId, userId);
 
@@ -35,11 +36,10 @@ export const RoleEnforcementModule: SocializeModule = {
 
                 const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
 
-                // Check if they are whitelisted before kicking
-                const config = stateManager.getMemberConfig(currentUserId);
-                if (!config.whitelistedUsers.includes(userId)) {
-                    actionQueue.enqueue(kickCmd, channelId, true);
-                }
+                // Action taken
+                actionQueue.enqueue(kickCmd, channelId, true);
+                payload.isHandled = true;
+                payload.reason = "Missing Required Roles";
             }
         });
     },

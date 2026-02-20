@@ -214,6 +214,9 @@ export const OwnershipModule: SocializeModule = {
     },
 
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {
+        const settings = moduleRegistry["settings"];
+        if (!settings) return;
+
         if (userId === currentUserId) {
             sendDebugMessage(channelId, `You joined managed channel <#${channelId}>`);
             moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
@@ -228,8 +231,9 @@ export const OwnershipModule: SocializeModule = {
         // If this is an owned channel, dispatch an event
         const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
+            const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
             sendDebugMessage(channelId, `User Joined Owned Channel: <@${userId}> (Owner: <@${ownership.creatorId || ownership.claimantId}>)`);
-            moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId });
+            moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
         }
     },
 

@@ -10,7 +10,6 @@ import { formatCommand } from "../utils/formatting";
 import { MemberLike, extractId } from "../utils/parsing";
 import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settingsHelpers";
-import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
 
 export const BansModule: SocializeModule = {
@@ -21,6 +20,20 @@ export const BansModule: SocializeModule = {
     init(settings: PluginSettings) {
         this.settings = settings;
         logger.info("BansModule initializing");
+
+        moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+            if (payload.isAllowed || payload.isHandled) return;
+
+            const currentUserId = Users.getCurrentUser()?.id;
+            if (payload.userId === currentUserId) return;
+
+            const ownership = stateManager.getOwnership(payload.channelId);
+            if (!ownership) return;
+
+            if (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId) return;
+
+            this.evaluateUserJoin(payload.userId, payload.channelId, payload.guildId);
+        });
 
         moduleRegistry.on(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, () => {
             this.recentlyKickedWaitlist.clear();
@@ -33,24 +46,11 @@ export const BansModule: SocializeModule = {
     },
 
     onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
-        if (!this.settings) return;
-
-        if (newState.channelId && oldState.channelId !== newState.channelId) {
-            const currentUserId = Users.getCurrentUser()?.id;
-            if (newState.userId === currentUserId) return;
-
-            const ownership = stateManager.getOwnership(newState.channelId);
-            if (!ownership) return;
-
-            if (ownership.creatorId !== currentUserId && ownership.claimantId !== currentUserId) return;
-
-            this.evaluateUserJoin(newState.userId, newState.channelId, newState.guildId);
-        }
+        // Voice state updates are now handled via USER_JOINED_OWNED_CHANNEL in OwnershipModule -> BansModule
     },
 
     evaluateUserJoin(userId: string, channelId: string, guildId: string) {
         if (!this.settings) return;
-        if (WhitelistModule.isWhitelisted(userId)) return;
 
         const isLocallyBlacklisted = this.settings.banInLocalBlacklist && BlacklistModule.isBlacklisted(userId);
         const isBlocked = this.settings.banBlockedUsers && RelationshipStore.isBlocked(userId);

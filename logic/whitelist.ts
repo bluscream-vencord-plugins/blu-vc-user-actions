@@ -1,5 +1,6 @@
-import { SocializeModule } from "./moduleRegistry";
+import { SocializeModule, moduleRegistry } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
+import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../utils/actionQueue";
@@ -14,6 +15,13 @@ export const WhitelistModule: SocializeModule = {
     init(settings: PluginSettings) {
         this.settings = settings;
         logger.info("WhitelistModule initializing");
+
+        moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+            if (this.isWhitelisted(payload.userId)) {
+                payload.isAllowed = true;
+                payload.reason = "Whitelisted";
+            }
+        });
     },
 
     stop() {

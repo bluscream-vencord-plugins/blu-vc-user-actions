@@ -66,6 +66,10 @@ export interface EventPayloads {
     [SocializeEvent.USER_JOINED_OWNED_CHANNEL]: {
         channelId: string;
         userId: string;
+        guildId: string;
+        isAllowed?: boolean; // If true, other modules shouldn't kick/ban
+        isHandled?: boolean; // If true, an action has already been taken
+        reason?: string;      // Optional reason if handled/allowed
     };
     [SocializeEvent.USER_LEFT_OWNED_CHANNEL]: {
         channelId: string;
