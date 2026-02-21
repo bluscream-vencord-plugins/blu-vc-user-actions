@@ -2,7 +2,7 @@ import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { ActionQueueItem } from "../types/state";
-import { SocializeEvent, EventPayloads } from "../types/events";
+import { PluginModuleEvent, EventPayloads } from "../types/events";
 import { Message } from "@vencord/discord-types";
 import { OptionType } from "@utils/types";
 import { defaultSettings } from "../settings";
@@ -24,12 +24,12 @@ export const CommandCleanupModule: PluginModule = {
     settingsSchema: commandCleanupSettings,
     settings: null as unknown as Record<string, any>,
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         logger.info("CommandCleanupModule initializing");
 
         messageActionsModule = require("@webpack/common").MessageActions;
 
-        moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: EventPayloads[SocializeEvent.ACTION_EXECUTED]) => {
+        moduleRegistry.on<PluginModuleEvent.ACTION_EXECUTED>(PluginModuleEvent.ACTION_EXECUTED, (payload) => {
             const s = moduleRegistry.settings as any;
             if (!s?.commandCleanup) return;
             const item: ActionQueueItem = payload.item;

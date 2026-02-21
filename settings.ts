@@ -12,6 +12,7 @@ import { voteBanningSettings } from "./modules/voteBanning";
 import { commandCleanupSettings } from "./modules/commandCleanup";
 import { remoteOperatorsSettings } from "./modules/remoteOperators";
 import { ownershipSettings } from "./modules/ownership";
+import { autoClaimSettings } from "./modules/autoClaim";
 
 export const coreSettings = {
     // ── Commands ──────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ const combinedSettings = {
     ...commandCleanupSettings,
     ...remoteOperatorsSettings,
     ...ownershipSettings,
+    ...autoClaimSettings,
 };
 
 export const defaultSettings = definePluginSettings(combinedSettings as any);

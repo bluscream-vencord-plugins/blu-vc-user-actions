@@ -1,5 +1,4 @@
 import { PluginModule } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { VoiceStateStore } from "@webpack/common";
 import { ApplicationCommandOptionType } from "@api/Commands";
@@ -10,7 +9,6 @@ import { OptionType } from "@utils/types";
 import { defaultSettings } from "../settings";
 
 export const voteBanningSettings = {
-    // ── Vote Banning ──────────────────────────────────────────────────────
     voteBanCommandString: { type: OptionType.STRING, description: "Command users type to vote-ban someone (e.g. !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
     voteBanPercentage: { type: OptionType.SLIDER, description: "Percentage of channel occupants required to pass a vote ban", default: 50, markers: [10, 25, 50, 75, 100], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
     voteBanWindowSecs: { type: OptionType.SLIDER, description: "Seconds a vote-ban stays open before expiring", default: 5 * 60, markers: [30, 60, 120, 300, 600, 1800], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowSecs = Math.round(v); } },
@@ -25,7 +23,7 @@ export const VoteBanningModule: PluginModule = {
     settings: null as unknown as Record<string, any>,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         this.settings = settings;
         logger.info("VoteBanningModule initializing");
 

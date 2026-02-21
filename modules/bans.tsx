@@ -1,6 +1,6 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { RequiredRoleMode } from "./roleEnforcement";
-import { SocializeEvent } from "../types/events";
+import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
@@ -40,11 +40,11 @@ export const BansModule: PluginModule = {
     recentlyKickedWaitlist: new Map<string, number>(),
 
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         this.settings = settings;
         logger.info("BansModule initializing");
 
-        moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+        moduleRegistry.on<PluginModuleEvent.USER_JOINED_OWNED_CHANNEL>(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
             if (payload.isAllowed || payload.isHandled) return;
 
             const currentUserId = Users.getCurrentUser()?.id;
@@ -61,7 +61,7 @@ export const BansModule: PluginModule = {
             }
         });
 
-        moduleRegistry.on(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, () => {
+        moduleRegistry.on<PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL>(PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, () => {
             this.recentlyKickedWaitlist.clear();
         });
     },

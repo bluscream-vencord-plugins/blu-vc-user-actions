@@ -19,7 +19,8 @@ import { BansModule } from "./modules/bans";
 import { VoteBanningModule } from "./modules/voteBanning";
 import { CommandCleanupModule } from "./modules/commandCleanup";
 import { RemoteOperatorsModule } from "./modules/remoteOperators";
-import { contextMenuHandlers } from "./components/menus";
+import { AutoClaimModule } from "./modules/autoClaim";
+import { contextMenuHandlers } from "./utils/menus";
 
 export default definePlugin({
     ...pluginInfo,
@@ -48,6 +49,7 @@ export default definePlugin({
         moduleRegistry.register(VoteBanningModule);
         moduleRegistry.register(CommandCleanupModule);
         moduleRegistry.register(RemoteOperatorsModule);
+        moduleRegistry.register(AutoClaimModule);
 
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as LoosePluginSettings);

@@ -42,10 +42,10 @@ export function sendEphemeralMessage(channelId: string, content: string, authorN
     try {
         const { sendBotMessage } = require("@api/Commands");
         const { UserStore: Users } = require("@webpack/common");
-        const { defaultSettings } = require("../types/settings");
+        const { moduleRegistry } = require("../utils/moduleRegistry");
 
         const user = Users.getCurrentUser();
-        const settings = defaultSettings.store;
+        const settings = moduleRegistry.settings as any;
 
         let finalAuthorName = authorName || settings.ephemeralAuthorName || "Socialize Voice [!]";
         let finalAuthorIconUrl = authorIconUrl || settings.ephemeralAuthorIconUrl || "";

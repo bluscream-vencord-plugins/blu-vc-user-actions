@@ -1,11 +1,11 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
-import { SocializeEvent, BotResponseType } from "../types/events";
+import { PluginModuleEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership, MemberChannelInfo } from "../types/state";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
-import { BotResponse } from "../utils/BotResponse";
+import { BotResponse } from "../types/BotResponse";
 import { parseBotInfoMessage, extractId } from "../utils/parsing";
 import { ActionQueue, actionQueue } from "../utils/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
@@ -836,7 +836,7 @@ export const OwnershipModule: PluginModule = {
             return;
         }
 
-        moduleRegistry.dispatch(SocializeEvent.BOT_EMBED_RECEIVED, {
+        moduleRegistry.dispatch(PluginModuleEvent.BOT_EMBED_RECEIVED, {
             messageId: message.id,
             channelId: message.channel_id,
             type: response.type,
@@ -954,7 +954,7 @@ export const OwnershipModule: PluginModule = {
         const debugMsg = formatMessageCommon(`Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`);
         sendDebugMessage(debugMsg, channelId);
 
-        moduleRegistry.dispatch(SocializeEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
+        moduleRegistry.dispatch(PluginModuleEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
 
         if (ownerId === meId) {
             ChannelNameRotationModule.startRotation(channelId);
@@ -985,7 +985,7 @@ export const OwnershipModule: PluginModule = {
 
         if (userId === currentUserId) {
             sendDebugMessage(`You joined managed channel <#${channelId}>`, channelId);
-            moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
+            moduleRegistry.dispatch(PluginModuleEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
             if (ownership) {
                 if (ownership.creatorId === userId || ownership.claimantId === userId) {
@@ -1004,13 +1004,13 @@ export const OwnershipModule: PluginModule = {
             }
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
             sendDebugMessage(`<@${userId}> joined owned channel`, channelId);
-            moduleRegistry.dispatch(SocializeEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
+            moduleRegistry.dispatch(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
         }
     },
 
     handleUserLeftChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
-            moduleRegistry.dispatch(SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
+            moduleRegistry.dispatch(PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
             ChannelNameRotationModule.stopRotation(channelId);
         }
 
@@ -1020,7 +1020,7 @@ export const OwnershipModule: PluginModule = {
             if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) {
                 return;
             }
-            moduleRegistry.dispatch(SocializeEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
+            moduleRegistry.dispatch(PluginModuleEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
             if (ownership.creatorId === userId || ownership.claimantId === userId) {
                 sendDebugMessage(`Owner <@${userId}> left channel`, channelId);
                 if (userId === currentUserId) {

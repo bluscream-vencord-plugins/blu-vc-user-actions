@@ -60,7 +60,7 @@ export function parseVoiceUserFromInput(input: string, channelId: string): strin
     return undefined; // No matches found
 }
 import { MemberChannelInfo } from "../types/state";
-import { BotResponse } from "./BotResponse";
+import { BotResponse } from "../types/BotResponse";
 
 const Patterns = {
     CHANNEL_ID: [
@@ -82,6 +82,8 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
     const info: MemberChannelInfo = {
         userId: response.initiatorId || "",
         isLocked: false,
+        customName: null,
+        userLimit: null,
         bannedUsers: [],
         permittedUsers: [],
     };

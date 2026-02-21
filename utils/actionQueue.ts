@@ -34,8 +34,8 @@ export class ActionQueue {
     private emitQueuedEvent(item: ActionQueueItem) {
         try {
             const { moduleRegistry } = require("../utils/moduleRegistry");
-            const { SocializeEvent } = require("../types/events");
-            moduleRegistry.dispatch(SocializeEvent.ACTION_QUEUED, { item });
+            const { PluginModuleEvent } = require("../types/events");
+            moduleRegistry.dispatch(PluginModuleEvent.ACTION_QUEUED, { item });
         } catch (e) { }
     }
 
@@ -158,7 +158,7 @@ export class ActionQueue {
                     // Dispatch execution event for cleanup module
                     try {
                         const { moduleRegistry: registry } = require("../utils/moduleRegistry");
-                        const { SocializeEvent: events } = require("../types/events");
+                        const { PluginModuleEvent: events } = require("../types/events");
                         registry.dispatch(events.ACTION_EXECUTED, { item });
                     } catch (e) {
                         logger.error("Failed to dispatch ACTION_EXECUTED:", e);

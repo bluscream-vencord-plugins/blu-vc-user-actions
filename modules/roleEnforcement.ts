@@ -2,11 +2,10 @@ import { UserStore as Users, GuildMemberStore } from "@webpack/common";
 import { OptionType } from "@utils/types";
 
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
 import { stateManager } from "../utils/stateManager";
-import { SocializeEvent } from "../types/events";
+import { PluginModuleEvent } from "../types/events";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
 import { isUserInVoiceChannel } from "../utils/channels";
@@ -19,7 +18,6 @@ export enum RequiredRoleMode {
 }
 
 export const roleEnforcementSettings = {
-    // ── Role Enforcement ──────────────────────────────────────────────────
     banNotInRoles: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users missing required roles", default: true, restartNeeded: false },
     requiredRoleIds: { type: OptionType.STRING, description: "Required role IDs — users missing these are auto-kicked (one per line)", default: "", multiline: true, restartNeeded: false },
     requiredRoleMode: {
@@ -41,10 +39,10 @@ export const RoleEnforcementModule: PluginModule = {
     settingsSchema: roleEnforcementSettings,
     settings: null as unknown as Record<string, any>,
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         logger.info("RoleEnforcementModule initializing");
 
-        moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+        moduleRegistry.on<PluginModuleEvent.USER_JOINED_OWNED_CHANNEL>(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
             if (payload.isAllowed || payload.isHandled) return;
 
             const { channelId, userId, guildId } = payload;

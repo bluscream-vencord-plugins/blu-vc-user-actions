@@ -1,6 +1,6 @@
 // import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
-import { SocializeEvent, EventPayloads } from "../types/events";
+import { PluginModuleEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
 import { React, UserStore as Users, RestAPI, ChannelStore, SelectedChannelStore } from "@webpack/common";
@@ -46,7 +46,7 @@ export interface PluginModule {
     // Optional Event Hooks
     onVoiceStateUpdate?(oldState: VoiceState, newState: VoiceState): void;
     onMessageCreate?(message: Message): void;
-    onCustomEvent?<K extends SocializeEvent>(event: K, payload: EventPayloads[K]): void;
+    onCustomEvent?<K extends PluginModuleEvent>(event: K, payload: EventPayloads[K]): void;
 
     [key: string]: any;
 
@@ -63,7 +63,7 @@ export interface PluginModule {
 export class ModuleRegistry {
     private modules: PluginModule[] = [];
     private _settings!: Record<string, any>;
-    private eventListeners: Map<SocializeEvent, Array<(payload: unknown) => void>> = new Map();
+    private eventListeners: Map<PluginModuleEvent, Array<(payload: unknown) => void>> = new Map();
 
     public init(settings: Record<string, any>) {
         this._settings = settings;
@@ -148,16 +148,18 @@ export class ModuleRegistry {
     }
 
     // Custom Event Bus
-    public on<K extends SocializeEvent>(event: K, listener: (payload: EventPayloads[K]) => void) {
-        if (!this.eventListeners.has(event)) {
-            this.eventListeners.set(event, []);
+    public on<K extends keyof EventPayloads>(event: K, listener: (payload: EventPayloads[K]) => void) {
+        const eventKey = event as unknown as PluginModuleEvent;
+        if (!this.eventListeners.has(eventKey)) {
+            this.eventListeners.set(eventKey, []);
         }
-        this.eventListeners.get(event)!.push(listener as (payload: unknown) => void);
+        this.eventListeners.get(eventKey)!.push(listener as (payload: unknown) => void);
     }
 
-    public dispatch<K extends SocializeEvent>(event: K, payload: EventPayloads[K]) {
-        if (this.eventListeners.has(event)) {
-            for (const listener of this.eventListeners.get(event)!) {
+    public dispatch<K extends keyof EventPayloads>(event: K, payload: EventPayloads[K]) {
+        const eventKey = event as unknown as PluginModuleEvent;
+        if (this.eventListeners.has(eventKey)) {
+            for (const listener of this.eventListeners.get(eventKey)!) {
                 try {
                     listener(payload);
                 } catch (e) {
@@ -169,7 +171,7 @@ export class ModuleRegistry {
         // Also dispatch to modules directly if they have the hook
         for (const mod of this.modules) {
             if (mod.onCustomEvent) {
-                mod.onCustomEvent(event, payload);
+                mod.onCustomEvent(eventKey, payload);
             }
         }
     }

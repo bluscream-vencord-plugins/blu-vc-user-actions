@@ -15,7 +15,7 @@ export enum BotResponseType {
     UNKNOWN = "Unknown"
 }
 
-export enum SocializeEvent {
+export enum PluginModuleEvent {
     // Fired when the internal state of a channel changes
     CHANNEL_OWNERSHIP_CHANGED = "SOCIALIZE_CHANNEL_OWNERSHIP_CHANGED",
 
@@ -38,12 +38,12 @@ export enum SocializeEvent {
 }
 
 export interface EventPayloads {
-    [SocializeEvent.CHANNEL_OWNERSHIP_CHANGED]: {
+    [PluginModuleEvent.CHANNEL_OWNERSHIP_CHANGED]: {
         channelId: string;
         oldOwnership: ChannelOwnership | null;
         newOwnership: ChannelOwnership | null;
     };
-    [SocializeEvent.BOT_EMBED_RECEIVED]: {
+    [PluginModuleEvent.BOT_EMBED_RECEIVED]: {
         messageId: string;
         channelId: string;
         type: BotResponseType;
@@ -51,19 +51,19 @@ export interface EventPayloads {
         targetUserId?: string;
         embed: unknown; // Ideally Discord Embed type
     };
-    [SocializeEvent.ACTION_EXECUTED]: {
+    [PluginModuleEvent.ACTION_EXECUTED]: {
         item: ActionQueueItem;
     };
-    [SocializeEvent.ACTION_QUEUED]: {
+    [PluginModuleEvent.ACTION_QUEUED]: {
         item: ActionQueueItem;
     };
-    [SocializeEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL]: {
+    [PluginModuleEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL]: {
         channelId: string;
     };
-    [SocializeEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL]: {
+    [PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL]: {
         channelId: string;
     };
-    [SocializeEvent.USER_JOINED_OWNED_CHANNEL]: {
+    [PluginModuleEvent.USER_JOINED_OWNED_CHANNEL]: {
         channelId: string;
         userId: string;
         guildId: string;
@@ -71,7 +71,7 @@ export interface EventPayloads {
         isHandled?: boolean; // If true, an action has already been taken
         reason?: string;      // Optional reason if handled/allowed
     };
-    [SocializeEvent.USER_LEFT_OWNED_CHANNEL]: {
+    [PluginModuleEvent.USER_LEFT_OWNED_CHANNEL]: {
         channelId: string;
         userId: string;
     };

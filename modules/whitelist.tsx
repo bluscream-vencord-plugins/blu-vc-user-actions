@@ -1,6 +1,5 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
-import { SocializeEvent } from "../types/events";
+import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../utils/actionQueue";
@@ -17,11 +16,8 @@ import { OptionType } from "@utils/types";
 import { defaultSettings } from "../settings";
 
 export const whitelistSettings = {
-    // ── Whitelisting (exclude from auto-actions) ──────────────────────────
     localUserWhitelist: { type: OptionType.STRING, description: "Local whitelist — user IDs to exclude from auto-actions (one per line)", default: "", multiline: true, restartNeeded: false },
     whitelistSkipMessage: { type: OptionType.STRING, description: "Message sent when skipping an action for a whitelisted user (supports {action}, {user_id}, {user_name})", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
-
-    // ── Permitting ────────────────────────────────────────────────────────
     permitLimit: { type: OptionType.SLIDER, description: "Max users in permit list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.permitLimit = Math.round(v); } },
     permitRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest entry when permit limit is reached", default: false, restartNeeded: false },
     permitRotationMessage: { type: OptionType.STRING, description: "Message sent on permit rotation (supports {user_id}, {user_id_new})", default: "♻️ Permit rotated: <@{user_id}> was unpermitted to make room for <@{user_id_new}>", restartNeeded: false },
@@ -35,11 +31,11 @@ export const WhitelistModule: PluginModule = {
     settings: undefined as Record<string, any> | undefined,
 
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         this.settings = settings;
         logger.info("WhitelistModule initializing");
 
-        moduleRegistry.on(SocializeEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+        moduleRegistry.on<PluginModuleEvent.USER_JOINED_OWNED_CHANNEL>(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
             if (this.isWhitelisted(payload.userId)) {
                 payload.isAllowed = true;
                 payload.reason = "Whitelisted";
