@@ -10,7 +10,7 @@ import { actionQueue } from "./utils/actionQueue";
 import { ChannelStore, GuildChannelStore } from "@webpack/common";
 
 // Modules
-import { OwnershipModule } from "./logic/ownership";
+import { OwnershipModule, OwnershipActions } from "./logic/ownership";
 import { WhitelistModule } from "./logic/whitelist";
 import { BlacklistModule } from "./logic/blacklist";
 import { ChannelNameRotationModule } from "./logic/channelNameRotation";
@@ -50,6 +50,17 @@ export default definePlugin({
 
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as PluginSettings);
+
+        if (this.settings.store.autoCreateOnStartup) {
+            logger.info("autoCreateOnStartup is enabled. Waiting 10 seconds before finding/creating channel...");
+            setTimeout(() => {
+                try {
+                    OwnershipActions.findOrCreateChannel();
+                } catch (e) {
+                    logger.error("Failed to autoCreateOnStartup:", e);
+                }
+            }, 10000);
+        }
 
         logger.info(`SocializeGuild started. ${moduleRegistry["modules"].length} modules. Bot ID: ${this.settings.store.botId}`);
     },
