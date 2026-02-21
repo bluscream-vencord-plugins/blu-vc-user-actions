@@ -2,7 +2,7 @@ import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
-import { React, UserStore as Users } from "@webpack/common";
+import { React, UserStore as Users, RestAPI } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
 
 export interface ExternalCommandOption {
@@ -17,7 +17,7 @@ export interface ExternalCommand {
     description: string;
     options?: ExternalCommandOption[];
     checkPermission?: (message: Message, settings: PluginSettings) => boolean;
-    execute: (args: Record<string, any>, message: Message, channelId: string) => void;
+    execute: (args: Record<string, any>, message: Message, channelId: string) => Promise<boolean> | boolean;
 }
 
 export interface SocializeModule {
@@ -142,7 +142,7 @@ export class ModuleRegistry {
         return false;
     }
 
-    public dispatchMessageCreate(message: Message) {
+    public async dispatchMessageCreate(message: Message) {
         // Run standard message create handlers
         for (const mod of this.modules) {
             if (mod.onMessageCreate) {
@@ -255,7 +255,16 @@ export class ModuleRegistry {
                 }
 
                 sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
-                cmd.execute(parsedArgs, message, message.channel_id);
+                try {
+                    const success = await cmd.execute(parsedArgs, message, message.channel_id);
+                    const emoji = success ? "%E2%9C%85" : "%E2%9D%8C"; // ✅ : ❌
+                    RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/${emoji}/@me` }).catch(e => {
+                        sendDebugMessage(`⚠️ Failed to add reaction: ${e.message}`, message.channel_id);
+                    });
+                } catch (err: any) {
+                    sendDebugMessage(`❌ Error executing command \`${cmd.name}\`: ${err.message}`, message.channel_id);
+                    RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/%E2%9D%8C/@me` }).catch(() => { });
+                }
                 return; // Stop after first match
             }
         }

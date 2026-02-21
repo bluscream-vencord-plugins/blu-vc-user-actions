@@ -42,7 +42,7 @@ export const VoteBanningModule: SocializeModule = {
             execute: (args, msg, channelId) => {
                 const targetUser = args.target;
                 const reason = args.reason || "";
-                if (!targetUser) return;
+                if (!targetUser) return false;
 
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
@@ -52,6 +52,7 @@ export const VoteBanningModule: SocializeModule = {
 
                 // Usually message is in text channel, but we bind vote to their current VC
                 VoteBanningModule.registerVote(targetUser, voterId, vcId, guildId, reason);
+                return true;
             }
         }
     ],

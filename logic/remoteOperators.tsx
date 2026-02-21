@@ -60,7 +60,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (newName) {
                     logger.info(`RemoteOperator (${msg.author.username}): Renaming channel to ${newName}`);
                     OwnershipActions.renameChannel(channelId, newName);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -75,7 +77,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Banning user ${target}`);
                     BansModule.enforceBanPolicy(target, channelId, false, `Remote operator ban by ${msg.author.username}`);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -90,7 +94,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Kicking user ${target}`);
                     OwnershipActions.kickUser(channelId, target);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -100,6 +106,7 @@ export const RemoteOperatorsModule: SocializeModule = {
             execute: (args, msg, channelId) => {
                 logger.info(`RemoteOperator (${msg.author.username}): Locking channel`);
                 OwnershipActions.lockChannel(channelId);
+                return true;
             }
         },
         {
@@ -109,6 +116,7 @@ export const RemoteOperatorsModule: SocializeModule = {
             execute: (args, msg, channelId) => {
                 logger.info(`RemoteOperator (${msg.author.username}): Unlocking channel`);
                 OwnershipActions.unlockChannel(channelId);
+                return true;
             }
         },
         {
@@ -123,7 +131,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Permitting user ${target}`);
                     WhitelistModule.permitUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -138,7 +148,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unpermitting user ${target}`);
                     WhitelistModule.unpermitUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -153,7 +165,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Whitelisting user ${target}`);
                     WhitelistModule.whitelistUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -168,7 +182,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unwhitelisting user ${target}`);
                     WhitelistModule.unwhitelistUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -183,7 +199,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Blacklisting user ${target}`);
                     BlacklistModule.blacklistUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         },
         {
@@ -198,7 +216,9 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unblacklisting user ${target}`);
                     BlacklistModule.unblacklistUser(target, channelId);
+                    return true;
                 }
+                return false;
             }
         }
     ]
