@@ -2,6 +2,7 @@ import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { React, UserStore as Users } from "@webpack/common";
+import { sendDebugMessage } from "../utils/debug";
 
 export interface ExternalCommand {
     name: string;
@@ -152,11 +153,6 @@ export class ModuleRegistry {
         for (const mod of this.modules) {
             if (mod.externalCommands) {
                 for (const cmd of mod.externalCommands) {
-                    // Check permission
-                    if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
-                        continue;
-                    }
-
                     const regexString = cmd.getRegexString(this._settings);
                     if (!regexString) continue;
 
@@ -167,6 +163,11 @@ export class ModuleRegistry {
                         const match = content.match(regex);
 
                         if (match) {
+                            if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
+                                sendDebugMessage(`🛑 Rejected command \`${cmd.name}\` from <@${message.author.id}> (Missing Permissions)`, message.channel_id);
+                                continue;
+                            }
+                            sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
                             cmd.execute(match, message, message.channel_id);
                         }
                     } catch (e) {

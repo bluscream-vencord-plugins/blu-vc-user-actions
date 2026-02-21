@@ -74,6 +74,7 @@ export const defaultSettings = definePluginSettings({
     permitCommand: { type: OptionType.STRING, description: "Permit Command Template (use {user_id})", default: "!v permit {user_id}", restartNeeded: false },
     unpermitCommand: { type: OptionType.STRING, description: "Unpermit Command Template (use {user_id})", default: "!v unpermit {user_id}", restartNeeded: false },
     // ── Remote Operators ──────────────────────────────────────────────────
+    remoteOperatorsEnabled: { type: OptionType.BOOLEAN, description: "Enable Remote Operator Commands", default: true, restartNeeded: false },
     remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
     friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
     remoteOpRenameRegex: { type: OptionType.STRING, description: "Regex to detect remote rename command (named group: name)", default: "^<@!?{me}>\\s+(?:channel\\s+)?name\\s+(?<name>.+)", restartNeeded: false },
@@ -81,6 +82,10 @@ export const defaultSettings = definePluginSettings({
     remoteOpKickRegex: { type: OptionType.STRING, description: "Regex to detect remote kick command (named group: target)", default: "^<@!?{me}>\\s+kick\\s+<@!?(?<target>\\d+)>", restartNeeded: false },
     remoteOpLockRegex: { type: OptionType.STRING, description: "Regex to detect remote lock command", default: "^<@!?{me}>\\s+lock(?!\\w)", restartNeeded: false },
     remoteOpUnlockRegex: { type: OptionType.STRING, description: "Regex to detect remote unlock command", default: "^<@!?{me}>\\s+unlock(?!\\w)", restartNeeded: false },
+    remoteOpPermitRegex: { type: OptionType.STRING, description: "Regex to detect remote permit command (named group: target)", default: "^<@!?{me}>\\s+permit\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
+    remoteOpUnpermitRegex: { type: OptionType.STRING, description: "Regex to detect remote unpermit command (named group: target)", default: "^<@!?{me}>\\s+unpermit\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
+    remoteOpWhitelistRegex: { type: OptionType.STRING, description: "Regex to detect remote whitelist command (named group: target)", default: "^<@!?{me}>\\s+whitelist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
+    remoteOpUnwhitelistRegex: { type: OptionType.STRING, description: "Regex to detect remote unwhitelist command (named group: target)", default: "^<@!?{me}>\\s+unwhitelist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
 
     // ── Core ──────────────────────────────────────────────────────────────
     guildId: { type: OptionType.STRING, description: "Guild ID", default: "505974446914535426", restartNeeded: false },
