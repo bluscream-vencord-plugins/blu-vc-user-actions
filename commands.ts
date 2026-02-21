@@ -143,27 +143,6 @@ export const socializeCommands = [
         }
     },
     {
-        name: `${commandName} kick`,
-        description: "Kick a user from the current voice channel",
-        inputType: ApplicationCommandInputType.BUILT_IN,
-        options: [
-            {
-                name: "user",
-                description: "The user to kick",
-                type: ApplicationCommandOptionType.USER,
-                required: true
-            }
-        ],
-        execute: (args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user parameter." });
-
-            OwnershipActions.kickUser(ctx.channel.id, userId);
-            sendBotMessage(ctx.channel.id, { content: `Kick requested for <@${userId}>.` });
-        }
-    },
-    {
         name: `${commandName} kick-banned`,
         description: "Kick all locally banned users from the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
