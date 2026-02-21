@@ -9,6 +9,7 @@ import { BansModule } from "./bans";
 
 export const VoteBanningModule: SocializeModule = {
     name: "VoteBanningModule",
+    requiredDependencies: ["BansModule"],
     settings: null as unknown as PluginSettings,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
 

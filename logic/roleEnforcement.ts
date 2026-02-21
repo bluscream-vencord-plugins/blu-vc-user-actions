@@ -11,6 +11,7 @@ import { isUserInVoiceChannel } from "../utils/channels";
 
 export const RoleEnforcementModule: SocializeModule = {
     name: "RoleEnforcementModule",
+    optionalDependencies: ["BansModule"],
 
     init(settings: PluginSettings) {
         logger.info("RoleEnforcementModule initializing");

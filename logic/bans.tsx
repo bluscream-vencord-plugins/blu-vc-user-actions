@@ -18,6 +18,7 @@ import { sendBotMessage } from "@api/Commands";
 
 export const BansModule: SocializeModule = {
     name: "BansModule",
+    requiredDependencies: ["BlacklistModule"],
     settings: null as unknown as PluginSettings,
     recentlyKickedWaitlist: new Map<string, number>(),
 

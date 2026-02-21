@@ -698,6 +698,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
 
 export const OwnershipModule: SocializeModule = {
     name: "OwnershipModule",
+    requiredDependencies: ["WhitelistModule", "BansModule", "BlacklistModule", "ChannelNameRotationModule"],
 
     // ── Menu Item Hooks ──────────────────────────────────────
 

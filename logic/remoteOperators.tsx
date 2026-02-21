@@ -10,6 +10,7 @@ import { BlacklistModule } from "./blacklist";
 
 export const RemoteOperatorsModule: SocializeModule = {
     name: "RemoteOperatorsModule",
+    requiredDependencies: ["OwnershipModule", "BansModule", "WhitelistModule", "BlacklistModule"],
     settings: undefined as unknown as PluginSettings,
 
     init(settings: PluginSettings) {

@@ -24,6 +24,10 @@ export interface ExternalCommand {
 
 export interface SocializeModule {
     name: string;
+    /** Modules that MUST be initialized before this one */
+    requiredDependencies?: string[];
+    /** Modules that should be initialized before this one if they exist */
+    optionalDependencies?: string[];
     settings?: PluginSettings;
     init(settings: PluginSettings): void;
     stop(): void;
@@ -52,12 +56,71 @@ export class ModuleRegistry {
 
     public init(settings: PluginSettings) {
         this._settings = settings;
+
+        // Resolve load order based on dependencies
+        const sorted = this.resolveLoadOrder(this.modules);
+        this.modules = sorted; // Re-order internal storage to match init order
+
         for (const mod of this.modules) {
-            mod.init(settings);
+            try {
+                mod.init(settings);
+            } catch (e) {
+                console.error(`Failed to initialize module ${mod.name}:`, e);
+            }
         }
     }
 
+    private resolveLoadOrder(modules: SocializeModule[]): SocializeModule[] {
+        const sorted: SocializeModule[] = [];
+        const visited = new Set<string>();
+        const visiting = new Set<string>();
+        const moduleMap = new Map(modules.map(m => [m.name, m]));
+
+        const visit = (mod: SocializeModule) => {
+            if (visited.has(mod.name)) return;
+            if (visiting.has(mod.name)) {
+                console.error(`Circular dependency detected in SocializeModule: ${mod.name}`);
+                visited.add(mod.name); // Break cycle
+                return;
+            }
+
+            visiting.add(mod.name);
+
+            // Required Deps
+            for (const depName of mod.requiredDependencies || []) {
+                const dep = moduleMap.get(depName);
+                if (dep) {
+                    visit(dep);
+                } else {
+                    console.error(`Missing required dependency for ${mod.name}: ${depName}`);
+                }
+            }
+
+            // Optional Deps
+            for (const depName of mod.optionalDependencies || []) {
+                const dep = moduleMap.get(depName);
+                if (dep) {
+                    visit(dep);
+                }
+            }
+
+            visiting.delete(mod.name);
+            visited.add(mod.name);
+            sorted.push(mod);
+        };
+
+        for (const mod of modules) {
+            visit(mod);
+        }
+
+        return sorted;
+    }
+
     public register(module: SocializeModule) {
+        if (this.modules.some(m => m.name === module.name)) {
+            console.warn(`Module ${module.name} is already registered.`);
+            return;
+        }
         this.modules.push(module);
     }
 
