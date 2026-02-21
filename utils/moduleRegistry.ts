@@ -3,68 +3,144 @@ import { logger } from "../utils/logger";
 import { PluginModuleEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
-import { React, UserStore as Users, RestAPI, ChannelStore, SelectedChannelStore } from "@webpack/common";
-import { getNewLineList } from "../utils/settingsHelpers";
+import { UserStore as Users, ChannelStore, SelectedChannelStore } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
-import { ActionQueue, actionQueue } from "../utils/actionQueue";
-import { isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channels";
-import { formatCommand } from "../utils/formatting";
+import { findAssociatedTextChannel } from "../utils/channels";
 import { extractId } from "../utils/parsing"; // Keeping this as it was in the original and instruction 1 mentioned it
-import { stateManager } from "../utils/stateManager";
-import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
+import { stateManager } from "../utils/state";
+import { sendEphemeralMessage } from "../utils/messaging";
 
 const COMMAND_TIMEOUT = 10000;
 
+/**
+ * Represents an option for an external text command.
+ */
 export interface ExternalCommandOption {
+    /** The name of the option */
     name: string;
+    /** A descriptive string explaining what the option does */
     description: string;
+    /** The type of the option (e.g., STRING, USER, INTEGER) */
     type: ApplicationCommandOptionType;
+    /** Whether the option is required for the command to execute */
     required?: boolean;
 }
 
+/**
+ * Represents an external text command that can be triggered via chat.
+ */
 export interface ExternalCommand {
+    /** The unique name of the command */
     name: string;
+    /** A descriptive string explaining the command's purpose */
     description: string;
+    /** Optional list of aliases for the command */
     aliases?: string[];
+    /** Optional list of arguments/options for the command */
     options?: ExternalCommandOption[];
+    /**
+     * Optional permission check before execution.
+     * @param message The Discord message object that triggered the command
+     * @param settings The current plugin settings
+     * @returns True if the user has permission to run the command
+     */
     checkPermission?: (message: Message, settings: Record<string, any>) => boolean;
+    /**
+     * Executes the command logic.
+     * @param args The parsed arguments for the command
+     * @param message The Discord message object that triggered the command
+     * @param channelId The ID of the channel where the command should be processed
+     * @returns A boolean or a promise resolving to a boolean indicating success
+     */
     execute: (args: Record<string, any>, message: Message, channelId: string) => Promise<boolean> | boolean;
 }
 
+/**
+ * Represents a modular component of the SocializeGuild plugin.
+ */
 export interface PluginModule {
+    /** The unique identifier name of the module */
     name: string;
+    /** A brief description of the module's purpose */
+    description?: string;
     /** Modules that MUST be initialized before this one */
     requiredDependencies?: string[];
     /** Modules that should be initialized before this one if they exist */
     optionalDependencies?: string[];
     /** The Vencord settings schema definitions for this module */
     settingsSchema?: Record<string, any>;
+    /** Current instance-specific settings for this module */
     settings?: Record<string, any>;
+    /**
+     * Initializes the module with the provided settings.
+     * @param settings The aggregated plugin settings
+     */
     init(settings: Record<string, any>): void;
+    /**
+     * Callback invoked when the plugin is stopping to perform any necessary cleanup.
+     */
     stop(): void;
 
-    // Optional Event Hooks
+    /**
+     * Optional hook for processing voice state updates.
+     * @param oldState The previous voice state
+     * @param newState The updated voice state
+     */
     onVoiceStateUpdate?(oldState: VoiceState, newState: VoiceState): void;
+    /**
+     * Optional hook for processing newly created messages.
+     * @param message The Discord message created
+     */
     onMessageCreate?(message: Message): void;
+    /**
+     * Optional hook for processing custom events from other modules.
+     * @param event The event type identifier
+     * @param payload The data associated with the event
+     */
     onCustomEvent?<K extends PluginModuleEvent>(event: K, payload: EventPayloads[K]): void;
 
     [key: string]: any;
 
-    // Menu Item Hooks
+    /**
+     * Optional hook to provide custom items for the voice channel toolbox menu.
+     * @param channel The channel currently being interacted with
+     */
     getToolboxMenuItems?(channel?: Channel): React.ReactElement[] | null;
+    /**
+     * Optional hook to provide custom items for the channel context menu.
+     * @param channel The channel targeted by the context menu
+     */
     getChannelMenuItems?(channel: Channel): React.ReactElement[] | null;
+    /**
+     * Optional hook to provide custom items for the user context menu.
+     * @param user The user targeted by the context menu
+     * @param channel The optional channel context
+     */
     getUserMenuItems?(user: User, channel?: Channel): React.ReactElement[] | null;
+    /**
+     * Optional hook to provide custom items for the guild context menu.
+     * @param guild The guild targeted by the context menu
+     */
     getGuildMenuItems?(guild: Guild): React.ReactElement[] | null;
 
-    // External Text Commands
+    /**
+     * Optional list of external text commands supported by this module.
+     */
     externalCommands?: ExternalCommand[];
 }
 
+/**
+ * Global registry responsible for managing plugin modules, their lifecycles, and event dispatching.
+ */
 export class ModuleRegistry {
     private modules: PluginModule[] = [];
     private _settings!: Record<string, any>;
     private eventListeners: Map<PluginModuleEvent, Array<(payload: unknown) => void>> = new Map();
 
+    /**
+     * Initializes all registered modules with the provided settings, following the dependency graph.
+     * @param settings The aggregated plugin settings
+     */
     public init(settings: Record<string, any>) {
         this._settings = settings;
 
@@ -127,6 +203,10 @@ export class ModuleRegistry {
         return sorted;
     }
 
+    /**
+     * Registers a new module with the registry.
+     * @param module The module instance to register
+     */
     public register(module: PluginModule) {
         if (this.modules.some(m => m.name === module.name)) {
             console.warn(`Module ${module.name} is already registered.`);
@@ -135,6 +215,9 @@ export class ModuleRegistry {
         this.modules.push(module);
     }
 
+    /**
+     * Stops all modules and clears the registry state.
+     */
     public stop() {
         for (const mod of this.modules) {
             mod.stop();
@@ -143,11 +226,19 @@ export class ModuleRegistry {
         this.modules = [];
     }
 
+    /**
+     * Returns the currently stored aggregated plugin settings.
+     */
     public get settings(): Record<string, any> {
         return this._settings;
     }
 
     // Custom Event Bus
+    /**
+     * Subscribes to a custom internal event.
+     * @param event The event identifier
+     * @param listener Callback function when the event is dispatched
+     */
     public on<K extends keyof EventPayloads>(event: K, listener: (payload: EventPayloads[K]) => void) {
         const eventKey = event as unknown as PluginModuleEvent;
         if (!this.eventListeners.has(eventKey)) {
@@ -156,6 +247,11 @@ export class ModuleRegistry {
         this.eventListeners.get(eventKey)!.push(listener as (payload: unknown) => void);
     }
 
+    /**
+     * Dispatches a custom event to all subscribers and direct module hooks.
+     * @param event The event identifier
+     * @param payload The metadata associated with the event
+     */
     public dispatch<K extends keyof EventPayloads>(event: K, payload: EventPayloads[K]) {
         const eventKey = event as unknown as PluginModuleEvent;
         if (this.eventListeners.has(eventKey)) {
@@ -177,23 +273,45 @@ export class ModuleRegistry {
     }
 
     // Menu Item Collection
+    /**
+     * Collects toolbox menu items from all registered modules.
+     * @param channel The current active channel context
+     */
     public collectToolboxItems(channel?: Channel): React.ReactElement[] {
         return this.modules.flatMap(m => m.getToolboxMenuItems?.(channel) || []).filter(Boolean);
     }
 
+    /**
+     * Collects channel context menu items from all registered modules.
+     * @param channel The target channel
+     */
     public collectChannelItems(channel: Channel): React.ReactElement[] {
         return this.modules.flatMap(m => m.getChannelMenuItems?.(channel) || []).filter(Boolean);
     }
 
+    /**
+     * Collects user context menu items from all registered modules.
+     * @param user The target user
+     * @param channel The optional channel context
+     */
     public collectUserItems(user: User, channel?: Channel): React.ReactElement[] {
         return this.modules.flatMap(m => m.getUserMenuItems?.(user, channel) || []).filter(Boolean);
     }
 
+    /**
+     * Collects guild context menu items from all registered modules.
+     * @param guild The target guild
+     */
     public collectGuildItems(guild: Guild): React.ReactElement[] {
         return this.modules.flatMap(m => m.getGuildMenuItems?.(guild) || []).filter(Boolean);
     }
 
     // Discord Event Dispatchers
+    /**
+     * Dispatches a Discord VOICE_STATE_UPDATE event to all modules.
+     * @param oldState The previous voice state
+     * @param newState The updated voice state
+     */
     public dispatchVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
         // logger.debug(`Dispatching voice state update for user ${newState?.userId || oldState?.userId}`);
         for (const mod of this.modules) {
@@ -207,6 +325,11 @@ export class ModuleRegistry {
         }
     }
 
+    /**
+     * Checks if the author of a message has permission to execute external commands.
+     * @param message The Discord message object
+     * @returns True if at least one module grants permission
+     */
     public checkExternalPermissions(message: Message): boolean {
         for (const mod of this.modules) {
             if (mod.externalCommands) {
@@ -220,6 +343,10 @@ export class ModuleRegistry {
         return false;
     }
 
+    /**
+     * Dispatches a Discord MESSAGE_CREATE event and processes potential external text commands.
+     * @param message The Discord message created
+     */
     public async dispatchMessageCreate(message: Message) {
         // Run standard message create handlers
         for (const mod of this.modules) {
@@ -404,4 +531,7 @@ export class ModuleRegistry {
     }
 }
 
+/**
+ * The singleton instance of the ModuleRegistry.
+ */
 export const moduleRegistry = new ModuleRegistry();

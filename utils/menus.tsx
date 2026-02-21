@@ -1,10 +1,16 @@
 import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChannelStore } from "@webpack/common";
 
 // Vencord types
-import { User, Channel, Guild } from "@vencord/discord-types";
 import { moduleRegistry } from "./moduleRegistry";
 import { logger } from "./logger";
 
+/**
+ * Injects a new menu item into a specific submenu or group within a native Discord context menu.
+ * @param children The current array of children in the native menu
+ * @param menuId Unique ID for the new menu item
+ * @param menuLabel Human-readable label for the menu item
+ * @param newItems Array of menu elements to be added
+ */
 export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[]) {
     const newMenu = (
         <Menu.MenuItem id={menuId} label={menuLabel} key={menuId}>
@@ -27,6 +33,9 @@ export function addToSubmenu(children: any[], menuId: string, menuLabel: string,
     }
 }
 
+/**
+ * Object containing hooks for various Discord context menus to inject custom plugin items.
+ */
 export const contextMenuHandlers = {
     "user-context": (children: any[], props: any) => {
         if (!props) return;

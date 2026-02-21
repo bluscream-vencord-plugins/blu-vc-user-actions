@@ -1,3 +1,7 @@
 import { Logger } from "@utils/Logger";
+import { pluginInfo } from "../info";
 
-export const logger = new Logger("SocializeGuild", "#5865F2");
+/**
+ * The singleton logger instance for the SocializeGuild plugin.
+ */
+export const logger = new Logger(pluginInfo.name, pluginInfo.color);

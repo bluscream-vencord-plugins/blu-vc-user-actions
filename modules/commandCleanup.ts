@@ -1,15 +1,19 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { ActionQueueItem } from "../types/state";
-import { PluginModuleEvent, EventPayloads } from "../types/events";
+import { PluginModuleEvent } from "../types/events";
 import { Message } from "@vencord/discord-types";
 import { OptionType } from "@utils/types";
 import { defaultSettings } from "../settings";
 
+/**
+ * Settings definitions for the CommandCleanupModule.
+ */
 export const commandCleanupSettings = {
     // ── Command Cleanup ───────────────────────────────────────────────────
+    /** When enabled, the plugin will automatically delete your bot command messages after sending them. */
     commandCleanup: { type: OptionType.BOOLEAN, description: "Delete command messages automatically after sending", default: true, restartNeeded: false },
+    /** The delay in milliseconds to wait before deleting the command message. */
     commandCleanupDelay: { type: OptionType.SLIDER, description: "Delay before deleting command (ms)", default: 1000, markers: [0, 500, 1000, 2000, 5000], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.commandCleanupDelay = Math.round(v); } },
 };
 
@@ -21,6 +25,7 @@ let messageActionsModule: any = null;
 
 export const CommandCleanupModule: PluginModule = {
     name: "CommandCleanupModule",
+    description: "Cleans up (deletes) bot command messages sent by the plugin.",
     settingsSchema: commandCleanupSettings,
     settings: null as unknown as Record<string, any>,
 

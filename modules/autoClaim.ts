@@ -2,13 +2,18 @@ import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
-import { stateManager } from "../utils/stateManager";
+import { stateManager } from "../utils/state";
 import { VoiceStateStore, UserStore, ChannelStore } from "@webpack/common";
 import { OptionType } from "@utils/types";
 import { formatCommand } from "../utils/formatting";
+import { sendDebugMessage } from "../utils/debug";
 
+/**
+ * Settings definitions for the AutoClaimModule.
+ */
 export const autoClaimSettings = {
     // ── Auto Claim ────────────────────────────────────────────────────────
+    /** When enabled, the plugin will attempt to claim a voice channel automatically if the current owner leaves. */
     autoClaimDisbanded: {
         type: OptionType.BOOLEAN,
         description: "Automatically claim the channel you're in when its owner leaves",
@@ -21,6 +26,7 @@ export type AutoClaimSettingsType = typeof autoClaimSettings;
 
 export const AutoClaimModule: PluginModule = {
     name: "AutoClaimModule",
+    description: "Automatically claims voice channels when their owners leave or are missing.",
     settingsSchema: autoClaimSettings,
     settings: null as unknown as Record<string, any>,
 
@@ -60,6 +66,11 @@ export const AutoClaimModule: PluginModule = {
         logger.info("AutoClaimModule stopping");
     },
 
+    /**
+     * Internal logic to verify if a channel is currently "disbanded" (has no owners present)
+     * and enqueue a claim command if the local user is present.
+     * @param channelId The target voice channel ID
+     */
     checkAndClaimIfDisbanded(channelId: string) {
         const me = UserStore.getCurrentUser();
         if (!me) return;
@@ -79,7 +90,9 @@ export const AutoClaimModule: PluginModule = {
 
         // If no owner is present in the voice channel, auto claim it
         if (!isCreatorPresent && !isClaimantPresent) {
-            logger.info(`Channel ${channelId} is disbanded (All owners left or missing). Auto-claiming...`);
+            const msg = `Channel ${channelId} is disbanded (All owners left or missing). Auto-claiming...`;
+            logger.info(msg);
+            sendDebugMessage(msg, channelId);
 
             // Get the claim command from global settings (which usually comes from Ownership module)
             const globalSettings = moduleRegistry.settings as any;

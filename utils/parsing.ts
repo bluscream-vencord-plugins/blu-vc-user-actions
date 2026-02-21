@@ -1,15 +1,26 @@
 import { UserStore, VoiceStateStore, GuildMemberStore } from "@webpack/common";
 import { User } from "@vencord/discord-types";
 
+/**
+ * Represents a type that can be treated as a member, providing various ways to access a user ID.
+ */
 export type MemberLike = { userId?: string, id?: string, user?: { id: string } };
 
+/**
+ * Normalizes a member object or string into a plain user ID string.
+ * @param member The member object or string ID
+ * @returns The extracted user ID
+ */
 export function extractId(member: MemberLike | string): string {
     if (typeof member === "string") return member;
     return member.userId || member.user?.id || member.id || "";
 }
 
 /**
- * Searches the voice channel for users matching the query (ID, mention, or partial name).
+ * Searches for a user in a specific voice channel by mention, ID, or partial name match.
+ * @param input The search query string
+ * @param channelId The ID of the voice channel to search in
+ * @returns The ID of the matching user, or undefined if no unique match found
  */
 export function parseVoiceUserFromInput(input: string, channelId: string): string | undefined {
     if (!input || !channelId) return undefined;
@@ -75,6 +86,11 @@ const Patterns = {
     USER_MENTION: /<@!?(\d+)>/
 };
 
+/**
+ * Parses a rich embed message from the moderation bot to extract channel ownership and status information.
+ * @param response The bot response object containing the embed
+ * @returns The parsed channel info and target channel ID, or null if parsing failed
+ */
 export function parseBotInfoMessage(response: BotResponse): { info: MemberChannelInfo, channelId: string } | null {
     if (!response.embed) return null;
     const rawDescription = response.getRawDescription();

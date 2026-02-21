@@ -2,18 +2,24 @@ import { ActionQueueItem } from "../types/state";
 
 import { logger } from "./logger";
 import { sendDebugMessage } from "./debug";
-import { sendExternalMessage } from "./messaging";
 import { OptionType } from "@utils/types";
 import { defaultSettings } from "../settings"; // Temporary cross import until fully decoupled
 
+/**
+ * Settings configuration for the ActionQueue.
+ */
 export const actionQueueSettings = {
+    /** Whether the action queue is globally enabled */
     queueEnabled: { type: OptionType.BOOLEAN, description: "Enable Action Queue", default: true, restartNeeded: false },
+    /** The interval in seconds between processing successive commands in the queue */
     queueInterval: { type: OptionType.SLIDER, description: "Action Queue Interval (seconds)", default: 2, markers: [1, 2, 5, 10], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.queueInterval = Math.round(v); } },
 };
 
 export type ActionQueueSettingsType = typeof actionQueueSettings;
 
-// Simple Action Queue
+/**
+ * A throttled execution queue used to send bot commands with a forced delay, preventing rate limits.
+ */
 export class ActionQueue {
     private queue: ActionQueueItem[] = [];
     private priorityQueue: ActionQueueItem[] = [];
@@ -23,10 +29,18 @@ export class ActionQueue {
     // Injected dependency to actually send commands
     private sendCommandCallback: ((command: string, channelId: string) => Promise<any>) | null = null;
 
+    /**
+     * Sets the default delay between actions in the queue.
+     * @param ms Delay in milliseconds
+     */
     public setDelay(ms: number) {
         this.delayMs = ms;
     }
 
+    /**
+     * Injects the callback function used to perform the actual message sending.
+     * @param callback Async function received (command, channelId) returning the server response
+     */
     public setCommandSender(callback: (command: string, channelId: string) => Promise<any>) {
         this.sendCommandCallback = callback;
     }
@@ -39,6 +53,13 @@ export class ActionQueue {
         } catch (e) { }
     }
 
+    /**
+     * Adds a new command to the queue for deferred execution.
+     * @param command The bot command string to send
+     * @param channelId The target Discord channel ID
+     * @param priority If true, the item is added to the priority queue processed before standard items
+     * @param executeCondition Optional callback checked immediately before execution; if returns false, the action is skipped
+     */
     public enqueue(command: string, channelId: string, priority: boolean = false, executeCondition?: () => boolean) {
         // Auto-prioritize specific high value bot actions
         if (command.includes(" claim") || command.includes(" info")) {
@@ -66,6 +87,12 @@ export class ActionQueue {
         this.processQueue();
     }
 
+    /**
+     * Adds a command directly to the very front of the execution queue.
+     * @param command Bot command string
+     * @param channelId Target channel ID
+     * @param executeCondition Optional pre-flight check
+     */
     public unshift(command: string, channelId: string, executeCondition?: () => boolean) {
         const item: ActionQueueItem = {
             id: Math.random().toString(36).substring(7),
@@ -82,6 +109,9 @@ export class ActionQueue {
         this.processQueue();
     }
 
+    /**
+     * Clears all pending items from the queue.
+     */
     public clear() {
         this.queue = [];
         this.priorityQueue = [];
@@ -177,4 +207,7 @@ export class ActionQueue {
     }
 }
 
+/**
+ * The singleton instance of the ActionQueue.
+ */
 export const actionQueue = new ActionQueue();

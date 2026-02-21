@@ -1,7 +1,9 @@
 import { UserStore, ChannelStore, GuildStore } from "@webpack/common";
 
 /**
- * Common formatter for basic messages like Skip Whitelist
+ * Formats a string with common placeholders like {now}, {me_id}, {me_name}.
+ * @param text The template string
+ * @returns The formatted string
  */
 export function formatMessageCommon(text: string): string {
     const me = UserStore.getCurrentUser();
@@ -30,17 +32,27 @@ export function formatMessageCommon(text: string): string {
 }
 
 /**
- * Format string replacing {user_id}, {channel_id}, {user} etc.
+ * Formats a bot command template with channel, guild, and user-specific metadata.
+ * @param template The command string containing placeholders (e.g., {channel_name}, {user})
+ * @param channelId The ID of the context channel
+ * @param options Additional metadata for placeholder replacement
+ * @returns The fully formatted command string
  */
 export function formatCommand(
     template: string,
     channelId: string,
     options?: {
+        /** The ID of the primary user targeted by the command */
         userId?: string;
+        /** The ID of a secondary user (e.g., for transfers) */
         newUserId?: string;
+        /** A new name for a channel */
         newChannelName?: string;
+        /** A reason to be included in the command output */
         reason?: string;
+        /** A size or limit value */
         size?: string;
+        /** A generic name placeholder */
         name?: string;
     }
 ): string {
@@ -93,7 +105,10 @@ export function formatCommand(
 }
 
 /**
- * Converts a timestamp to Discord's relative/absolute time format.
+ * Converts a timestamp or Date object to a Discord-formatted timestamp string (e.g., <t:1234567890:R>).
+ * @param datetime The date/timestamp to format
+ * @param relative If true, uses the relative time format (:R)
+ * @returns The Discord timestamp string
  */
 export function toDiscordTime(datetime: number | Date, relative = false): string {
     const timestamp = typeof datetime === 'number' ? datetime : datetime.getTime();

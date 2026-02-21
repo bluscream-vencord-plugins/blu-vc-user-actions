@@ -3,30 +3,38 @@ import { RequiredRoleMode } from "./roleEnforcement";
 import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
-import { stateManager } from "../utils/stateManager";
-import { UserStore as Users, RelationshipStore, GuildMemberStore, VoiceStateStore } from "@webpack/common";
-import { VoiceState } from "@vencord/discord-types";
+import { stateManager } from "../utils/state";
+import { UserStore as Users, RelationshipStore, GuildMemberStore } from "@webpack/common";
 import { formatCommand } from "../utils/formatting";
 import { MemberLike, extractId } from "../utils/parsing";
 import { sendDebugMessage } from "../utils/debug";
-import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
-import { getNewLineList } from "../utils/settingsHelpers";
+import { sendEphemeralMessage } from "../utils/messaging";
+import { getNewLineList } from "../utils/settings";
 import { isUserInVoiceChannel } from "../utils/channels";
 import { BlacklistModule } from "./blacklist";
-import { User, Channel } from "@vencord/discord-types";
-import { Menu, React } from "@webpack/common";
-import { sendBotMessage } from "@api/Commands";
 import { OptionType } from "@utils/types";
+import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 import { defaultSettings } from "../settings";
+import { pluginInfo } from "../info";
 
+/**
+ * Settings definitions for the BansModule.
+ */
 export const banSettings = {
     // ── Banning ───────────────────────────────────────────────────────────
+    /** Maximum number of users that can be in the bot's ban list before rotation logic triggers. */
     banLimit: { type: OptionType.SLIDER, description: "Max users in ban list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.banLimit = Math.round(v); } },
+    /** Whether to automatically unban the oldest entry when the ban limit is reached and a new ban is needed. */
     banRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest ban when limit is reached", default: true, restartNeeded: false },
+    /** Minimum duration in seconds to wait before re-kicking a user to prevent kick loops. */
     banRotateCooldown: { type: OptionType.NUMBER, description: "Minimum seconds before re-kicking a user (0 = infinite)", default: 0, restartNeeded: false },
+    /** The message template used when a ban is rotated. */
     banRotationMessage: { type: OptionType.STRING, description: "Message sent on ban rotation (supports {user_id}, {user_id_new})", default: "♻️ Ban rotated: <@{user_id}> was unbanned to make room for <@{user_id_new}>", restartNeeded: false },
+    /** Whether to automatically enforce the local user blacklist. */
     banInLocalBlacklist: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users in the local blacklist", default: true, restartNeeded: false },
+    /** Whether to automatically kick/ban users you have blocked on Discord. */
     banBlockedUsers: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users you have blocked", default: true, restartNeeded: false },
+    /** A local list of user IDs to be automatically kicked from your channels. */
     localUserBlacklist: { type: OptionType.STRING, description: "Local ban list — user IDs to auto-kick (one per line)", default: "", multiline: true, restartNeeded: false },
 };
 
@@ -34,9 +42,11 @@ export type BanSettingsType = typeof banSettings;
 
 export const BansModule: PluginModule = {
     name: "BansModule",
+    description: "Manages and enforces user bans and kicks in owned channels.",
     requiredDependencies: ["BlacklistModule"],
     settingsSchema: banSettings,
     settings: null as unknown as Record<string, any>,
+    /** Temporary internal map to track users who were recently kicked to prevent spam. */
     recentlyKickedWaitlist: new Map<string, number>(),
 
 
@@ -71,10 +81,13 @@ export const BansModule: PluginModule = {
         logger.info("BansModule stopping");
     },
 
-    onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
-        // Voice state updates are now handled via USER_JOINED_OWNED_CHANNEL in OwnershipModule -> BansModule
-    },
-
+    /**
+     * Evaluates whether a user's join violates ban policies (blacklist, blocked, roles).
+     * @param userId The ID of the user who joined
+     * @param channelId The target channel ID
+     * @param guildId The target guild ID
+     * @returns True if an enforcement action was taken, false otherwise
+     */
     evaluateUserJoin(userId: string, channelId: string, guildId: string): boolean {
         if (!this.settings) return false;
         logger.debug(`Evaluating join for ${userId} in ${channelId}`);
@@ -225,3 +238,48 @@ export const BansModule: PluginModule = {
         BlacklistModule.unblacklistUser(userId, channelId);
     }
 };
+
+export const bansCommands = [
+    {
+        name: `${pluginInfo.commandName} ban`,
+        description: "Add a user to the local ban list",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to ban",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user or channel." });
+            }
+            BansModule.enforceBanPolicy(userId, ctx.channel.id, true, "Manual Ban");
+            return sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for <@${userId}>` });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName}  unban`,
+        description: "Remove a user from the local ban list",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to unban",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user or channel." });
+            }
+            BansModule.unbanUser(userId, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for <@${userId}>` });
+        }
+    }
+];

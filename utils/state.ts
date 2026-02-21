@@ -6,16 +6,28 @@ import * as DataStore from "@api/DataStore";
 const STORAGE_KEY_OWNERS = "SocializeGuild_Owners_v3";
 const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v3";
 
+/**
+ * Internal store structure combining plugin settings with runtime state.
+ */
 type StoreWithState = PluginSettings & {
+    /** Map of channel IDs to their ownership metadata */
     activeChannelOwnerships: Record<string, ChannelOwnership>;
+    /** Map of user IDs to their personal channel configurations */
     memberConfigs: Record<string, MemberChannelInfo>;
 };
 
+/**
+ * Manages the persistent and runtime state of the plugin, including ownerships and user preferences.
+ */
 export class StateManager {
     private store!: StoreWithState;
     private initialized = false;
     private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+    /**
+     * Initializes the state manager and loads stored data from the Vencord DataStore.
+     * @param vencordStore The core Vencord settings store proxy
+     */
     public async init(vencordStore: PluginSettings) {
         this.store = vencordStore as StoreWithState;
         this.store.activeChannelOwnerships = {};
@@ -43,6 +55,9 @@ export class StateManager {
         this.saveTimer = setTimeout(() => this.flushSave(), 500);
     }
 
+    /**
+     * Performs a synchronous write to the backend storage.
+     */
     private async flushSave() {
         this.saveTimer = null;
         try {
@@ -61,10 +76,20 @@ export class StateManager {
         }
     }
 
+    /**
+     * Retrieves the ownership status of a voice channel.
+     * @param channelId The ID of the channel to query
+     * @returns The ownership metadata or null if unowned
+     */
     public getOwnership(channelId: string): ChannelOwnership | null {
         return this.store?.activeChannelOwnerships?.[channelId] || null;
     }
 
+    /**
+     * Updates or removes the ownership record for a channel.
+     * @param channelId The target channel ID
+     * @param ownership The updated ownership data, or null to clear ownership
+     */
     public setOwnership(channelId: string, ownership: Partial<ChannelOwnership> | null) {
         if (!this.store) return;
         if (ownership === null) {
@@ -78,6 +103,11 @@ export class StateManager {
         this.scheduleSave();
     }
 
+    /**
+     * Retrieves or initializes the channel preference configuration for a user.
+     * @param userId The ID of the user
+     * @returns The member configuration object
+     */
     public getMemberConfig(userId: string): MemberChannelInfo {
         if (!this.store?.memberConfigs[userId]) {
             this.store.memberConfigs[userId] = {
@@ -92,20 +122,36 @@ export class StateManager {
         return this.store.memberConfigs[userId];
     }
 
+    /**
+     * Checks if a user has an existing cached configuration.
+     * @param userId The ID of the user
+     */
     public hasMemberConfig(userId: string): boolean {
         return !!this.store?.memberConfigs[userId];
     }
 
+    /**
+     * Partially updates a user's channel configuration.
+     * @param userId The ID of the user to update
+     * @param update The partial configuration data to merge
+     */
     public updateMemberConfig(userId: string, update: Partial<MemberChannelInfo>) {
         const config = this.getMemberConfig(userId);
         Object.assign(config, update);
         this.scheduleSave();
     }
 
+    /**
+     * Returns all active channel ownership records.
+     */
     public getAllActiveOwnerships(): Record<string, ChannelOwnership> {
         return this.store?.activeChannelOwnerships || {};
     }
 
+    /**
+     * Finds all channels associated with a specific user (as creator or claimant).
+     * @param userId The ID of the user to look up
+     */
     public getChannelOwnershipsForUser(userId: string): ChannelOwnership[] {
         const ownerships: ChannelOwnership[] = [];
         for (const channelId in this.store?.activeChannelOwnerships) {
@@ -118,4 +164,7 @@ export class StateManager {
     }
 }
 
+/**
+ * The singleton instance of the StateManager.
+ */
 export const stateManager = new StateManager();

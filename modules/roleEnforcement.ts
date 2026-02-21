@@ -4,22 +4,34 @@ import { OptionType } from "@utils/types";
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
-import { stateManager } from "../utils/stateManager";
+import { stateManager } from "../utils/state";
 import { PluginModuleEvent } from "../types/events";
-import { getNewLineList } from "../utils/settingsHelpers";
+import { getNewLineList } from "../utils/settings";
 import { sendDebugMessage } from "../utils/debug";
 import { isUserInVoiceChannel } from "../utils/channels";
 import { formatCommand } from "../utils/formatting";
 
+/**
+ * Modes for evaluating user role requirements.
+ */
 export enum RequiredRoleMode {
+    /** User must have ALL of the specified roles. */
     ALL = "All",
+    /** User must have AT LEAST ONE of the specified roles. */
     ANY = "Any",
+    /** User must NOT have any of the specified roles. */
     NONE = "None"
 }
 
+/**
+ * Settings definitions for the RoleEnforcementModule.
+ */
 export const roleEnforcementSettings = {
+    /** Whether to automatically kick or ban users who do not meet the role requirements. */
     banNotInRoles: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users missing required roles", default: true, restartNeeded: false },
+    /** A newline-separated list of role IDs used for enforcement. */
     requiredRoleIds: { type: OptionType.STRING, description: "Required role IDs — users missing these are auto-kicked (one per line)", default: "", multiline: true, restartNeeded: false },
+    /** Determines how the role IDs are matched (All, Any, or None). */
     requiredRoleMode: {
         type: OptionType.SELECT,
         description: "How to match roles?",
@@ -35,6 +47,7 @@ export type RoleEnforcementSettingsType = typeof roleEnforcementSettings;
 
 export const RoleEnforcementModule: PluginModule = {
     name: "RoleEnforcementModule",
+    description: "Enforces role-based access control for owned voice channels. It can automatically kick users based on their Discord roles.",
     optionalDependencies: ["BansModule"],
     settingsSchema: roleEnforcementSettings,
     settings: null as unknown as Record<string, any>,

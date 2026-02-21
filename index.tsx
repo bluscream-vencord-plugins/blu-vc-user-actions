@@ -2,7 +2,7 @@ import definePlugin from "@utils/types";
 import { pluginInfo } from "./info";
 import { defaultSettings, LoosePluginSettings } from "./settings";
 import { moduleRegistry } from "./utils/moduleRegistry";
-import { stateManager } from "./utils/stateManager";
+import { stateManager } from "./utils/state";
 import { logger } from "./utils/logger";
 import { socializeCommands } from "./commands";
 import { actionQueue } from "./utils/actionQueue";

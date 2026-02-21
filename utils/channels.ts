@@ -2,22 +2,34 @@ import type { Channel } from "@vencord/discord-types";
 import { ChannelType } from "@vencord/discord-types/enums";
 import { ChannelStore, GuildChannelStore, VoiceStateStore } from "@webpack/common";
 
+/**
+ * Checks if a channel object represents a voice or stage channel.
+ */
 export const isVoiceChannel = (channel: Channel | null | undefined): channel is Channel =>
     channel?.type === ChannelType.GUILD_VOICE || channel?.type === ChannelType.GUILD_STAGE_VOICE;
 
+/**
+ * Checks if a channel object represents a stage channel.
+ */
 export const isStageChannel = (channel: Channel | null | undefined): channel is Channel =>
     channel?.type === ChannelType.GUILD_STAGE_VOICE;
 
+/**
+ * Checks if a channel object represents a guild text channel.
+ */
 export const isTextChannel = (channel: Channel | null | undefined): channel is Channel =>
     channel?.type === ChannelType.GUILD_TEXT;
 
+/**
+ * Checks if a channel object represents a guild channel (not a DM).
+ */
 export const isGuildChannel = (channel: any): channel is Channel =>
     channel && typeof channel.isDM === "function" ? !channel.isDM() && !channel.isGroupDM() : false;
 
 /**
- * Finds the text channel associated with a voice channel.
- * Looks for a text channel in the same category with the same name (case-sensitive).
- * Returns the text channel, or null if none is found.
+ * Finds the text channel associated with a voice channel (matching category and name).
+ * @param voiceChannel The voice channel object or ID
+ * @returns The associated text channel or null
  */
 export function findAssociatedTextChannel(voiceChannel: Channel | string | null | undefined): Channel | null {
     const ch = typeof voiceChannel === "string"
@@ -38,7 +50,9 @@ export function findAssociatedTextChannel(voiceChannel: Channel | string | null 
 }
 
 /**
- * Checks if a specific user is currently in a given voice channel.
+ * Checks if a user is currently a member of a specific voice channel.
+ * @param userId The ID of the user
+ * @param channelId The ID of the voice channel
  */
 export function isUserInVoiceChannel(userId: string, channelId: string): boolean {
     if (!userId || !channelId) return false;

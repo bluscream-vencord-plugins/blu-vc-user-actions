@@ -1,50 +1,64 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
 import { PluginModuleEvent, BotResponseType } from "../types/events";
-import { ChannelOwnership, MemberChannelInfo } from "../types/state";
-import { stateManager } from "../utils/stateManager";
+import { ChannelOwnership } from "../types/state";
+import { stateManager } from "../utils/state";
 import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../types/BotResponse";
-import { parseBotInfoMessage, extractId } from "../utils/parsing";
-import { ActionQueue, actionQueue } from "../utils/actionQueue";
+import { parseBotInfoMessage } from "../utils/parsing";
+import { actionQueue } from "../utils/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
-import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
-import { isVoiceChannel, isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channels";
+import { sendEphemeralMessage } from "../utils/messaging";
+import { isVoiceChannel, isUserInVoiceChannel } from "../utils/channels";
 import {
-    GuildChannelStore, ChannelStore, GuildStore,
+    GuildChannelStore, ChannelStore,
     SelectedChannelStore, UserStore as Users,
     VoiceStateStore, ChannelActions,
     ChannelRouter,
     Menu, React, showToast
 } from "@webpack/common";
-import { openPluginModal } from "@components/settings/tabs";
+import { openSettings } from "../utils/settings";
 import { WhitelistModule } from "./whitelist";
 import { BansModule } from "./bans";
 import { BlacklistModule } from "./blacklist";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
-import { ApplicationCommandOptionType } from "@api/Commands";
-import { getNewLineList } from "../utils/settingsHelpers";
+import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
+import { getNewLineList } from "../utils/settings";
 import { OptionType } from "@utils/types";
+import { pluginInfo } from "../info";
 
+/**
+ * Settings definitions for the OwnershipModule.
+ */
 export const ownershipSettings = {
     // ── Channel Claiming / Ownership ──────────────────────────────────────
+    /** The message template used when a voice channel is successfully claimed. */
     ownershipChangeMessage: { type: OptionType.STRING, description: "Message sent when ownership changes (supports {reason}, {channel_id}, {channel_name}, {guild_id}, {guild_name}, {user_id}, {user_name})", default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})", restartNeeded: false },
 
     // ── Commands ──────────────────────────────────────────────────────────
+    /** Command template to claim a channel. */
     claimCommand: { type: OptionType.STRING, description: "Claim Channel Command", default: "!v claim", restartNeeded: false },
+    /** Command template to lock a channel. */
     lockCommand: { type: OptionType.STRING, description: "Lock Channel Command", default: "!v lock", restartNeeded: false },
+    /** Command template to unlock a channel. */
     unlockCommand: { type: OptionType.STRING, description: "Unlock Channel Command", default: "!v unlock", restartNeeded: false },
+    /** Command template to reset a channel's settings. */
     resetCommand: { type: OptionType.STRING, description: "Reset Channel Command", default: "!v name \"\" | !v limit 0 | !v unlock", restartNeeded: false },
+    /** Command template to request channel info from the bot. */
     infoCommand: { type: OptionType.STRING, description: "Get Channel Info Command", default: "!v info", restartNeeded: false },
+    /** Command template to kick a user. */
     kickCommand: { type: OptionType.STRING, description: "Kick Command Template (use {user_id})", default: "!v kick {user_id}", restartNeeded: false },
+    /** Command template to set a channel's user limit. */
     setSizeCommand: { type: OptionType.STRING, description: "Set Channel Size Command Template (use {size})", default: "!v limit {size}", restartNeeded: false },
+    /** Command template to rename a voice channel. */
     setChannelNameCommand: { type: OptionType.STRING, description: "Set Channel Name Command Template (use {name})", default: "!v name {name}", restartNeeded: false },
 
     // ── Ephermal Author Settings ──────────────────────────────────────────────────
+    /** Displayed author name for local-only (ephemeral) plugin messages. Supports {username}, {displayname}, {userid}. */
     ephemeralAuthorName: { type: OptionType.STRING, description: "Author name for bot messages (displayed as the sender). Variables: {username}=username, {displayname}=display name, {userid}=user ID", default: "Socialize Voice [!]", placeholder: "Clyde or {username}", restartNeeded: false, },
+    /** Author icon URL for ephemeral plugin messages. Supports {avatar}. */
     ephemeralAuthorIconUrl: { type: OptionType.STRING, description: "Author icon URL for bot messages (leave empty for default). Variables: {username}=username, {displayname}=display name, {userid}=user ID, {avatar}=avatar URL", default: "https://cdn.discordapp.com/avatars/913852862990262282/6cef25d3cdfad395b26e32260da0b320.webp?size=1024", placeholder: "https://example.com/avatar.png or {avatar}", restartNeeded: false, },
 };
 
@@ -59,6 +73,10 @@ function getSettings() {
     return moduleRegistry.settings as any;
 }
 
+/**
+ * A central collection of actions for managing channel ownership and settings.
+ * These actions bridge UI interactions and bot command execution.
+ */
 export const OwnershipActions = {
     syncInfo(channelId: string) {
         OwnershipModule.requestChannelInfo(channelId);
@@ -216,10 +234,203 @@ export const OwnershipActions = {
         stateManager["store"].memberConfigs = {};
         showToast("Plugin state has been reset.");
     },
-    openSettings() {
-        try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
-    }
 };
+
+export const ownershipCommands = [
+    {
+        name: `${pluginInfo.commandName} sync`,
+        description: "Force manual sync of channel info and ownership",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            const settings = moduleRegistry["settings"];
+            if (!settings || !ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
+            }
+            OwnershipActions.syncInfo(ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} claim`,
+        description: "Claim the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            OwnershipActions.claimChannel(ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: "Claim requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} lock`,
+        description: "Lock the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            OwnershipActions.lockChannel(ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: "Lock requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} unlock`,
+        description: "Unlock the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            OwnershipActions.unlockChannel(ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: "Unlock requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} reset`,
+        description: "Reset the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            OwnershipActions.resetChannel(ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: "Reset requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} rename`,
+        description: "Rename the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "name",
+                description: "The new name for the channel",
+                type: ApplicationCommandOptionType.STRING,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            const newName = args.find(a => a.name === "name")?.value;
+            if (!newName) {
+                return sendBotMessage(ctx.channel.id, { content: "Missing name parameter." });
+            }
+
+            OwnershipActions.renameChannel(ctx.channel.id, newName);
+            return sendBotMessage(ctx.channel.id, { content: `Rename to "${newName}" requested.` });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} limit`,
+        description: "Set the user limit for the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "size",
+                description: "The new user limit (0 for unlimited)",
+                type: ApplicationCommandOptionType.INTEGER,
+                required: true,
+                min_value: 0,
+                max_value: 99
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            const size = args.find(a => a.name === "size")?.value;
+            if (typeof size !== 'number') {
+                return sendBotMessage(ctx.channel.id, { content: "Missing or invalid size parameter." });
+            }
+
+            OwnershipActions.setChannelSize(ctx.channel.id, size);
+            return sendBotMessage(ctx.channel.id, { content: `User limit change to ${size} requested.` });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} kick`,
+        description: "Kick a user from the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to kick",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId) {
+                return sendBotMessage(ctx.channel.id, { content: "Missing user parameter." });
+            }
+
+            OwnershipActions.kickUser(ctx.channel.id, userId);
+            return sendBotMessage(ctx.channel.id, { content: `Kick requested for <@${userId}>.` });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} kick-banned`,
+        description: "Kick all locally banned users from the current voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            if (!ctx.channel) {
+                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            }
+
+            const n = OwnershipActions.kickBannedUsers(ctx.channel.id);
+            let content = "";
+            if (n === -1) {
+                content = "No personal ban list found for this channel.";
+            } else {
+                content = n > 0 ? `Kicked ${n} banned user(s).` : "No banned users found in your channel.";
+            }
+            return sendBotMessage(ctx.channel.id, { content });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} reset-state`,
+        description: "Emergency reset of SocializeGuild internal state",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.resetState();
+            return sendBotMessage(ctx.channel.id, { content: "Plugin state reset requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} create`,
+        description: "Join the creation channel to create a new managed voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.createChannel();
+            return sendBotMessage(ctx.channel.id, { content: "Channel creation requested." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} find`,
+        description: "Find an existing owned channel or create a new one",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.findOrCreateChannel(false);
+            return sendBotMessage(ctx.channel.id, { content: "Searching for or creating your channel..." });
+        }
+    },
+    {
+        name: `${pluginInfo.commandName} fetch-owners`,
+        description: "Fetch all channel owners in the managed category",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipModule.fetchAllOwners();
+            return sendBotMessage(ctx.channel.id, { content: "Started fetching all owners. This may take a moment." });
+        }
+    }
+];
 
 function getMyVoiceChannelId(): string | null {
     return SelectedChannelStore.getVoiceChannelId() ?? null;
@@ -645,7 +856,7 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
             id="socialize-open-settings"
             label="Open Settings"
             key="socialize-open-settings"
-            action={() => OwnershipActions.openSettings()}
+            action={() => openSettings()}
         />,
     ].filter(Boolean) as React.ReactElement[];
 }
@@ -709,7 +920,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
             id="socialize-toolbox-open-settings"
             label="Open Settings"
             key="socialize-toolbox-open-settings"
-            action={() => OwnershipActions.openSettings()}
+            action={() => openSettings()}
         />
     );
 
@@ -722,6 +933,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
 
 export const OwnershipModule: PluginModule = {
     name: "OwnershipModule",
+    description: "The core module responsible for tracking and managing voice channel ownership. It handles Discord events (voice state updates, messages) and provides context menu items.",
     requiredDependencies: ["WhitelistModule", "BansModule", "BlacklistModule", "ChannelNameRotationModule"],
     settingsSchema: ownershipSettings,
     settings: undefined as unknown as Record<string, any>,
@@ -775,6 +987,10 @@ export const OwnershipModule: PluginModule = {
 
     // ── Logic Helpers ────────────────────────────────────────
 
+    /**
+     * Batch requests channel information from the bot for all channels in the managed category.
+     * Uses a delay between requests to avoid triggerring bot rate limits.
+     */
     async fetchAllOwners() {
         const settings = getSettings();
         if (!settings) return;
@@ -792,6 +1008,10 @@ export const OwnershipModule: PluginModule = {
         logger.info("Batch fetch complete.");
     },
 
+    /**
+     * Sends a command to the bot to request information about a specific channel.
+     * @param channelId The ID of the voice channel
+     */
     requestChannelInfo(channelId: string) {
         const settings = getSettings();
         if (!settings) return;

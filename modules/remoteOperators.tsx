@@ -1,20 +1,26 @@
 import { ApplicationCommandOptionType } from "@api/Commands";
 import { PluginModule } from "../utils/moduleRegistry";
-import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { RelationshipStore, React, Menu } from "@webpack/common";
 import { OwnershipActions, isUserOwner } from "./ownership";
 import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
-import { getNewLineList } from "../utils/settingsHelpers";
+import { getNewLineList } from "../utils/settings";
 import { OptionType } from "@utils/types";
 
+/**
+ * Settings definitions for the RemoteOperatorsModule.
+ */
 export const remoteOperatorsSettings = {
     // ── Remote Operators ──────────────────────────────────────────────────
+    /** Whether to allow certain authorized users to control your channel via text commands. */
     remoteOperatorsEnabled: { type: OptionType.BOOLEAN, description: "Enable Remote Operator Commands", default: true, restartNeeded: false },
+    /** The character used to prefix remote commands (e.g., @lock). */
     externalCommandPrefix: { type: OptionType.STRING, description: "Global prefix for remote/external commands", default: "@", restartNeeded: false },
+    /** A newline-separated list of user IDs who are granted remote operator permissions. */
     remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
+    /** If enabled, all users on your Discord friends list are automatically treated as remote operators. */
     friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
 };
 
@@ -25,6 +31,7 @@ const checkPermission = (msg: any, s: any) =>
 
 export const RemoteOperatorsModule: PluginModule = {
     name: "RemoteOperatorsModule",
+    description: "Allows authorized users to control the local user's voice channel remotely.",
     requiredDependencies: ["OwnershipModule", "BansModule", "WhitelistModule", "BlacklistModule"],
     settingsSchema: remoteOperatorsSettings,
     settings: undefined as unknown as Record<string, any>,
@@ -36,6 +43,10 @@ export const RemoteOperatorsModule: PluginModule = {
     stop() {
         // Nothing specific to stop
     },
+    /**
+     * Checks if a user has remote operator privileges based on friends list or explicit ID list.
+     * @param userId The ID of the user to check
+     */
     isOperator(userId: string): boolean {
         if (!this.settings) return false;
         if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(userId)) {
@@ -64,6 +75,9 @@ export const RemoteOperatorsModule: PluginModule = {
         ];
     },
 
+    /**
+     * List of remotely executable commands and their handler logic.
+     */
     externalCommands: [
         {
             name: "claim",

@@ -4,26 +4,46 @@ import { findStoreLazy } from "@webpack";
 
 const ReferencedMessageStore = findStoreLazy("ReferencedMessageStore") as any;
 
+/**
+ * Categorizes the type of response received from the moderation bot.
+ */
 export enum BotResponseType {
+    /** Bot confirmed channel creation */
     CREATED = "Channel Created",
+    /** Bot confirmed channel claim */
     CLAIMED = "Channel Claimed",
+    /** Bot sent channel settings information */
     INFO = "Channel Settings",
+    /** Bot confirmed a user was banned */
     BANNED = "Banned",
+    /** Bot confirmed a user was unbanned */
     UNBANNED = "Unbanned",
+    /** Bot confirmed a user was permitted */
     PERMITTED = "Permitted",
+    /** Bot confirmed a user was unpermitted */
     UNPERMITTED = "Unpermitted",
+    /** Bot confirmed channel size was updated */
     SIZE_SET = "Size Set",
+    /** Bot confirmed channel was locked */
     LOCKED = "Locked",
+    /** Bot confirmed channel was unlocked */
     UNLOCKED = "Unlocked",
+    /** Fallback for unrecognized bot responses */
     UNKNOWN = "Unknown"
 }
 
+/**
+ * Deep-extracted author metadata from a Discord embed.
+ */
 interface EmbedAuthor {
     name?: string;
     icon_url?: string;
     iconURL?: string;
 }
 
+/**
+ * Shallow representation of a Discord embed used for parsing.
+ */
 interface Embed {
     title?: string;
     description?: string;
@@ -31,12 +51,21 @@ interface Embed {
     author?: EmbedAuthor;
 }
 
+/**
+ * Wrapper class representing a message authored by the target bot, enriched with parsed metadata.
+ */
 export class BotResponse {
+    /** The categorized type of the bot's response */
     public type: BotResponseType = BotResponseType.UNKNOWN;
+    /** The ID of the user who initiated the action */
     public initiatorId?: string;
+    /** The ID of the user targeted by the action (e.g., banned user) */
     public targetId?: string;
+    /** The ID of the channel where the response was sent */
     public channelId: string;
+    /** Parsed timestamp of the message */
     public timestamp: number;
+    /** The primary rich embed from the message, if any */
     public embed: Embed | undefined;
 
     constructor(private msg: Message, private botId: string) {
@@ -178,10 +207,16 @@ export class BotResponse {
         return undefined;
     }
 
+    /**
+     * Checks if the underlying message was indeed sent by the configured bot.
+     */
     public isBot() {
         return this.msg.author.id === this.botId;
     }
 
+    /**
+     * Extracts the raw description text from the embed, handling different field names.
+     */
     public getRawDescription(): string {
         return this.embed?.rawDescription || this.embed?.description || "";
     }

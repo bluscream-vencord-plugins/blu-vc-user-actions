@@ -3,23 +3,30 @@ import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../utils/actionQueue";
-import { stateManager } from "../utils/stateManager";
+import { stateManager } from "../utils/state";
 import { MemberLike, extractId } from "../utils/parsing";
-import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
+import { getUserIdList, setNewLineList } from "../utils/settings";
 import { sendDebugMessage } from "../utils/debug";
-import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
+import { sendEphemeralMessage } from "../utils/messaging";
 
-import { User, Channel } from "@vencord/discord-types";
-import { Menu, React, UserStore as Users } from "@webpack/common";
-import { sendBotMessage } from "@api/Commands";
+import { UserStore as Users } from "@webpack/common";
 import { OptionType } from "@utils/types";
+import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
 import { defaultSettings } from "../settings";
 
+/**
+ * Settings definitions for the WhitelistModule.
+ */
 export const whitelistSettings = {
+    /** A newline-separated list of user IDs to exclude from automated enforcement actions. */
     localUserWhitelist: { type: OptionType.STRING, description: "Local whitelist — user IDs to exclude from auto-actions (one per line)", default: "", multiline: true, restartNeeded: false },
+    /** Template for the message sent when an enforcement action is skipped due to whitelist. */
     whitelistSkipMessage: { type: OptionType.STRING, description: "Message sent when skipping an action for a whitelisted user (supports {action}, {user_id}, {user_name})", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
+    /** Maximum number of users that can be in the temporary permit list before rotation occurs. */
     permitLimit: { type: OptionType.SLIDER, description: "Max users in permit list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.permitLimit = Math.round(v); } },
+    /** Whether to automatically remove the oldest entry from the permit list when the limit is reached. */
     permitRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest entry when permit limit is reached", default: false, restartNeeded: false },
+    /** Template for the notification message sent when permit rotation occurs. */
     permitRotationMessage: { type: OptionType.STRING, description: "Message sent on permit rotation (supports {user_id}, {user_id_new})", default: "♻️ Permit rotated: <@{user_id}> was unpermitted to make room for <@{user_id_new}>", restartNeeded: false },
 };
 
@@ -27,6 +34,7 @@ export type WhitelistSettingsType = typeof whitelistSettings;
 
 export const WhitelistModule: PluginModule = {
     name: "WhitelistModule",
+    description: "Manages whitelisted and temporarily permitted users. Whitelisting bypasses enforcement globally, while permitting allows access to specific channels.",
     settingsSchema: whitelistSettings,
     settings: undefined as Record<string, any> | undefined,
 
@@ -75,11 +83,12 @@ export const WhitelistModule: PluginModule = {
         sendDebugMessage(`User <@${userId}> removed from local whitelist.`, channelId);
     },
 
-    // ── Permit rotation ───────────────────────────────────────────────────
-    // Mirrors the ban rotation in bans.tsx. When the permit list for the current
-    // user reaches permitLimit and permitRotateEnabled is on, the oldest permitted
-    // user is automatically unpermitted to make room for the new one.
-
+    /**
+     * Handles permit list rotation logic for a user in a specific channel.
+     * If the permit limit is reached and rotation is enabled, the oldest entry is removed.
+     * @param userId The ID of the user to permit
+     * @param channelId The target voice channel ID
+     */
     applyPermitRotation(userId: string, channelId: string) {
         if (!this.settings) return;
         const s = this.settings as any; // permitLimit / permitRotateEnabled are new fields
@@ -120,6 +129,11 @@ export const WhitelistModule: PluginModule = {
 
     // ── Permit / Unpermit ─────────────────────────────────────────────────
 
+    /**
+     * Permits multiple users into a voice channel, applying rotation logic if necessary.
+     * @param members Array of user IDs or member-like objects to permit
+     * @param channelId The target voice channel ID
+     */
     permitUsers(members: (MemberLike | string)[], channelId: string) {
         if (!this.settings) return;
         for (const member of members) {
@@ -162,3 +176,97 @@ export const WhitelistModule: PluginModule = {
         this.unpermitUsers([member], channelId);
     }
 };
+
+export const whitelistCommands = [
+    {
+        name: `socialize whitelist`,
+        description: "Add a user to the local whitelist",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to whitelist",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
+            }
+
+            const whitelist = WhitelistModule.getWhitelist();
+            if (!whitelist.includes(userId)) {
+                whitelist.push(userId);
+                WhitelistModule.setWhitelist(whitelist);
+            }
+            return sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
+        }
+    },
+    {
+        name: `socialize unwhitelist`,
+        description: "Remove a user from the local whitelist",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to unwhitelist",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
+            }
+
+            WhitelistModule.unwhitelistUser(userId, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Removed <@${userId}> from local whitelist.` });
+        }
+    },
+    {
+        name: `socialize permit`,
+        description: "Permit a user into managed channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to permit",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
+            }
+            WhitelistModule.whitelistUser(userId, ctx.channel.id);
+            WhitelistModule.permitUser(userId, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
+        }
+    },
+    {
+        name: `socialize unpermit`,
+        description: "Unpermit a user from managed channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        options: [
+            {
+                name: "user",
+                description: "The user to unpermit",
+                type: ApplicationCommandOptionType.USER,
+                required: true
+            }
+        ],
+        execute: (args: any[], ctx: any) => {
+            const userId = args.find(a => a.name === "user")?.value;
+            if (!userId || !ctx.channel) {
+                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
+            }
+            WhitelistModule.unpermitUser(userId, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Unpermitted <@${userId}>` });
+        }
+    }
+];
