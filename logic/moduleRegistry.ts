@@ -1,14 +1,23 @@
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
+import { ApplicationCommandOptionType } from "@api/Commands";
 import { React, UserStore as Users } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
+
+export interface ExternalCommandOption {
+    name: string;
+    description: string;
+    type: ApplicationCommandOptionType;
+    required?: boolean;
+}
 
 export interface ExternalCommand {
     name: string;
     description: string;
+    options?: ExternalCommandOption[];
     checkPermission?: (message: Message, settings: PluginSettings) => boolean;
-    execute: (args: string[], message: Message, channelId: string) => void;
+    execute: (args: Record<string, any>, message: Message, channelId: string) => void;
 }
 
 export interface SocializeModule {
@@ -197,10 +206,56 @@ export class ModuleRegistry {
                 }
 
                 const remainder = effectiveContent.slice(cmd.name.length).trim();
-                const args = remainder ? remainder.split(/\s+/) : [];
+                const parsedArgs: Record<string, any> = {};
+
+                if (cmd.options && cmd.options.length > 0) {
+                    // Simple space-based splitting for now, respecting multi-word strings if they are at the end
+                    const rawArgs = remainder ? remainder.split(/\s+/) : [];
+
+                    for (let i = 0; i < cmd.options.length; i++) {
+                        const opt = cmd.options[i];
+                        let val: string | undefined = rawArgs[i];
+
+                        // If it's the last option and it's a STRING, take the entire remainder
+                        if (i === cmd.options.length - 1 && opt.type === ApplicationCommandOptionType.STRING) {
+                            val = rawArgs.slice(i).join(" ");
+                        }
+
+                        if (!val) {
+                            if (opt.required) {
+                                sendDebugMessage(`⚠️ Missing required argument \`${opt.name}\` for command \`${cmd.name}\``, message.channel_id);
+                                return;
+                            }
+                            continue;
+                        }
+
+                        // Parse based on type
+                        switch (opt.type) {
+                            case ApplicationCommandOptionType.USER:
+                            case ApplicationCommandOptionType.MENTIONABLE: {
+                                const id = val.replace(/[<@!>]/g, "");
+                                parsedArgs[opt.name] = id;
+                                break;
+                            }
+                            case ApplicationCommandOptionType.INTEGER:
+                            case ApplicationCommandOptionType.NUMBER: {
+                                parsedArgs[opt.name] = Number(val);
+                                break;
+                            }
+                            case ApplicationCommandOptionType.BOOLEAN: {
+                                parsedArgs[opt.name] = val.toLowerCase() === "true" || val === "1" || val.toLowerCase() === "yes";
+                                break;
+                            }
+                            default: {
+                                parsedArgs[opt.name] = val;
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
-                cmd.execute(args, message, message.channel_id);
+                cmd.execute(parsedArgs, message, message.channel_id);
                 return; // Stop after first match
             }
         }

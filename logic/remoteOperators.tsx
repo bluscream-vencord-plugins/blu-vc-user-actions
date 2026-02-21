@@ -1,12 +1,12 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { ApplicationCommandOptionType } from "@api/Commands";
+import { SocializeModule } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
-import { UserStore as Users, RelationshipStore, React, Menu } from "@webpack/common";
+import { RelationshipStore, React, Menu } from "@webpack/common";
 import { OwnershipActions } from "./ownership";
 import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
-import { extractId } from "../utils/parsing";
 
 export const RemoteOperatorsModule: SocializeModule = {
     name: "RemoteOperatorsModule",
@@ -51,9 +51,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "name",
             description: "Rename channel remotely",
+            options: [
+                { name: "name", description: "The new name for the channel", type: ApplicationCommandOptionType.STRING, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const newName = args.join(" ").trim();
+                const newName = args.name;
                 if (newName) {
                     logger.info(`RemoteOperator (${msg.author.username}): Renaming channel to ${newName}`);
                     OwnershipActions.renameChannel(channelId, newName);
@@ -63,9 +66,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "ban",
             description: "Ban user remotely",
+            options: [
+                { name: "target", description: "The user to ban", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Banning user ${target}`);
                     BansModule.enforceBanPolicy(target, channelId, false, `Remote operator ban by ${msg.author.username}`);
@@ -75,9 +81,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "kick",
             description: "Kick user remotely",
+            options: [
+                { name: "target", description: "The user to kick", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Kicking user ${target}`);
                     OwnershipActions.kickUser(channelId, target);
@@ -105,9 +114,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "permit",
             description: "Permit user remotely",
+            options: [
+                { name: "target", description: "The user to permit", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Permitting user ${target}`);
                     WhitelistModule.permitUser(target, channelId);
@@ -117,9 +129,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "unpermit",
             description: "Unpermit user remotely",
+            options: [
+                { name: "target", description: "The user to unpermit", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unpermitting user ${target}`);
                     WhitelistModule.unpermitUser(target, channelId);
@@ -129,9 +144,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "whitelist",
             description: "Whitelist user remotely",
+            options: [
+                { name: "target", description: "The user to whitelist", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Whitelisting user ${target}`);
                     WhitelistModule.whitelistUser(target, channelId);
@@ -141,9 +159,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "unwhitelist",
             description: "Unwhitelist user remotely",
+            options: [
+                { name: "target", description: "The user to unwhitelist", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unwhitelisting user ${target}`);
                     WhitelistModule.unwhitelistUser(target, channelId);
@@ -153,9 +174,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "blacklist",
             description: "Blacklist user remotely",
+            options: [
+                { name: "target", description: "The user to blacklist", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Blacklisting user ${target}`);
                     BlacklistModule.blacklistUser(target, channelId);
@@ -165,9 +189,12 @@ export const RemoteOperatorsModule: SocializeModule = {
         {
             name: "unblacklist",
             description: "Unblacklist user remotely",
+            options: [
+                { name: "target", description: "The user to unblacklist", type: ApplicationCommandOptionType.USER, required: true }
+            ],
             checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
             execute: (args, msg, channelId) => {
-                const target = extractId(args[0]);
+                const target = args.target;
                 if (target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unblacklisting user ${target}`);
                     BlacklistModule.unblacklistUser(target, channelId);

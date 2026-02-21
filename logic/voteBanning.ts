@@ -1,9 +1,8 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { SocializeModule } from "./moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { VoiceStateStore } from "@webpack/common";
-import { Message } from "@vencord/discord-types";
-import { extractId } from "../utils/parsing";
+import { ApplicationCommandOptionType } from "@api/Commands";
 import { stateManager } from "../utils/stateManager";
 import { sendDebugMessage } from "../utils/debug";
 import { BansModule } from "./bans";
@@ -30,6 +29,10 @@ export const VoteBanningModule: SocializeModule = {
         {
             name: "vote ban",
             description: "Initiate a vote ban against a user",
+            options: [
+                { name: "target", description: "The user to vote ban", type: ApplicationCommandOptionType.USER, required: true },
+                { name: "reason", description: "The reason for the vote ban", type: ApplicationCommandOptionType.STRING, required: false }
+            ],
             checkPermission: (msg, s) => {
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
@@ -37,8 +40,8 @@ export const VoteBanningModule: SocializeModule = {
                 return !!(voterVoiceState && voterVoiceState.channelId);
             },
             execute: (args, msg, channelId) => {
-                const targetUser = extractId(args[0]);
-                const reason = args.slice(1).join(" ");
+                const targetUser = args.target;
+                const reason = args.reason || "";
                 if (!targetUser) return;
 
                 const voterId = msg.author.id;
