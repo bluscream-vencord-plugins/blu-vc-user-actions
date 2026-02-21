@@ -1,4 +1,4 @@
-import { SocializeModule } from "./moduleRegistry";
+import { PluginModule } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
@@ -8,7 +8,7 @@ import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { UserStore as Users, ChannelStore } from "@webpack/common";
 
-export const ChannelNameRotationModule: SocializeModule = {
+export const ChannelNameRotationModule: PluginModule = {
     name: "ChannelNameRotationModule",
     settings: null as unknown as PluginSettings,
     rotationIntervalId: null as unknown as number,

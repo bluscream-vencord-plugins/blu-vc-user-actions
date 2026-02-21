@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { ActionQueueItem } from "../types/state";
@@ -9,7 +9,7 @@ import { Message } from "@vencord/discord-types";
 const executedCommands = new Map<string, Set<string>>();
 let messageActionsModule: any = null;
 
-export const CommandCleanupModule: SocializeModule = {
+export const CommandCleanupModule: PluginModule = {
     name: "CommandCleanupModule",
 
     init(settings: PluginSettings) {

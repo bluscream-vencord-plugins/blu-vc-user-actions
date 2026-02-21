@@ -1,11 +1,11 @@
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 
-import { moduleRegistry } from "./logic/moduleRegistry";
-import { WhitelistModule } from "./logic/whitelist";
-import { ChannelNameRotationModule } from "./logic/channelNameRotation";
-import { BansModule } from "./logic/bans";
+import { moduleRegistry } from "./utils/moduleRegistry";
+import { WhitelistModule } from "./modules/whitelist";
+import { ChannelNameRotationModule } from "./modules/channelNameRotation";
+import { BansModule } from "./modules/bans";
 import { stateManager } from "./utils/stateManager";
-import { OwnershipActions } from "./logic/ownership";
+import { OwnershipActions } from "./modules/ownership";
 
 export const commandName = "socialize";
 
@@ -402,7 +402,7 @@ export const socializeCommands = [
         description: "Fetch all channel owners in the managed category",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            const { OwnershipModule } = require("./logic/ownership");
+            const { OwnershipModule } = require("./modules/ownership");
             OwnershipModule.fetchAllOwners();
             return sendBotMessage(ctx.channel.id, { content: "Started fetching all owners. This may take a moment." });
         }

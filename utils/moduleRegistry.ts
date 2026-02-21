@@ -31,7 +31,7 @@ export interface ExternalCommand {
     execute: (args: Record<string, any>, message: Message, channelId: string) => Promise<boolean> | boolean;
 }
 
-export interface SocializeModule {
+export interface PluginModule {
     name: string;
     /** Modules that MUST be initialized before this one */
     requiredDependencies?: string[];
@@ -59,7 +59,7 @@ export interface SocializeModule {
 }
 
 export class ModuleRegistry {
-    private modules: SocializeModule[] = [];
+    private modules: PluginModule[] = [];
     private _settings!: PluginSettings;
     private eventListeners: Map<SocializeEvent, Array<(payload: unknown) => void>> = new Map();
 
@@ -79,16 +79,16 @@ export class ModuleRegistry {
         }
     }
 
-    private resolveLoadOrder(modules: SocializeModule[]): SocializeModule[] {
-        const sorted: SocializeModule[] = [];
+    private resolveLoadOrder(modules: PluginModule[]): PluginModule[] {
+        const sorted: PluginModule[] = [];
         const visited = new Set<string>();
         const visiting = new Set<string>();
         const moduleMap = new Map(modules.map(m => [m.name, m]));
 
-        const visit = (mod: SocializeModule) => {
+        const visit = (mod: PluginModule) => {
             if (visited.has(mod.name)) return;
             if (visiting.has(mod.name)) {
-                console.error(`Circular dependency detected in SocializeModule: ${mod.name}`);
+                console.error(`Circular dependency detected in PluginModule: ${mod.name}`);
                 visited.add(mod.name); // Break cycle
                 return;
             }
@@ -125,7 +125,7 @@ export class ModuleRegistry {
         return sorted;
     }
 
-    public register(module: SocializeModule) {
+    public register(module: PluginModule) {
         if (this.modules.some(m => m.name === module.name)) {
             console.warn(`Module ${module.name} is already registered.`);
             return;
@@ -292,7 +292,7 @@ export class ModuleRegistry {
         }
 
         // Collect all external commands
-        const allCmds: { mod: SocializeModule, cmd: ExternalCommand }[] = [];
+        const allCmds: { mod: PluginModule, cmd: ExternalCommand }[] = [];
         for (const mod of this.modules) {
             if (mod.externalCommands) {
                 for (const cmd of mod.externalCommands) {

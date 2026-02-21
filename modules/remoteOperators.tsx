@@ -1,5 +1,5 @@
 import { ApplicationCommandOptionType } from "@api/Commands";
-import { SocializeModule } from "./moduleRegistry";
+import { PluginModule } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { RelationshipStore, React, Menu } from "@webpack/common";
@@ -12,7 +12,7 @@ import { getNewLineList } from "../utils/settingsHelpers";
 const checkPermission = (msg: any, s: PluginSettings) =>
     isUserOwner(msg.author.id, msg.channel_id) || (s.remoteOperatorsEnabled && RemoteOperatorsModule.isOperator(msg.author.id));
 
-export const RemoteOperatorsModule: SocializeModule = {
+export const RemoteOperatorsModule: PluginModule = {
     name: "RemoteOperatorsModule",
     requiredDependencies: ["OwnershipModule", "BansModule", "WhitelistModule", "BlacklistModule"],
     settings: undefined as unknown as PluginSettings,

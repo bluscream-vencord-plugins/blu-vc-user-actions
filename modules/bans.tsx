@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings, RequiredRoleMode } from "../types/settings";
 import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
@@ -17,7 +17,7 @@ import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
 import { sendBotMessage } from "@api/Commands";
 
-export const BansModule: SocializeModule = {
+export const BansModule: PluginModule = {
     name: "BansModule",
     requiredDependencies: ["BlacklistModule"],
     settings: null as unknown as PluginSettings,

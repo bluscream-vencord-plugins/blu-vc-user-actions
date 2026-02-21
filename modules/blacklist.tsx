@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
@@ -6,7 +6,7 @@ import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
 
-export const BlacklistModule: SocializeModule = {
+export const BlacklistModule: PluginModule = {
     name: "BlacklistModule",
     settings: undefined as PluginSettings | undefined,
 

@@ -1,4 +1,4 @@
-import { moduleRegistry } from "../logic/moduleRegistry";
+import { moduleRegistry } from "../utils/moduleRegistry";
 import { logger } from "./logger";
 import { SelectedChannelStore } from "@webpack/common";
 import { sendEphemeralMessage } from "./messaging";

@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership, MemberChannelInfo } from "../types/state";
@@ -697,7 +697,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
 // Module Export
 // ─────────────────────────────────────────────────────────────
 
-export const OwnershipModule: SocializeModule = {
+export const OwnershipModule: PluginModule = {
     name: "OwnershipModule",
     requiredDependencies: ["WhitelistModule", "BansModule", "BlacklistModule", "ChannelNameRotationModule"],
 

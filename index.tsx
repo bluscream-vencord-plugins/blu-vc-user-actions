@@ -2,7 +2,7 @@ import definePlugin from "@utils/types";
 import { pluginInfo } from "./info";
 import { defaultSettings } from "./types/settings";
 import { PluginSettings } from "./types/settings";
-import { moduleRegistry } from "./logic/moduleRegistry";
+import { moduleRegistry } from "./utils/moduleRegistry";
 import { stateManager } from "./utils/stateManager";
 import { logger } from "./utils/logger";
 import { socializeCommands } from "./commands";
@@ -11,15 +11,15 @@ import { ChannelStore, GuildChannelStore } from "@webpack/common";
 import { sendExternalMessage } from "./utils/messaging";
 
 // Modules
-import { OwnershipModule, OwnershipActions } from "./logic/ownership";
-import { WhitelistModule } from "./logic/whitelist";
-import { BlacklistModule } from "./logic/blacklist";
-import { ChannelNameRotationModule } from "./logic/channelNameRotation";
-import { RoleEnforcementModule } from "./logic/roleEnforcement";
-import { BansModule } from "./logic/bans";
-import { VoteBanningModule } from "./logic/voteBanning";
-import { CommandCleanupModule } from "./logic/commandCleanup";
-import { RemoteOperatorsModule } from "./logic/remoteOperators";
+import { OwnershipModule, OwnershipActions } from "./modules/ownership";
+import { WhitelistModule } from "./modules/whitelist";
+import { BlacklistModule } from "./modules/blacklist";
+import { ChannelNameRotationModule } from "./modules/channelNameRotation";
+import { RoleEnforcementModule } from "./modules/roleEnforcement";
+import { BansModule } from "./modules/bans";
+import { VoteBanningModule } from "./modules/voteBanning";
+import { CommandCleanupModule } from "./modules/commandCleanup";
+import { RemoteOperatorsModule } from "./modules/remoteOperators";
 import { contextMenuHandlers } from "./components/menus";
 
 export default definePlugin({

@@ -2,7 +2,7 @@ import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChan
 
 // Vencord types
 import { User, Channel, Guild } from "@vencord/discord-types";
-import { moduleRegistry } from "../logic/moduleRegistry";
+import { moduleRegistry } from "../utils/moduleRegistry";
 import { logger } from "../utils/logger";
 
 export function addToSubmenu(children: any[], menuId: string, menuLabel: string, newItems: any[]) {

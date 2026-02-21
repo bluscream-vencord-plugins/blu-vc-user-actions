@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings, RequiredRoleMode } from "../types/settings";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
@@ -10,7 +10,7 @@ import { sendDebugMessage } from "../utils/debug";
 import { isUserInVoiceChannel } from "../utils/channels";
 import { formatCommand } from "../utils/formatting";
 
-export const RoleEnforcementModule: SocializeModule = {
+export const RoleEnforcementModule: PluginModule = {
     name: "RoleEnforcementModule",
     optionalDependencies: ["BansModule"],
 

@@ -1,4 +1,4 @@
-import { SocializeModule, moduleRegistry } from "./moduleRegistry";
+import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
@@ -14,7 +14,7 @@ import { User, Channel } from "@vencord/discord-types";
 import { Menu, React, UserStore as Users } from "@webpack/common";
 import { sendBotMessage } from "@api/Commands";
 
-export const WhitelistModule: SocializeModule = {
+export const WhitelistModule: PluginModule = {
     name: "WhitelistModule",
     settings: undefined as PluginSettings | undefined,
 

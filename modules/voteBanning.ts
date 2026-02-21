@@ -1,4 +1,4 @@
-import { SocializeModule } from "./moduleRegistry";
+import { PluginModule } from "../utils/moduleRegistry";
 import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { VoiceStateStore } from "@webpack/common";
@@ -7,7 +7,7 @@ import { stateManager } from "../utils/stateManager";
 import { sendDebugMessage } from "../utils/debug";
 import { BansModule } from "./bans";
 
-export const VoteBanningModule: SocializeModule = {
+export const VoteBanningModule: PluginModule = {
     name: "VoteBanningModule",
     requiredDependencies: ["BansModule"],
     settings: null as unknown as PluginSettings,
