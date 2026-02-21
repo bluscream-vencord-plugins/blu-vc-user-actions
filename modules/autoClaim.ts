@@ -117,7 +117,7 @@ export const AutoClaimModule: PluginModule = {
                 logger.error(`[AutoClaim] Failed to enqueue claim command: ${e}`);
 
             }
-            const cleanupDelay = s.commandCleanupDelay || 1;
+            const cleanupDelay = s.commandCleanupDelay || 1000;
             const sentMsg = sendExternalMessage(channelId, claimCmd); // TODO: FIX AND REMOVE TO USE QUEUE
             setTimeout(() => {
                 MessageActions.deleteMessage(channelId, sentMsg.id);
