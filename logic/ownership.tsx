@@ -15,6 +15,7 @@ import {
     GuildChannelStore, ChannelStore, GuildStore,
     SelectedChannelStore, UserStore as Users,
     VoiceStateStore, ChannelActions,
+    ChannelRouter,
     Menu, React, showToast
 } from "@webpack/common";
 import { openPluginModal } from "@components/settings/tabs";
@@ -23,7 +24,7 @@ import { BansModule } from "./bans";
 import { BlacklistModule } from "./blacklist";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
-import { sendBotMessage } from "@api/Commands";
+import { sendBotMessage, ApplicationCommandOptionType } from "@api/Commands";
 import { getNewLineList } from "../utils/settingsHelpers";
 
 // ─────────────────────────────────────────────────────────────
@@ -173,6 +174,10 @@ export const OwnershipActions = {
         if (targetChannelId) {
             showToast(`Joining channel ${channelName}`);
             ChannelActions?.selectVoiceChannel(targetChannelId);
+            // Wait 2 seconds before focusing the text chat
+            setTimeout(() => {
+                ChannelRouter?.transitionToChannel(targetChannelId);
+            }, 2000);
         } else if (create) {
             logger.info("findOrCreateChannel: No existing channel found, creating a new one.");
             showToast("No channel found, creating one");
@@ -201,10 +206,12 @@ function getOwnership(channelId: string): ChannelOwnership | null {
 }
 
 function amIOwner(channelId: string): boolean {
-    const me = Users.getCurrentUser()?.id;
-    if (!me) return false;
+    return isUserOwner(Users.getCurrentUser()?.id || "", channelId);
+}
+
+function isUserOwner(userId: string, channelId: string): boolean {
     const o = getOwnership(channelId);
-    return o?.creatorId === me || o?.claimantId === me;
+    return o?.creatorId === userId || o?.claimantId === userId;
 }
 
 function getUserDisplayName(userId: string): string {
@@ -902,6 +909,100 @@ export const OwnershipModule: SocializeModule = {
         const targetStr = response.targetId ? ` target <@${response.targetId}>` : "";
         sendDebugMessage(`Bot Response: **${response.type}**${targetStr} from <@${userId || "Unknown"}>${banSuffix}`, message.channel_id);
     },
+
+    // ── External Commands ────────────────────────────────────
+
+    externalCommands: [
+        {
+            name: "claim",
+            description: "Claim the current channel",
+            execute: (args, msg, channelId) => {
+                OwnershipActions.claimChannel(channelId);
+                return true;
+            }
+        },
+        {
+            name: "lock",
+            description: "Lock the current channel",
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                OwnershipActions.lockChannel(channelId);
+                return true;
+            }
+        },
+        {
+            name: "unlock",
+            description: "Unlock the current channel",
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                OwnershipActions.unlockChannel(channelId);
+                return true;
+            }
+        },
+        {
+            name: "reset",
+            description: "Reset the current channel",
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                OwnershipActions.resetChannel(channelId);
+                return true;
+            }
+        },
+        {
+            name: "name",
+            description: "Rename the current channel",
+            options: [
+                { name: "name", description: "The new name for the channel", type: ApplicationCommandOptionType.STRING, required: true }
+            ],
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                if (args.name) {
+                    OwnershipActions.renameChannel(channelId, args.name);
+                    return true;
+                }
+                return false;
+            }
+        },
+        {
+            name: "size",
+            description: "Set the size limit for the current channel",
+            options: [
+                { name: "size", description: "The user limit (0 for unlimited)", type: ApplicationCommandOptionType.INTEGER, required: true }
+            ],
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                if (args.size !== undefined) {
+                    OwnershipActions.setChannelSize(channelId, args.size);
+                    return true;
+                }
+                return false;
+            }
+        },
+        {
+            name: "kick banned",
+            description: "Kick all banned users from the VC",
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                const n = OwnershipActions.kickBannedUsers(channelId);
+                return n >= 0;
+            }
+        },
+        {
+            name: "kick",
+            description: "Kick a specific user from the VC",
+            options: [
+                { name: "userId", description: "The user to kick", type: ApplicationCommandOptionType.USER, required: true }
+            ],
+            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
+            execute: (args, msg, channelId) => {
+                if (args.userId) {
+                    OwnershipActions.kickUser(channelId, args.userId);
+                    return true;
+                }
+                return false;
+            }
+        }
+    ],
 
     // ── Internal Helpers ─────────────────────────────────────
 
