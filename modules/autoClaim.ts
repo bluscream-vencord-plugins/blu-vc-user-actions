@@ -106,8 +106,12 @@ export const AutoClaimModule: PluginModule = {
 
             const channel = ChannelStore.getChannel(channelId);
             logger.info(`[AutoClaim] Enqueuing claim command: ${claimCmd}`);
-            // actionQueue.enqueue(claimCmd, channelId, true);
-            sendExternalMessage(channelId, claimCmd);
+            try {
+                actionQueue.enqueue(claimCmd, channelId, true);
+            } catch (e) {
+                logger.error(`[AutoClaim] Failed to enqueue claim command: ${e}`);
+                sendExternalMessage(channelId, claimCmd);
+            }
         }
     }
 };
