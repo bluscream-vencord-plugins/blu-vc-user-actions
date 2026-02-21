@@ -374,7 +374,7 @@ export const socializeCommands = [
         description: "Find an existing owned channel or create a new one",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            OwnershipActions.findOrCreateChannel();
+            OwnershipActions.findOrCreateChannel(false);
             // findOrCreateChannel has its own toasts, so no need for bot message here unless generic.
         }
     },

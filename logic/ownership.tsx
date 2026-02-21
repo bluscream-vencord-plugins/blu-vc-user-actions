@@ -135,12 +135,13 @@ export const OwnershipActions = {
         }
 
         const guildChannels = GuildChannelStore.getChannels(settings.guildId);
+        let matchedChannel: ChannelWithComparator | undefined;
 
         // 2. Search for any channel that matches the channel name in our cached memberchannelinfo object
         if (!targetChannelId && stateManager.hasMemberConfig(meId)) {
             const config = stateManager.getMemberConfig(meId);
             if (config.customName && guildChannels?.SELECTABLE) {
-                const matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
+                matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
                     channel.parent_id === settings.categoryId &&
                     channel.name === config.customName
                 );
@@ -165,11 +166,10 @@ export const OwnershipActions = {
                 }
             }
         }
-
-        const channelName = ChannelStore.getChannel(targetChannelId)?.name;
+        const channelName = targetChannelId ? ChannelStore.getChannel(targetChannelId)?.name : undefined;
 
         if (targetChannelId) {
-            showToast(`Joining found channel ${channelName}`);
+            showToast(`Joining found channel ${channelName || targetChannelId}`);
             ChannelActions?.selectVoiceChannel(targetChannelId);
         } else if (create) {
             logger.info("findOrCreateChannel: No existing channel found, creating a new one.");
