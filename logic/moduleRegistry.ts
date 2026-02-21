@@ -230,14 +230,14 @@ export class ModuleRegistry {
         const contentRaw = message.content ?? "";
         const contentTrim = contentRaw.trim();
         const contentLower = contentTrim.toLowerCase();
-        const prefix = this._settings.externalCommandPrefix || "@";
+        const prefix = this._settings.externalCommandPrefix;
         const meMention = `<@${meId}>`;
         const meMentionNick = `<@!${meId}>`;
 
         let effectiveContent = "";
         let triggered = false;
 
-        if (contentLower.startsWith(prefix.toLowerCase())) {
+        if (prefix && prefix.trim() !== "" && contentLower.startsWith(prefix.toLowerCase())) {
             triggered = true;
             effectiveContent = contentTrim.slice(prefix.length).trim();
         } else if (contentLower.startsWith(meMention)) {
@@ -264,14 +264,15 @@ export class ModuleRegistry {
         allCmds.sort((a, b) => b.cmd.name.length - a.cmd.name.length);
 
         const effectiveContentLower = effectiveContent.toLowerCase();
+        let matchedName = false;
 
         for (const { mod, cmd } of allCmds) {
             const cmdNameLower = cmd.name.toLowerCase();
             // Check if content starts with command name followed by space or end of string
             if (effectiveContentLower === cmdNameLower || effectiveContentLower.startsWith(cmdNameLower + " ")) {
+                matchedName = true;
                 if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
-                    sendDebugMessage(`🛑 Rejected command \`${cmd.name}\` from <@${message.author.id}> (Missing Permissions)`, message.channel_id);
-                    return; // Stop processing once matched
+                    continue; // Check other implementations of this command if permission fails
                 }
 
                 const remainder = effectiveContent.slice(cmd.name.length).trim();
@@ -302,8 +303,7 @@ export class ModuleRegistry {
                         switch (opt.type) {
                             case ApplicationCommandOptionType.USER:
                             case ApplicationCommandOptionType.MENTIONABLE: {
-                                // const { extractId } = require("../utils/parsing"); // Removed local require
-                                parsedArgs[opt.name] = extractId(val); // Used imported extractId
+                                parsedArgs[opt.name] = extractId(val);
                                 break;
                             }
                             case ApplicationCommandOptionType.INTEGER:
@@ -346,8 +346,12 @@ export class ModuleRegistry {
                     sendDebugMessage(debugMsg, message.channel_id);
                     RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/${emoji}/@me` }).catch(() => { });
                 }
-                return; // Stop after first match
+                return; // Stop after first match that passes permission
             }
+        }
+
+        if (matchedName) {
+            sendDebugMessage(`🛑 Rejected command from <@${message.author.id}> (Missing Permissions)`, message.channel_id);
         }
     }
 }
