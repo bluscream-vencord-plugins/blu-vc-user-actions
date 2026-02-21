@@ -103,7 +103,7 @@ export const OwnershipActions = {
             showToast("No creation channel ID configured.");
         }
     },
-    findOrCreateChannel() {
+    findOrCreateChannel(create = true) {
         const settings = getSettings();
         if (!settings) return;
 
@@ -119,7 +119,11 @@ export const OwnershipActions = {
         const ownerships = stateManager["store"].activeChannelOwnerships;
         const myOwnedChannels = Object.keys(ownerships).filter(
             id => ownerships[id].creatorId === meId || ownerships[id].claimantId === meId
-        );
+        ).sort((a, b) => {
+            const timeA = Math.max(ownerships[a].createdAt || 0, ownerships[a].claimedAt || 0);
+            const timeB = Math.max(ownerships[b].createdAt || 0, ownerships[b].claimedAt || 0);
+            return timeB - timeA; // Descending, newest first
+        });
 
         for (const id of myOwnedChannels) {
             const channel = ChannelStore.getChannel(id);
@@ -162,12 +166,18 @@ export const OwnershipActions = {
             }
         }
 
+        const channelName = ChannelStore.getChannel(targetChannelId)?.name;
+
         if (targetChannelId) {
+            showToast(`Joining found channel ${channelName}`);
             ChannelActions?.selectVoiceChannel(targetChannelId);
-            showToast("Joined found channel.");
-        } else {
+        } else if (create) {
             logger.info("findOrCreateChannel: No existing channel found, creating a new one.");
+            showToast("No channel found, creating one");
             this.createChannel();
+        } else {
+            logger.info("findOrCreateChannel: No existing channel found, not creating a new one.");
+            showToast("No existing channel found");
         }
     },
     resetState() {
