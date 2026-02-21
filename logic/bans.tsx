@@ -186,5 +186,19 @@ export const BansModule: SocializeModule = {
 
     banUser(member: MemberLike | string, channelId: string) {
         this.banUsers([member], channelId);
+    },
+
+    unbanUser(userId: string, channelId: string) {
+        if (!this.settings) return;
+        const currentUserId = Users.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId }), channelId);
+
+        if (stateManager.hasMemberConfig(currentUserId)) {
+            const ownerCfg = stateManager.getMemberConfig(currentUserId);
+            stateManager.updateMemberConfig(currentUserId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== userId) });
+        }
+        BlacklistModule.unblacklistUser(userId, channelId);
     }
 };
