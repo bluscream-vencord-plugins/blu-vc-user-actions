@@ -25,24 +25,25 @@ export const VoteBanningModule: SocializeModule = {
         logger.info("VoteBanningModule stopping");
     },
 
-    onMessageCreate(message: Message) {
-        if (!this.settings || !this.settings.botId || !this.settings.voteBanRegex) return;
+    externalCommands: [
+        {
+            name: "Vote Ban",
+            description: "Initiate a vote ban against a user",
+            getRegexString: s => s.voteBanRegex,
+            execute: (match, msg, channelId) => {
+                const targetUser = match.groups?.target;
+                const reason = match.groups?.reason || "";
+                if (!targetUser) return;
 
-        const regex = new RegExp(this.settings.voteBanRegex, "i");
-        const match = message.content.match(regex);
+                const voterId = msg.author.id;
+                const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
+                if (!voterVoiceState || !voterVoiceState.channelId) return; // Voter must be in VC
 
-        if (match) {
-            const targetUser = match.groups?.target;
-            const reason = match.groups?.reason || "";
-            if (!targetUser) return;
-
-            const voterId = message.author.id;
-            const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
-            if (!voterVoiceState || !voterVoiceState.channelId) return;
-
-            this.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId, reason);
+                // Usually message is in text channel, but we bind vote to their current VC
+                VoteBanningModule.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId, reason);
+            }
         }
-    },
+    ],
 
     registerVote(targetUser: string, voterId: string, channelId: string, guildId: string, reason?: string) {
         if (!this.settings) return;

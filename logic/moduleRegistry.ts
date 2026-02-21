@@ -1,7 +1,15 @@
 import { PluginSettings } from "../types/settings";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
-import { React } from "@webpack/common";
+import { React, UserStore as Users } from "@webpack/common";
+
+export interface ExternalCommand {
+    name: string;
+    description: string;
+    getRegexString: (settings: PluginSettings) => string | undefined;
+    checkPermission?: (message: Message, settings: PluginSettings) => boolean;
+    execute: (match: RegExpMatchArray, message: Message, channelId: string) => void;
+}
 
 export interface SocializeModule {
     name: string;
@@ -21,6 +29,9 @@ export interface SocializeModule {
     getChannelMenuItems?(channel: Channel): React.ReactElement[] | null;
     getUserMenuItems?(user: User, channel?: Channel): React.ReactElement[] | null;
     getGuildMenuItems?(guild: Guild): React.ReactElement[] | null;
+
+    // External Text Commands
+    externalCommands?: ExternalCommand[];
 }
 
 export class ModuleRegistry {
@@ -109,14 +120,58 @@ export class ModuleRegistry {
         }
     }
 
+    public checkExternalPermissions(message: Message): boolean {
+        for (const mod of this.modules) {
+            if (mod.externalCommands) {
+                for (const cmd of mod.externalCommands) {
+                    if (cmd.checkPermission && cmd.checkPermission(message, this._settings)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public dispatchMessageCreate(message: Message) {
-        // logger.debug(`Dispatching message create from ${message.author.username} in ${message.channel_id}`);
+        // Run standard message create handlers
         for (const mod of this.modules) {
             if (mod.onMessageCreate) {
                 try {
                     mod.onMessageCreate(message);
                 } catch (e) {
                     console.error(`Error in module ${mod.name} onMessageCreate:`, e);
+                }
+            }
+        }
+
+        // Process External Commands
+        const meId = Users.getCurrentUser()?.id;
+        if (!meId || !this._settings) return;
+
+        for (const mod of this.modules) {
+            if (mod.externalCommands) {
+                for (const cmd of mod.externalCommands) {
+                    // Check permission
+                    if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
+                        continue;
+                    }
+
+                    const regexString = cmd.getRegexString(this._settings);
+                    if (!regexString) continue;
+
+                    try {
+                        const pattern = regexString.replace("{me}", meId);
+                        const regex = new RegExp(pattern, "i");
+                        const content = (message.content ?? "").trim().toLowerCase();
+                        const match = content.match(regex);
+
+                        if (match) {
+                            cmd.execute(match, message, message.channel_id);
+                        }
+                    } catch (e) {
+                        console.error(`Invalid regex for ExternalCommand ${cmd.name}: ${regexString}`, e);
+                    }
                 }
             }
         }
