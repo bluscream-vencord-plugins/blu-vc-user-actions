@@ -120,11 +120,13 @@ export const BansModule: SocializeModule = {
     enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false, reason?: string) {
         if (!this.settings) return;
 
+        BlacklistModule.blacklistUser(userId, channelId);
+
         const lastKickTime = this.recentlyKickedWaitlist.get(userId);
         const now = Date.now();
         const cooldownMs = (this.settings.banRotateCooldown || 0) * 1000;
 
-        logger.debug(`[BansModule] enforceBanPolicy for ${userId}: kickFirst=${kickFirst}, lastKick=${lastKickTime}, now=${now}, cooldown=${cooldownMs}`);
+        logger.debug(`[BansModule] enforceBanPolicy for ${userId}: lastKick=${lastKickTime}, now=${now}, cooldown=${cooldownMs}`);
 
         if (kickFirst) {
             const shouldKick = !lastKickTime || (cooldownMs > 0 && (now - lastKickTime) > cooldownMs);
@@ -175,8 +177,7 @@ export const BansModule: SocializeModule = {
         actionQueue.enqueue(
             banCmd,
             channelId,
-            true,
-            () => isUserInVoiceChannel(userId, channelId)
+            true
         );
         this.recentlyKickedWaitlist.delete(userId);
     },
@@ -184,7 +185,7 @@ export const BansModule: SocializeModule = {
     banUsers(members: (MemberLike | string)[], channelId: string) {
         for (const member of members) {
             const userId = extractId(member);
-            if (userId) this.enforceBanPolicy(userId, channelId, false);
+            if (userId) this.enforceBanPolicy(userId, channelId, true);
         }
     },
 

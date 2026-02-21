@@ -163,7 +163,7 @@ export const RemoteOperatorsModule: SocializeModule = {
                 const target = args.target;
                 if (target) {
                     logger.info(`RemoteAction (${msg.author.username}): Banning user ${target}`);
-                    BansModule.enforceBanPolicy(target, channelId, false, `Remote action by ${msg.author.username}`);
+                    BansModule.enforceBanPolicy(target, channelId, true, `Remote action by ${msg.author.username}`);
                     return true;
                 }
                 return false;
