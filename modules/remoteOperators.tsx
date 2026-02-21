@@ -80,6 +80,15 @@ export const RemoteOperatorsModule: PluginModule = {
      */
     externalCommands: [
         {
+            name: "info",
+            description: "Request channel info remotely",
+            execute: (args, msg, channelId) => {
+                logger.info(`RemoteAction (${msg.author.username}): Requesting channel info`);
+                OwnershipActions.syncInfo(channelId);
+                return true;
+            }
+        },
+        {
             name: "claim",
             description: "Claim the current channel",
             execute: (args, msg, channelId) => {

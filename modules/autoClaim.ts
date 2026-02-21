@@ -7,6 +7,7 @@ import { VoiceStateStore, UserStore, ChannelStore } from "@webpack/common";
 import { OptionType } from "@utils/types";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
+import { sendExternalMessage } from "../utils/messaging";
 
 /**
  * Settings definitions for the AutoClaimModule.
@@ -58,7 +59,7 @@ export const AutoClaimModule: PluginModule = {
             // Delay briefly to allow VoiceStates to settle and Ownership info to be parsed if we just joined
             setTimeout(() => {
                 this.checkAndClaimIfDisbanded(payload.channelId);
-            }, 1500);
+            }, 1000);
         });
     },
 
@@ -105,7 +106,8 @@ export const AutoClaimModule: PluginModule = {
 
             const channel = ChannelStore.getChannel(channelId);
             logger.info(`[AutoClaim] Enqueuing claim command: ${claimCmd}`);
-            actionQueue.enqueue(claimCmd, channelId, true);
+            // actionQueue.enqueue(claimCmd, channelId, true);
+            sendExternalMessage(channelId, claimCmd);
         }
     }
 };
