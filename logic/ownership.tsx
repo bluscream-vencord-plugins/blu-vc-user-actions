@@ -209,8 +209,8 @@ function amIOwner(channelId: string): boolean {
     return isUserOwner(Users.getCurrentUser()?.id || "", channelId);
 }
 
-function isUserOwner(userId: string, channelId: string): boolean {
-    const o = getOwnership(channelId);
+export function isUserOwner(userId: string, channelId: string): boolean {
+    const o = stateManager.getOwnership(channelId);
     return o?.creatorId === userId || o?.claimantId === userId;
 }
 
@@ -914,97 +914,9 @@ export const OwnershipModule: SocializeModule = {
 
     // ── External Commands ────────────────────────────────────
 
-    externalCommands: [
-        {
-            name: "claim",
-            description: "Claim the current channel",
-            execute: (args, msg, channelId) => {
-                OwnershipActions.claimChannel(channelId);
-                return true;
-            }
-        },
-        {
-            name: "lock",
-            description: "Lock the current channel",
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                OwnershipActions.lockChannel(channelId);
-                return true;
-            }
-        },
-        {
-            name: "unlock",
-            description: "Unlock the current channel",
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                OwnershipActions.unlockChannel(channelId);
-                return true;
-            }
-        },
-        {
-            name: "reset",
-            description: "Reset the current channel",
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                OwnershipActions.resetChannel(channelId);
-                return true;
-            }
-        },
-        {
-            name: "name",
-            description: "Rename the current channel",
-            options: [
-                { name: "name", description: "The new name for the channel", type: ApplicationCommandOptionType.STRING, required: true }
-            ],
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                if (args.name) {
-                    OwnershipActions.renameChannel(channelId, args.name);
-                    return true;
-                }
-                return false;
-            }
-        },
-        {
-            name: "size",
-            description: "Set the size limit for the current channel",
-            options: [
-                { name: "size", description: "The user limit (0 for unlimited)", type: ApplicationCommandOptionType.INTEGER, required: true }
-            ],
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                if (args.size !== undefined) {
-                    OwnershipActions.setChannelSize(channelId, args.size);
-                    return true;
-                }
-                return false;
-            }
-        },
-        {
-            name: "kick banned",
-            description: "Kick all banned users from the VC",
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                const n = OwnershipActions.kickBannedUsers(channelId);
-                return n >= 0;
-            }
-        },
-        {
-            name: "kick",
-            description: "Kick a specific user from the VC",
-            options: [
-                { name: "userId", description: "The user to kick", type: ApplicationCommandOptionType.USER, required: true }
-            ],
-            checkPermission: (msg) => isUserOwner(msg.author.id, msg.channel_id),
-            execute: (args, msg, channelId) => {
-                if (args.userId) {
-                    OwnershipActions.kickUser(channelId, args.userId);
-                    return true;
-                }
-                return false;
-            }
-        }
-    ],
+    // ── External Commands ────────────────────────────────────
+    // (None - Moved to RemoteOperatorsModule)
+
 
     // ── Internal Helpers ─────────────────────────────────────
 

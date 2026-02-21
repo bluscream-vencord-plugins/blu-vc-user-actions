@@ -1,4 +1,5 @@
 import { PluginSettings } from "../types/settings";
+import { logger } from "../utils/logger";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
@@ -336,9 +337,11 @@ export class ModuleRegistry {
 
                     const emoji = success ? "%E2%9C%85" : "%E2%9D%8C"; // ✅ : ❌
                     RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/${emoji}/@me` }).catch(e => {
-                        sendDebugMessage(`⚠️ Failed to add reaction: ${e.message}`, message.channel_id);
+                        logger.error("Failed to add reaction to command message:", e);
+                        sendDebugMessage(`⚠️ Failed to add reaction: ${e?.message || e?.statusText || String(e)}`, message.channel_id);
                     });
                 } catch (err: any) {
+                    logger.error(`Error executing command ${cmd.name}:`, err);
                     const isTimeout = err.message === "TIMEOUT";
                     const emoji = isTimeout ? "%E2%8C%9B" : "%E2%9D%8C"; // ⏳ : ❌
                     const debugMsg = isTimeout ? `⏳ Command \`${cmd.name}\` timed out after ${COMMAND_TIMEOUT / 1000}s` : `❌ Error executing command \`${cmd.name}\`: ${err.message}`;
