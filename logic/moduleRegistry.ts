@@ -5,6 +5,8 @@ import { ApplicationCommandOptionType } from "@api/Commands";
 import { React, UserStore as Users, RestAPI } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
 
+const COMMAND_TIMEOUT = 10000;
+
 export interface ExternalCommandOption {
     name: string;
     description: string;
@@ -256,14 +258,26 @@ export class ModuleRegistry {
 
                 sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
                 try {
-                    const success = await cmd.execute(parsedArgs, message, message.channel_id);
+                    const timeoutPromise = new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error("TIMEOUT")), COMMAND_TIMEOUT)
+                    );
+
+                    const success = await Promise.race([
+                        cmd.execute(parsedArgs, message, message.channel_id),
+                        timeoutPromise
+                    ]) as boolean;
+
                     const emoji = success ? "%E2%9C%85" : "%E2%9D%8C"; // ✅ : ❌
                     RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/${emoji}/@me` }).catch(e => {
                         sendDebugMessage(`⚠️ Failed to add reaction: ${e.message}`, message.channel_id);
                     });
                 } catch (err: any) {
-                    sendDebugMessage(`❌ Error executing command \`${cmd.name}\`: ${err.message}`, message.channel_id);
-                    RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/%E2%9D%8C/@me` }).catch(() => { });
+                    const isTimeout = err.message === "TIMEOUT";
+                    const emoji = isTimeout ? "%E2%8C%9B" : "%E2%9D%8C"; // ⏳ : ❌
+                    const debugMsg = isTimeout ? `⏳ Command \`${cmd.name}\` timed out after ${COMMAND_TIMEOUT / 1000}s` : `❌ Error executing command \`${cmd.name}\`: ${err.message}`;
+
+                    sendDebugMessage(debugMsg, message.channel_id);
+                    RestAPI.put({ url: `/channels/${message.channel_id}/messages/${message.id}/reactions/${emoji}/@me` }).catch(() => { });
                 }
                 return; // Stop after first match
             }
