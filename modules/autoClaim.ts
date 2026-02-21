@@ -109,7 +109,7 @@ export const AutoClaimModule: PluginModule = {
             // We use formatCommand just in case it takes variables, although it's usually static
             const claimCmd = formatCommand(claimCmdTemplate, channelId, {});
 
-            const channel = ChannelStore.getChannel(channelId);
+            // const channel = ChannelStore.getChannel(channelId);
             logger.info(`[AutoClaim] Enqueuing claim command: ${claimCmd}`);
             try {
                 actionQueue.enqueue(claimCmd, channelId, true);
