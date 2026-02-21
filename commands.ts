@@ -264,7 +264,7 @@ export const socializeCommands = [
         }
     },
     {
-        name: `${commandName} naming start`,
+        name: `${commandName} name start`,
         description: "Manually start name rotation for current channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
@@ -274,7 +274,7 @@ export const socializeCommands = [
         }
     },
     {
-        name: `${commandName} naming stop`,
+        name: `${commandName} name stop`,
         description: "Manually stop name rotation",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
@@ -316,6 +316,24 @@ export const socializeCommands = [
         }
     },
     {
+        name: `${commandName} reset-state`,
+        description: "Emergency reset of SocializeGuild internal state",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.resetState();
+            sendBotMessage(ctx.channel.id, { content: "Plugin state reset requested." });
+        }
+    },
+    {
+        name: `${commandName} create`,
+        description: "Join the creation channel to create a new managed voice channel",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.createChannel();
+            sendBotMessage(ctx.channel.id, { content: "Channel creation requested." });
+        }
+    },
+    {
         name: `${commandName} fetch-owners`,
         description: "Fetch all channel owners in the managed category",
         inputType: ApplicationCommandInputType.BUILT_IN,
@@ -330,14 +348,8 @@ export const socializeCommands = [
         description: "Open the SocializeGuild settings modal",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            const { openPluginModal } = require("@components/settings/tabs");
-            const { plugins } = require("@api/PluginManager");
-            try {
-                openPluginModal(plugins["SocializeGuild"]);
-                sendBotMessage(ctx.channel.id, { content: "Opened settings modal." });
-            } catch (e) {
-                sendBotMessage(ctx.channel.id, { content: "Failed to open settings modal." });
-            }
+            OwnershipActions.openSettings();
+            sendBotMessage(ctx.channel.id, { content: "Opened settings modal." });
         }
     }
 ];

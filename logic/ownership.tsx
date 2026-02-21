@@ -17,12 +17,11 @@ import {
     VoiceStateStore, ChannelActions,
     Menu, React, showToast
 } from "@webpack/common";
-import { ChannelNameRotationModule } from "./channelNameRotation";
-import { WhitelistModule } from "./whitelist";
 import { openPluginModal } from "@components/settings/tabs";
+import { WhitelistModule } from "./whitelist";
+import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
 import { sendBotMessage } from "@api/Commands";
-import { SocializeActions } from "./actions";
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -31,6 +30,71 @@ import { SocializeActions } from "./actions";
 function getSettings() {
     return moduleRegistry.settings;
 }
+
+export const OwnershipActions = {
+    syncInfo(channelId: string) {
+        OwnershipModule.requestChannelInfo(channelId);
+    },
+    claimChannel(channelId: string) {
+        const s = getSettings();
+        if (s) actionQueue.enqueue(formatCommand(s.claimCommand, channelId), channelId, true);
+    },
+    lockChannel(channelId: string) {
+        const s = getSettings();
+        if (s) actionQueue.enqueue(formatCommand(s.lockCommand, channelId), channelId, true);
+    },
+    unlockChannel(channelId: string) {
+        const s = getSettings();
+        if (s) actionQueue.enqueue(formatCommand(s.unlockCommand, channelId), channelId, true);
+    },
+    resetChannel(channelId: string) {
+        const s = getSettings();
+        if (s) actionQueue.enqueue(formatCommand(s.resetCommand, channelId), channelId);
+    },
+    setChannelSize(channelId: string, size: number) {
+        const s = getSettings();
+        if (!s) return;
+        const sizeCmd = formatCommand(s.setSizeCommand || "!v size {size}", channelId)
+            .replace(/{size}/g, String(size))
+            .replace(/{channel_limit}/g, String(size));
+        actionQueue.enqueue(sizeCmd, channelId, false);
+    },
+    renameChannel(channelId: string, newName: string) {
+        const s = getSettings();
+        if (!s) return;
+        actionQueue.enqueue(
+            formatCommand(s.setChannelNameCommand || "!v name {name}", channelId, { name: newName }),
+            channelId,
+            true
+        );
+    },
+    kickUser(channelId: string, userId: string) {
+        const s = getSettings();
+        if (!s) return;
+        actionQueue.enqueue(
+            formatCommand(s.kickCommand, channelId, { userId }),
+            channelId,
+            false,
+            () => isUserInVoiceChannel(userId, channelId)
+        );
+    },
+    createChannel() {
+        const settings = getSettings();
+        if (settings?.creationChannelId) {
+            ChannelActions?.selectVoiceChannel(settings.creationChannelId);
+        } else {
+            showToast("No creation channel ID configured.");
+        }
+    },
+    resetState() {
+        stateManager["store"].activeChannelOwnerships = {};
+        stateManager["store"].memberConfigs = {};
+        showToast("Plugin state has been reset.");
+    },
+    openSettings() {
+        try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
+    }
+};
 
 function getMyVoiceChannelId(): string | null {
     return SelectedChannelStore.getVoiceChannelId() ?? null;
@@ -72,31 +136,31 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
             id="socialize-claim-channel"
             label="Claim Channel"
             key="socialize-claim-channel"
-            action={() => SocializeActions.claimChannel(channel.id)}
+            action={() => OwnershipActions.claimChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-lock-channel"
             label="Lock Channel"
             key="socialize-lock-channel"
-            action={() => SocializeActions.lockChannel(channel.id)}
+            action={() => OwnershipActions.lockChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-unlock-channel"
             label="Unlock Channel"
             key="socialize-unlock-channel"
-            action={() => SocializeActions.unlockChannel(channel.id)}
+            action={() => OwnershipActions.unlockChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-reset-channel"
             label="Reset Channel"
             key="socialize-reset-channel"
-            action={() => SocializeActions.resetChannel(channel.id)}
+            action={() => OwnershipActions.resetChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-info-channel"
             label="Channel Info"
             key="socialize-info-channel"
-            action={() => SocializeActions.syncInfo(channel.id)}
+            action={() => OwnershipActions.syncInfo(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-set-size-submenu"
@@ -108,7 +172,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                     key={`size-${size}`}
                     id={`socialize-set-size-${size}`}
                     label={size === 0 ? "Unlimited" : `${size} Users`}
-                    action={() => SocializeActions.setChannelSize(channel.id, size)}
+                    action={() => OwnershipActions.setChannelSize(channel.id, size)}
                 />
             ))}
         </Menu.MenuItem>,
@@ -147,7 +211,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                         cancelText: "Cancel",
                         onConfirm: () => {
                             if (newNameValue && newNameValue !== channel.name) {
-                                SocializeActions.renameChannel(channel.id, newNameValue);
+                                OwnershipActions.renameChannel(channel.id, newNameValue);
                             }
                         },
                         body: <RenameBody initialValue={channel.name} onUpdate={(v) => newNameValue = v} />
@@ -172,7 +236,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                     let n = 0;
                     for (const uid in states) {
                         if (config.bannedUsers.includes(uid)) {
-                            SocializeActions.kickUser(channel.id, uid);
+                            OwnershipActions.kickUser(channel.id, uid);
                             n++;
                         }
                     }
@@ -244,7 +308,7 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 key="socialize-kick-user"
                 label="Kick from VC"
                 color="brand"
-                action={() => SocializeActions.kickUser(myChannelId!, user.id)}
+                action={() => OwnershipActions.kickUser(myChannelId!, user.id)}
             />
         );
     }
@@ -258,11 +322,12 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isBanned ? "Unban from VC" : "Ban from VC"}
                 color={isBanned ? "success" : "danger"}
                 action={() => {
+                    const { BansActions } = require("./bans");
                     if (isBanned) {
-                        SocializeActions.unbanUser(myChannelId!, user.id);
+                        BansActions.unbanUser(myChannelId!, user.id);
                         showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
                     } else {
-                        SocializeActions.banUser(myChannelId!, user.id);
+                        BansActions.banUser(myChannelId!, user.id);
                         showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
                     }
                 }}
@@ -282,11 +347,12 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isPermitted ? "Unpermit" : "Permit"}
                 color={isPermitted ? "default" : "success"}
                 action={() => {
+                    const { WhitelistActions } = require("./whitelist");
                     if (isPermitted) {
-                        SocializeActions.unpermitUser(myChannelId!, user.id);
+                        WhitelistActions.unpermitUser(myChannelId!, user.id);
                         showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
                     } else {
-                        SocializeActions.permitUser(myChannelId!, user.id);
+                        WhitelistActions.permitUser(myChannelId!, user.id);
                         showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
                     }
                 }}
@@ -405,20 +471,13 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
             id="socialize-guild-channel-info"
             label="Get Channel Info"
             key="socialize-guild-channel-info"
-            action={() => SocializeActions.syncInfo(voiceChannelId!)}
+            action={() => OwnershipActions.syncInfo(voiceChannelId!)}
         />,
         <Menu.MenuItem
             id="socialize-guild-create-channel"
             label="Create Channel"
             key="socialize-guild-create-channel"
-            action={() => {
-                const settings = getSettings();
-                if (settings?.creationChannelId) {
-                    ChannelActions?.selectVoiceChannel(settings.creationChannelId);
-                } else {
-                    showToast("No creation channel ID configured.");
-                }
-            }}
+            action={() => OwnershipActions.createChannel()}
         />,
         <Menu.MenuSeparator key="socialize-guild-sep2" />,
         <Menu.MenuItem
@@ -426,19 +485,13 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
             label="Reset Plugin State"
             key="socialize-guild-reset-state"
             color="danger"
-            action={() => {
-                stateManager["store"].activeChannelOwnerships = {};
-                stateManager["store"].memberConfigs = {};
-                showToast("Plugin state has been reset.");
-            }}
+            action={() => OwnershipActions.resetState()}
         />,
         <Menu.MenuItem
             id="socialize-open-settings"
             label="Open Settings"
             key="socialize-open-settings"
-            action={() => {
-                try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
-            }}
+            action={() => OwnershipActions.openSettings()}
         />,
     ].filter(Boolean) as React.ReactElement[];
 }
@@ -461,25 +514,25 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
                 id="socialize-toolbox-info"
                 label="Get Channel Info"
                 key="socialize-toolbox-info"
-                action={() => SocializeActions.syncInfo(voiceChannelId)}
+                action={() => OwnershipActions.syncInfo(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-claim"
                 label="Claim Channel"
                 key="socialize-toolbox-claim"
-                action={() => SocializeActions.claimChannel(voiceChannelId)}
+                action={() => OwnershipActions.claimChannel(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-lock"
                 label="Lock Channel"
                 key="socialize-toolbox-lock"
-                action={() => SocializeActions.lockChannel(voiceChannelId)}
+                action={() => OwnershipActions.lockChannel(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-unlock"
                 label="Unlock Channel"
                 key="socialize-toolbox-unlock"
-                action={() => SocializeActions.unlockChannel(voiceChannelId)}
+                action={() => OwnershipActions.unlockChannel(voiceChannelId)}
             />
         );
     }
@@ -509,9 +562,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
             id="socialize-toolbox-open-settings"
             label="Open Settings"
             key="socialize-toolbox-open-settings"
-            action={() => {
-                try { openPluginModal(plugins["SocializeGuild"]); } catch (e) { logger.error("Could not open settings modal:", e); }
-            }}
+            action={() => OwnershipActions.openSettings()}
         />
     );
 
