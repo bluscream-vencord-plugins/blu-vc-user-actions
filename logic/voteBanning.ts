@@ -30,6 +30,12 @@ export const VoteBanningModule: SocializeModule = {
             name: "Vote Ban",
             description: "Initiate a vote ban against a user",
             getRegexString: s => s.voteBanRegex,
+            checkPermission: (msg, s) => {
+                const voterId = msg.author.id;
+                const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
+                // Voter must be in a Voice Channel to initiate a vote ban
+                return !!(voterVoiceState && voterVoiceState.channelId);
+            },
             execute: (match, msg, channelId) => {
                 const targetUser = match.groups?.target;
                 const reason = match.groups?.reason || "";
@@ -37,10 +43,12 @@ export const VoteBanningModule: SocializeModule = {
 
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
-                if (!voterVoiceState || !voterVoiceState.channelId) return; // Voter must be in VC
+                // We know this exists because checkPermission passed
+                const vcId = voterVoiceState!.channelId!;
+                const guildId = voterVoiceState!.guildId!;
 
                 // Usually message is in text channel, but we bind vote to their current VC
-                VoteBanningModule.registerVote(targetUser, voterId, voterVoiceState.channelId, voterVoiceState.guildId, reason);
+                VoteBanningModule.registerVote(targetUser, voterId, vcId, guildId, reason);
             }
         }
     ],
