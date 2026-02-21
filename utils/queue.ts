@@ -128,11 +128,6 @@ export class ActionQueue {
             settings = moduleRegistry["settings"];
         } catch (e) { }
 
-        if (settings && settings.queueEnabled === false) {
-            logger.debug("actionQueue paused via settings.");
-            return; // Paused
-        }
-
         const delay = settings && typeof settings.queueInterval === "number" ?
             (settings.queueInterval * 1000) : this.delayMs;
 
@@ -141,6 +136,13 @@ export class ActionQueue {
         const item = this.priorityQueue.shift() || this.queue.shift();
 
         if (item) {
+            if (settings && settings.queueEnabled === false) {
+                logger.debug("actionQueue paused via settings.");
+                sendDebugMessage(`Queue Disabled. Skipping command ${item.command}`);
+                this.processQueue();
+                return;
+            }
+
             if (item.executeCondition && !item.executeCondition()) {
                 sendDebugMessage(`Pre-flight condition failed for \`${item.command}\`. Skipping.`, item.channelId);
                 this.isProcessing = false;

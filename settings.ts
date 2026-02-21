@@ -1,7 +1,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
-import { actionQueueSettings } from "./utils/actionQueue";
+import { actionQueueSettings } from "./utils/queue";
 // --- Module Settings Imports ---
 import { banSettings } from "./modules/bans";
 import { whitelistSettings } from "./modules/whitelist";

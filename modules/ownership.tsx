@@ -6,7 +6,7 @@ import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../types/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { sendEphemeralMessage } from "../utils/messaging";

@@ -3,7 +3,7 @@ import { OptionType } from "@utils/types";
 
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { logger } from "../utils/logger";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { stateManager } from "../utils/state";
 import { PluginModuleEvent } from "../types/events";
 import { getNewLineList } from "../utils/settings";

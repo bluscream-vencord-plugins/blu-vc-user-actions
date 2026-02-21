@@ -5,7 +5,7 @@ import { moduleRegistry } from "./utils/moduleRegistry";
 import { stateManager } from "./utils/state";
 import { logger } from "./utils/logger";
 import { socializeCommands } from "./commands";
-import { actionQueue } from "./utils/actionQueue";
+import { actionQueue } from "./utils/queue";
 import { ChannelStore } from "@webpack/common";
 import { sendExternalMessage } from "./utils/messaging";
 

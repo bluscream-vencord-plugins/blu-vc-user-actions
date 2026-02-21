@@ -2,7 +2,7 @@ import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { RequiredRoleMode } from "./roleEnforcement";
 import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { stateManager } from "../utils/state";
 import { UserStore as Users, RelationshipStore, GuildMemberStore } from "@webpack/common";
 import { formatCommand } from "../utils/formatting";

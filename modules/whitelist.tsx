@@ -2,7 +2,7 @@ import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { stateManager } from "../utils/state";
 import { MemberLike, extractId } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settings";

@@ -1,6 +1,6 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { logger } from "../utils/logger";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { getNewLineList } from "../utils/settings";

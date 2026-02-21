@@ -1,13 +1,14 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
 import { PluginModuleEvent } from "../types/events";
 import { logger } from "../utils/logger";
-import { actionQueue } from "../utils/actionQueue";
+import { actionQueue } from "../utils/queue";
 import { stateManager } from "../utils/state";
-import { VoiceStateStore, UserStore, ChannelStore } from "@webpack/common";
+import { VoiceStateStore, UserStore, ChannelStore, MessageActions } from "@webpack/common";
 import { OptionType } from "@utils/types";
 import { formatCommand } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { sendExternalMessage } from "../utils/messaging";
+import { commandCleanupSettings } from "./commandCleanup";
 
 /**
  * Settings definitions for the AutoClaimModule.
@@ -28,6 +29,7 @@ export type AutoClaimSettingsType = typeof autoClaimSettings;
 export const AutoClaimModule: PluginModule = {
     name: "AutoClaimModule",
     description: "Automatically claims voice channels when their owners leave or are missing.",
+    optionalDependencies: ["CommandCleanupModule"],
     settingsSchema: autoClaimSettings,
     settings: null as unknown as Record<string, any>,
 
@@ -73,6 +75,9 @@ export const AutoClaimModule: PluginModule = {
      * @param channelId The target voice channel ID
      */
     checkAndClaimIfDisbanded(channelId: string) {
+        const s = moduleRegistry.settings as any;
+        if (!s?.commandCleanup) return;
+
         const me = UserStore.getCurrentUser();
         if (!me) return;
 
@@ -110,8 +115,13 @@ export const AutoClaimModule: PluginModule = {
                 actionQueue.enqueue(claimCmd, channelId, true);
             } catch (e) {
                 logger.error(`[AutoClaim] Failed to enqueue claim command: ${e}`);
-                sendExternalMessage(channelId, claimCmd);
+
             }
+            const cleanupDelay = s.commandCleanupDelay || 1;
+            const sentMsg = sendExternalMessage(channelId, claimCmd); // TODO: FIX AND REMOVE TO USE QUEUE
+            setTimeout(() => {
+                MessageActions.deleteMessage(channelId, sentMsg.id);
+            }, cleanupDelay);
         }
     }
 };
