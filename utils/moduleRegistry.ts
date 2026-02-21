@@ -363,6 +363,10 @@ export class ModuleRegistry {
         const meId = Users.getCurrentUser()?.id;
         if (!meId || !this._settings) return;
 
+        // Security check: Ignore messages from bots or system to prevent loops/false positives
+        // Ephemeral messages sent by plugins often have a bot author or no ID.
+        if (message.author?.bot || message.author?.id === "0" || message.author?.id === "1") return;
+
         const contentRaw = message.content ?? "";
         const contentTrim = contentRaw.trim();
         const contentLower = contentTrim.toLowerCase();
@@ -375,14 +379,19 @@ export class ModuleRegistry {
         let triggered = false;
 
         if (!isDM && prefix && prefix.trim() !== "" && contentLower.startsWith(prefix.toLowerCase())) {
+            // Ensure prefix isn't just a mention start if it's '@'
+            if (prefix === "@" && (contentLower.startsWith(meMention) || contentLower.startsWith(meMentionNick))) {
+                // This is a mention-trigger, handled below
+            } else {
+                triggered = true;
+                effectiveContent = contentTrim.slice(prefix.length).trim();
+            }
+        }
+
+        if (!triggered && (contentLower.startsWith(meMention) || contentLower.startsWith(meMentionNick))) {
             triggered = true;
-            effectiveContent = contentTrim.slice(prefix.length).trim();
-        } else if (contentLower.startsWith(meMention)) {
-            triggered = true;
-            effectiveContent = contentTrim.slice(meMention.length).trim();
-        } else if (contentLower.startsWith(meMentionNick)) {
-            triggered = true;
-            effectiveContent = contentTrim.slice(meMentionNick.length).trim();
+            const mentionLength = contentLower.startsWith(meMention) ? meMention.length : meMentionNick.length;
+            effectiveContent = contentTrim.slice(mentionLength).trim();
         }
 
         if (!triggered) return;

@@ -6,7 +6,7 @@ import { stateManager } from "./utils/state";
 import { logger } from "./utils/logger";
 import { socializeCommands } from "./commands";
 import { actionQueue } from "./utils/actionQueue";
-import { ChannelStore, GuildChannelStore } from "@webpack/common";
+import { ChannelStore } from "@webpack/common";
 import { sendExternalMessage } from "./utils/messaging";
 
 // Modules

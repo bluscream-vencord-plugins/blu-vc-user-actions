@@ -82,6 +82,7 @@ export class ActionQueue {
         }
 
         sendDebugMessage(`Enqueued command: \`${command.substring(0, 50)}${command.length > 50 ? "..." : ""}\` (Priority: ${priority})`, channelId);
+        logger.debug(`ActionQueue.enqueue: isProcessing=${this.isProcessing}, hasCallback=${!!this.sendCommandCallback}, priorityCount=${this.priorityQueue.length}, queueCount=${this.queue.length}`);
 
         this.emitQueuedEvent(item);
         this.processQueue();
@@ -152,7 +153,8 @@ export class ActionQueue {
                 sendDebugMessage(`actionQueue Error: sendCommandCallback is null for \`${item.command}\``, item.channelId);
             } else {
                 try {
-                    sendDebugMessage(`Executing command: \`${item.command}\``, item.channelId);
+                    logger.info(`actionQueue: Executing command "${item.command}" in channel ${item.channelId}`);
+                    sendDebugMessage(`🚀 Sending command: \`${item.command}\``, item.channelId);
 
                     const timeoutPromise = new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error("Timeout after 10s waiting for sendCommandCallback")), 10000)

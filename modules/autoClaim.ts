@@ -88,6 +88,8 @@ export const AutoClaimModule: PluginModule = {
         const isCreatorPresent = creatorId && voiceStates[creatorId];
         const isClaimantPresent = claimantId && voiceStates[claimantId];
 
+        logger.debug(`[AutoClaim] checkAndClaimIfDisbanded(${channelId}): creatorPresent=${!!isCreatorPresent}, claimantPresent=${!!isClaimantPresent}`);
+
         // If no owner is present in the voice channel, auto claim it
         if (!isCreatorPresent && !isClaimantPresent) {
             const msg = `Channel ${channelId} is disbanded (All owners left or missing). Auto-claiming...`;
@@ -102,7 +104,7 @@ export const AutoClaimModule: PluginModule = {
             const claimCmd = formatCommand(claimCmdTemplate, channelId, {});
 
             const channel = ChannelStore.getChannel(channelId);
-
+            logger.info(`[AutoClaim] Enqueuing claim command: ${claimCmd}`);
             actionQueue.enqueue(claimCmd, channelId, true);
         }
     }
