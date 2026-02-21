@@ -86,6 +86,8 @@ export const defaultSettings = definePluginSettings({
     remoteOpUnpermitRegex: { type: OptionType.STRING, description: "Regex to detect remote unpermit command (named group: target)", default: "^<@!?{me}>\\s+unpermit\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
     remoteOpWhitelistRegex: { type: OptionType.STRING, description: "Regex to detect remote whitelist command (named group: target)", default: "^<@!?{me}>\\s+whitelist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
     remoteOpUnwhitelistRegex: { type: OptionType.STRING, description: "Regex to detect remote unwhitelist command (named group: target)", default: "^<@!?{me}>\\s+unwhitelist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
+    remoteOpBlacklistRegex: { type: OptionType.STRING, description: "Regex to detect remote blacklist command (named group: target)", default: "^<@!?{me}>\\s+blacklist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
+    remoteOpUnblacklistRegex: { type: OptionType.STRING, description: "Regex to detect remote unblacklist command (named group: target)", default: "^<@!?{me}>\\s+unblacklist\\s+(?:<@!?)?(?<target>\\d+)>?", restartNeeded: false },
 
     // ── Core ──────────────────────────────────────────────────────────────
     guildId: { type: OptionType.STRING, description: "Guild ID", default: "505974446914535426", restartNeeded: false },

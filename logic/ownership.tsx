@@ -19,6 +19,8 @@ import {
 } from "@webpack/common";
 import { openPluginModal } from "@components/settings/tabs";
 import { WhitelistModule } from "./whitelist";
+import { BansModule } from "./bans";
+import { BlacklistModule } from "./blacklist";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
 import { sendBotMessage } from "@api/Commands";
@@ -362,9 +364,13 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     const ownerConfig = (myChannelId && ownerId && stateManager.hasMemberConfig(ownerId))
         ? stateManager.getMemberConfig(ownerId)
         : null;
-    const { BlacklistModule } = require("./blacklist");
     const isBlacklisted = BlacklistModule.isBlacklisted(user.id);
     const isBanned = (ownerConfig?.bannedUsers.includes(user.id) ?? false) || isBlacklisted;
+
+    const showToast = (msg: string) => {
+        const { Toasts } = require("@webpack/common");
+        Toasts.show({ message: msg, type: Toasts.Type.SUCCESS });
+    };
 
     const items: React.ReactElement[] = [];
 
@@ -399,28 +405,6 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
         );
     }
 
-    // Ban/Unban (only if I'm owner)
-    if (amOwner && myChannelId) {
-        items.push(
-            <Menu.MenuItem
-                id="socialize-ban-user"
-                key="socialize-ban-user"
-                label={isBanned ? "Unban from VC" : "Ban from VC"}
-                color={isBanned ? "success" : "danger"}
-                action={() => {
-                    const { BansActions } = require("./bans");
-                    if (isBanned) {
-                        BansActions.unbanUser(myChannelId!, user.id);
-                        showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
-                    } else {
-                        BansActions.banUser(myChannelId!, user.id);
-                        showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
-                    }
-                }}
-            />
-        );
-    }
-
     // Permit/Unpermit (only if I'm owner)
     if (amOwner && myChannelId) {
         const hasOwnerCfg = stateManager.hasMemberConfig(meId);
@@ -433,13 +417,66 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isPermitted ? "Unpermit" : "Permit"}
                 color={isPermitted ? "default" : "success"}
                 action={() => {
-                    const { WhitelistActions } = require("./whitelist");
                     if (isPermitted) {
-                        WhitelistActions.unpermitUser(myChannelId!, user.id);
+                        WhitelistModule.unpermitUser(user.id, myChannelId!);
                         showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
                     } else {
-                        WhitelistActions.permitUser(myChannelId!, user.id);
+                        WhitelistModule.permitUser(user.id, myChannelId!);
                         showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
+                    }
+                }}
+            />
+        );
+    }
+
+    // Whitelist / Blacklist (Global settings, accessible if owner or admin-like)
+    items.push(
+        <Menu.MenuItem
+            id="socialize-whitelist-user"
+            key="socialize-whitelist-user"
+            label={isWhitelisted ? "Remove from Whitelist" : "Add to Whitelist"}
+            color={isWhitelisted ? "brand" : "brand"}
+            action={() => {
+                if (isWhitelisted) {
+                    WhitelistModule.unwhitelistUser(user.id, myChannelId || undefined);
+                } else {
+                    WhitelistModule.whitelistUser(user.id, myChannelId || undefined);
+                }
+            }}
+        />
+    );
+
+    items.push(
+        <Menu.MenuItem
+            id="socialize-blacklist-user"
+            key="socialize-blacklist-user"
+            label={isBlacklisted ? "Remove from Blacklist" : "Add to Blacklist"}
+            color={isBlacklisted ? "danger" : "danger"}
+            action={() => {
+                if (isBlacklisted) {
+                    BlacklistModule.unblacklistUser(user.id, myChannelId || undefined);
+                } else {
+                    BlacklistModule.blacklistUser(user.id, myChannelId || undefined);
+                }
+            }}
+        />
+    );
+
+    // Ban/Unban (only if I'm owner)
+    if (amOwner && myChannelId) {
+        items.push(
+            <Menu.MenuItem
+                id="socialize-ban-user"
+                key="socialize-ban-user"
+                label={isBanned ? "Unban from VC" : "Ban from VC"}
+                color={isBanned ? "success" : "danger"}
+                action={() => {
+                    if (isBanned) {
+                        BansModule.unbanUser(user.id, myChannelId!);
+                        showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
+                    } else {
+                        BansModule.banUser(user.id, myChannelId!);
+                        showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
                     }
                 }}
             />

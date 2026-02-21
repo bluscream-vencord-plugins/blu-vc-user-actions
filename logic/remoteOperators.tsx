@@ -5,6 +5,7 @@ import { UserStore as Users, RelationshipStore, React, Menu } from "@webpack/com
 import { OwnershipActions } from "./ownership";
 import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
+import { BlacklistModule } from "./blacklist";
 
 export const RemoteOperatorsModule: SocializeModule = {
     name: "RemoteOperatorsModule",
@@ -66,7 +67,7 @@ export const RemoteOperatorsModule: SocializeModule = {
             execute: (match, msg, channelId) => {
                 if (match?.groups?.target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Banning user ${match.groups.target}`);
-                    BansModule.enforceBanPolicy(match.groups.target, channelId, true, `Remote operator ban by ${msg.author.username}`);
+                    BansModule.enforceBanPolicy(match.groups.target, channelId, false, `Remote operator ban by ${msg.author.username}`);
                 }
             }
         },
@@ -147,6 +148,30 @@ export const RemoteOperatorsModule: SocializeModule = {
                 if (match?.groups?.target) {
                     logger.info(`RemoteOperator (${msg.author.username}): Unwhitelisting user ${match.groups.target}`);
                     WhitelistModule.unwhitelistUser(match.groups.target, channelId);
+                }
+            }
+        },
+        {
+            name: "Remote Blacklist",
+            description: "Blacklist user remotely",
+            getRegexString: s => s.remoteOpBlacklistRegex,
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
+            execute: (match, msg, channelId) => {
+                if (match?.groups?.target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Blacklisting user ${match.groups.target}`);
+                    BlacklistModule.blacklistUser(match.groups.target, channelId);
+                }
+            }
+        },
+        {
+            name: "Remote Unblacklist",
+            description: "Unblacklist user remotely",
+            getRegexString: s => s.remoteOpUnblacklistRegex,
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
+            execute: (match, msg, channelId) => {
+                if (match?.groups?.target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Unblacklisting user ${match.groups.target}`);
+                    BlacklistModule.unblacklistUser(match.groups.target, channelId);
                 }
             }
         }
