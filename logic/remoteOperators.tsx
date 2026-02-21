@@ -7,6 +7,7 @@ import { OwnershipActions } from "./ownership";
 import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
+import { getNewLineList } from "../utils/settingsHelpers";
 
 export const RemoteOperatorsModule: SocializeModule = {
     name: "RemoteOperatorsModule",
@@ -25,7 +26,7 @@ export const RemoteOperatorsModule: SocializeModule = {
         if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(userId)) {
             return true;
         } else if (this.settings.remoteOperatorList) {
-            const operatorList = this.settings.remoteOperatorList.split("\n").map(s => s.trim()).filter(Boolean);
+            const operatorList = getNewLineList(this.settings.remoteOperatorList);
             if (operatorList.includes(userId)) {
                 return true;
             }

@@ -6,11 +6,11 @@ import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../utils/BotResponse";
-import { parseBotInfoMessage } from "../utils/parsing";
+import { parseBotInfoMessage, extractId } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
-import { formatCommand } from "../utils/formatting";
+import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
-import { isUserInVoiceChannel } from "../utils/channels";
+import { isVoiceChannel, isUserInVoiceChannel } from "../utils/channels";
 import {
     GuildChannelStore, ChannelStore, GuildStore,
     SelectedChannelStore, UserStore as Users,
@@ -711,6 +711,7 @@ export const OwnershipModule: SocializeModule = {
         if (!settings) return null;
         // Only show for voice channels in our managed category
         if (channel.parent_id !== settings.categoryId && channel.id !== settings.creationChannelId) return null;
+        if (!isVoiceChannel(channel)) return null;
         return makeChannelItems(channel);
     },
 
@@ -735,7 +736,7 @@ export const OwnershipModule: SocializeModule = {
         const channelId = SelectedChannelStore.getVoiceChannelId();
         if (channelId) {
             const channel = ChannelStore.getChannel(channelId);
-            if (channel?.parent_id === settings.categoryId || channelId === settings.creationChannelId) {
+            if (channel && (channel.parent_id === settings.categoryId || channelId === settings.creationChannelId)) {
                 this.handleUserJoinedChannel(currentUserId, channelId, currentUserId);
             }
         }
@@ -783,13 +784,13 @@ export const OwnershipModule: SocializeModule = {
         if (oldState.channelId !== newState.channelId) {
             if (newState.channelId) {
                 const newChannel = ChannelStore.getChannel(newState.channelId);
-                if (newChannel?.parent_id === settings.categoryId || newState.channelId === settings.creationChannelId) {
+                if (newChannel && (newChannel.parent_id === settings.categoryId || newState.channelId === settings.creationChannelId)) {
                     this.handleUserJoinedChannel(newState.userId, newState.channelId, currentUserId);
                 }
             }
             if (oldState.channelId) {
                 const oldChannel = ChannelStore.getChannel(oldState.channelId);
-                if (oldChannel?.parent_id === settings.categoryId || oldState.channelId === settings.creationChannelId) {
+                if (oldChannel && (oldChannel.parent_id === settings.categoryId || oldState.channelId === settings.creationChannelId)) {
                     this.handleUserLeftChannel(oldState.userId, oldState.channelId, currentUserId);
                 }
             }
@@ -1011,7 +1012,8 @@ export const OwnershipModule: SocializeModule = {
         const meId = Users.getCurrentUser()?.id;
 
         this.notifyOwnership(channelId, ownerId, type);
-        sendDebugMessage(`Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`, channelId);
+        const debugMsg = formatMessageCommon(`Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`);
+        sendDebugMessage(debugMsg, channelId);
 
         moduleRegistry.dispatch(SocializeEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
 
@@ -1027,18 +1029,10 @@ export const OwnershipModule: SocializeModule = {
         const settings = getSettings();
         if (!settings) return;
 
-        const channel = ChannelStore.getChannel(channelId);
-        const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
-        const ownerName = getUserDisplayName(ownerId);
-
-        const formatted = settings.ownershipChangeMessage
-            .replace(/{reason}/g, type === "creator" ? "Created" : "Claimed")
-            .replace(/{channel_id}/g, channelId)
-            .replace(/{channel_name}/g, channel?.name || "Unknown")
-            .replace(/{guild_id}/g, channel?.guild_id || "")
-            .replace(/{guild_name}/g, guild?.name || "Unknown")
-            .replace(/{user_id}/g, ownerId)
-            .replace(/{user_name}/g, ownerName);
+        const formatted = formatCommand(settings.ownershipChangeMessage, channelId, {
+            userId: ownerId,
+            reason: type === "creator" ? "Created" : "Claimed"
+        });
 
         sendBotMessage(channelId, { content: formatted });
     },

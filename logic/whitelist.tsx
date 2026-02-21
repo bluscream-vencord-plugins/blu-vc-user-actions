@@ -93,9 +93,10 @@ export const WhitelistModule: SocializeModule = {
                 );
 
                 const rotMsg: string = s.permitRotationMessage || "♻️ Permit rotated: <@{user_id}> was unpermitted to make room for <@{user_id_new}>";
-                const msg = rotMsg
-                    .replace(/{user_id}/g, oldest)
-                    .replace(/{user_id_new}/g, userId);
+                const msg = formatCommand(rotMsg, channelId, {
+                    userId: oldest,
+                    newUserId: userId
+                });
                 sendBotMessage(channelId, { content: msg });
             }
         }

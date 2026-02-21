@@ -37,6 +37,7 @@ export function formatCommand(
     channelId: string,
     options?: {
         userId?: string;
+        newUserId?: string;
         newChannelName?: string;
         reason?: string;
         size?: string;
@@ -61,6 +62,15 @@ export function formatCommand(
             .replace(/{user_id}/g, options.userId)
             .replace(/{user}/g, `<@${options.userId}>`)
             .replace(/{user_name}/g, userName);
+    }
+
+    if (options?.newUserId) {
+        const user = UserStore.getUser(options.newUserId);
+        const userName = user?.globalName || user?.username || options.newUserId;
+        formatted = formatted
+            .replace(/{user_id_new}/g, options.newUserId)
+            .replace(/{user_new}/g, `<@${options.newUserId}>`)
+            .replace(/{user_name_new}/g, userName);
     }
 
     // Handle optional channel name

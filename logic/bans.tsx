@@ -154,12 +154,14 @@ export const BansModule: SocializeModule = {
             const oldestBannedUser = config.bannedUsers.shift();
             if (oldestBannedUser) {
                 sendDebugMessage(`Ban list full. Unbanning ${oldestBannedUser} to make room...`, channelId);
-                actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser }), channelId, true);
+                const unbanCmd = formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser });
+                actionQueue.enqueue(unbanCmd, channelId, true);
 
                 if (this.settings.banRotationMessage) {
-                    const rotationStr = this.settings.banRotationMessage
-                        .replace(/{user_id}/g, oldestBannedUser)
-                        .replace(/{user_id_new}/g, userId);
+                    const rotationStr = formatCommand(this.settings.banRotationMessage, channelId, {
+                        userId: oldestBannedUser,
+                        newUserId: userId
+                    });
                     sendBotMessage(channelId, { content: rotationStr });
                 }
             }
@@ -169,8 +171,9 @@ export const BansModule: SocializeModule = {
             stateManager.updateMemberConfig(currentUserId, { bannedUsers: [...config.bannedUsers, userId] });
         }
 
+        const banCmd = formatCommand(this.settings.banCommand, channelId, { userId, reason });
         actionQueue.enqueue(
-            formatCommand(this.settings.banCommand, channelId, { userId, reason }),
+            banCmd,
             channelId,
             true,
             () => isUserInVoiceChannel(userId, channelId)
@@ -194,7 +197,8 @@ export const BansModule: SocializeModule = {
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
-        actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId }), channelId);
+        const cmd = formatCommand(this.settings.unbanCommand, channelId, { userId });
+        actionQueue.enqueue(cmd, channelId);
 
         if (stateManager.hasMemberConfig(currentUserId)) {
             const ownerCfg = stateManager.getMemberConfig(currentUserId);

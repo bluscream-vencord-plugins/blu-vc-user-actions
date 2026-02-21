@@ -3,7 +3,11 @@ import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
 import { React, UserStore as Users, RestAPI } from "@webpack/common";
+import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
+import { isUserInVoiceChannel } from "../utils/channels";
+import { formatCommand } from "../utils/formatting";
+import { extractId } from "../utils/parsing"; // Keeping this as it was in the original and instruction 1 mentioned it
 
 const COMMAND_TIMEOUT = 10000;
 
@@ -298,8 +302,8 @@ export class ModuleRegistry {
                         switch (opt.type) {
                             case ApplicationCommandOptionType.USER:
                             case ApplicationCommandOptionType.MENTIONABLE: {
-                                const id = val.replace(/[<@!>]/g, "");
-                                parsedArgs[opt.name] = id;
+                                // const { extractId } = require("../utils/parsing"); // Removed local require
+                                parsedArgs[opt.name] = extractId(val); // Used imported extractId
                                 break;
                             }
                             case ApplicationCommandOptionType.INTEGER:

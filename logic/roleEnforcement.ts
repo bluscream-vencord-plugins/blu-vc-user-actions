@@ -8,6 +8,7 @@ import { SocializeEvent } from "../types/events";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
 import { isUserInVoiceChannel } from "../utils/channels";
+import { formatCommand } from "../utils/formatting";
 
 export const RoleEnforcementModule: SocializeModule = {
     name: "RoleEnforcementModule",
@@ -54,7 +55,7 @@ export const RoleEnforcementModule: SocializeModule = {
                 if (shouldKick) {
                     sendDebugMessage(`<@${userId}> matched role enforcement conditions (${settings.requiredRoleMode}). Kicking.`, channelId);
 
-                    const kickCmd = settings.kickCommand.replace("{user}", `<@${userId}>`);
+                    const kickCmd = formatCommand(settings.kickCommand, channelId, { userId });
 
                     // Action taken
                     actionQueue.enqueue(
