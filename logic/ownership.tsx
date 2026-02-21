@@ -22,6 +22,7 @@ import { WhitelistModule } from "./whitelist";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
 import { sendBotMessage } from "@api/Commands";
+import { getNewLineList } from "../utils/settingsHelpers";
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -100,6 +101,73 @@ export const OwnershipActions = {
             ChannelActions?.selectVoiceChannel(settings.creationChannelId);
         } else {
             showToast("No creation channel ID configured.");
+        }
+    },
+    findOrCreateChannel() {
+        const settings = getSettings();
+        if (!settings) return;
+
+        const meId = Users.getCurrentUser()?.id;
+        if (!meId) {
+            this.createChannel();
+            return;
+        }
+
+        let targetChannelId: string | undefined;
+
+        // 1. Check if the last channel we are cached creator in still exists
+        const ownerships = stateManager["store"].activeChannelOwnerships;
+        const myOwnedChannels = Object.keys(ownerships).filter(
+            id => ownerships[id].creatorId === meId || ownerships[id].claimantId === meId
+        );
+
+        for (const id of myOwnedChannels) {
+            const channel = ChannelStore.getChannel(id);
+            if (channel && channel.parent_id === settings.categoryId) {
+                targetChannelId = id;
+                logger.info(`findOrCreateChannel: Found existing owned channel ${id}`);
+                break;
+            }
+        }
+
+        const guildChannels = GuildChannelStore.getChannels(settings.guildId);
+
+        // 2. Search for any channel that matches the channel name in our cached memberchannelinfo object
+        if (!targetChannelId && stateManager.hasMemberConfig(meId)) {
+            const config = stateManager.getMemberConfig(meId);
+            if (config.customName && guildChannels?.SELECTABLE) {
+                const matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
+                    channel.parent_id === settings.categoryId &&
+                    channel.name === config.customName
+                );
+                if (matchedChannel) {
+                    targetChannelId = matchedChannel.channel.id;
+                    logger.info(`findOrCreateChannel: Found channel matching custom name ${targetChannelId}`);
+                }
+            }
+        }
+
+        // 3. Search for any channels with names in our channel name rotation
+        if (!targetChannelId && guildChannels?.SELECTABLE && settings.channelNameRotationNames) {
+            const nameList = getNewLineList(settings.channelNameRotationNames);
+            if (nameList.length > 0) {
+                const matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
+                    channel.parent_id === settings.categoryId &&
+                    nameList.includes(channel.name)
+                );
+                if (matchedChannel) {
+                    targetChannelId = matchedChannel.channel.id;
+                    logger.info(`findOrCreateChannel: Found channel matching rotation name ${targetChannelId}`);
+                }
+            }
+        }
+
+        if (targetChannelId) {
+            ChannelActions?.selectVoiceChannel(targetChannelId);
+            showToast("Joined found channel.");
+        } else {
+            logger.info("findOrCreateChannel: No existing channel found, creating a new one.");
+            this.createChannel();
         }
     },
     resetState() {
@@ -550,14 +618,7 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
             id="socialize-toolbox-create"
             label="Create Channel"
             key="socialize-toolbox-create"
-            action={() => {
-                const settings = getSettings();
-                if (settings?.creationChannelId) {
-                    ChannelActions?.selectVoiceChannel(settings.creationChannelId);
-                } else {
-                    showToast("No creation channel ID configured.");
-                }
-            }}
+            action={() => OwnershipActions.createChannel()}
         />,
         <Menu.MenuItem
             id="socialize-toolbox-fetch-owners"

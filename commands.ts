@@ -370,6 +370,15 @@ export const socializeCommands = [
         }
     },
     {
+        name: `${commandName} find`,
+        description: "Find an existing owned channel or create a new one",
+        inputType: ApplicationCommandInputType.BUILT_IN,
+        execute: (_args: any[], ctx: any) => {
+            OwnershipActions.findOrCreateChannel();
+            // findOrCreateChannel has its own toasts, so no need for bot message here unless generic.
+        }
+    },
+    {
         name: `${commandName} fetch-owners`,
         description: "Fetch all channel owners in the managed category",
         inputType: ApplicationCommandInputType.BUILT_IN,
