@@ -7,9 +7,8 @@ import { sendDebugMessage } from "../utils/debug";
 export interface ExternalCommand {
     name: string;
     description: string;
-    getRegexString: (settings: PluginSettings) => string | undefined;
     checkPermission?: (message: Message, settings: PluginSettings) => boolean;
-    execute: (match: RegExpMatchArray, message: Message, channelId: string) => void;
+    execute: (args: string[], message: Message, channelId: string) => void;
 }
 
 export interface SocializeModule {
@@ -150,30 +149,59 @@ export class ModuleRegistry {
         const meId = Users.getCurrentUser()?.id;
         if (!meId || !this._settings) return;
 
+        const contentRaw = message.content ?? "";
+        const contentTrim = contentRaw.trim();
+        const contentLower = contentTrim.toLowerCase();
+        const prefix = this._settings.externalCommandPrefix || "@";
+        const meMention = `<@${meId}>`;
+        const meMentionNick = `<@!${meId}>`;
+
+        let effectiveContent = "";
+        let triggered = false;
+
+        if (contentLower.startsWith(prefix.toLowerCase())) {
+            triggered = true;
+            effectiveContent = contentTrim.slice(prefix.length).trim();
+        } else if (contentLower.startsWith(meMention)) {
+            triggered = true;
+            effectiveContent = contentTrim.slice(meMention.length).trim();
+        } else if (contentLower.startsWith(meMentionNick)) {
+            triggered = true;
+            effectiveContent = contentTrim.slice(meMentionNick.length).trim();
+        }
+
+        if (!triggered) return;
+
+        // Collect all external commands
+        const allCmds: { mod: SocializeModule, cmd: ExternalCommand }[] = [];
         for (const mod of this.modules) {
             if (mod.externalCommands) {
                 for (const cmd of mod.externalCommands) {
-                    const regexString = cmd.getRegexString(this._settings);
-                    if (!regexString) continue;
-
-                    try {
-                        const pattern = regexString.replace("{me}", meId);
-                        const regex = new RegExp(pattern, "i");
-                        const content = (message.content ?? "").trim().toLowerCase();
-                        const match = content.match(regex);
-
-                        if (match) {
-                            if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
-                                sendDebugMessage(`🛑 Rejected command \`${cmd.name}\` from <@${message.author.id}> (Missing Permissions)`, message.channel_id);
-                                continue;
-                            }
-                            sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
-                            cmd.execute(match, message, message.channel_id);
-                        }
-                    } catch (e) {
-                        console.error(`Invalid regex for ExternalCommand ${cmd.name}: ${regexString}`, e);
-                    }
+                    allCmds.push({ mod, cmd });
                 }
+            }
+        }
+
+        // Sort by name length descending to match longest command first (subcommands)
+        allCmds.sort((a, b) => b.cmd.name.length - a.cmd.name.length);
+
+        const effectiveContentLower = effectiveContent.toLowerCase();
+
+        for (const { mod, cmd } of allCmds) {
+            const cmdNameLower = cmd.name.toLowerCase();
+            // Check if content starts with command name followed by space or end of string
+            if (effectiveContentLower === cmdNameLower || effectiveContentLower.startsWith(cmdNameLower + " ")) {
+                if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
+                    sendDebugMessage(`🛑 Rejected command \`${cmd.name}\` from <@${message.author.id}> (Missing Permissions)`, message.channel_id);
+                    return; // Stop processing once matched
+                }
+
+                const remainder = effectiveContent.slice(cmd.name.length).trim();
+                const args = remainder ? remainder.split(/\s+/) : [];
+
+                sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
+                cmd.execute(args, message, message.channel_id);
+                return; // Stop after first match
             }
         }
     }

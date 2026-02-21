@@ -6,6 +6,7 @@ import { OwnershipActions } from "./ownership";
 import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
+import { extractId } from "../utils/parsing";
 
 export const RemoteOperatorsModule: SocializeModule = {
     name: "RemoteOperatorsModule",
@@ -48,130 +49,128 @@ export const RemoteOperatorsModule: SocializeModule = {
 
     externalCommands: [
         {
-            name: "Remote Rename",
+            name: "name",
             description: "Rename channel remotely",
-            getRegexString: s => s.remoteOpRenameRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.name) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Renaming channel to ${match.groups.name}`);
-                    OwnershipActions.renameChannel(channelId, match.groups.name.trim());
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const newName = args.join(" ").trim();
+                if (newName) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Renaming channel to ${newName}`);
+                    OwnershipActions.renameChannel(channelId, newName);
                 }
             }
         },
         {
-            name: "Remote Ban",
+            name: "ban",
             description: "Ban user remotely",
-            getRegexString: s => s.remoteOpBanRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Banning user ${match.groups.target}`);
-                    BansModule.enforceBanPolicy(match.groups.target, channelId, false, `Remote operator ban by ${msg.author.username}`);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Banning user ${target}`);
+                    BansModule.enforceBanPolicy(target, channelId, false, `Remote operator ban by ${msg.author.username}`);
                 }
             }
         },
         {
-            name: "Remote Kick",
+            name: "kick",
             description: "Kick user remotely",
-            getRegexString: s => s.remoteOpKickRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Kicking user ${match.groups.target}`);
-                    OwnershipActions.kickUser(channelId, match.groups.target);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Kicking user ${target}`);
+                    OwnershipActions.kickUser(channelId, target);
                 }
             }
         },
         {
-            name: "Remote Lock",
+            name: "lock",
             description: "Lock channel remotely",
-            getRegexString: s => s.remoteOpLockRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
                 logger.info(`RemoteOperator (${msg.author.username}): Locking channel`);
                 OwnershipActions.lockChannel(channelId);
             }
         },
         {
-            name: "Remote Unlock",
+            name: "unlock",
             description: "Unlock channel remotely",
-            getRegexString: s => s.remoteOpUnlockRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
                 logger.info(`RemoteOperator (${msg.author.username}): Unlocking channel`);
                 OwnershipActions.unlockChannel(channelId);
             }
         },
         {
-            name: "Remote Permit",
+            name: "permit",
             description: "Permit user remotely",
-            getRegexString: s => s.remoteOpPermitRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Permitting user ${match.groups.target}`);
-                    WhitelistModule.permitUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Permitting user ${target}`);
+                    WhitelistModule.permitUser(target, channelId);
                 }
             }
         },
         {
-            name: "Remote Unpermit",
+            name: "unpermit",
             description: "Unpermit user remotely",
-            getRegexString: s => s.remoteOpUnpermitRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Unpermitting user ${match.groups.target}`);
-                    WhitelistModule.unpermitUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Unpermitting user ${target}`);
+                    WhitelistModule.unpermitUser(target, channelId);
                 }
             }
         },
         {
-            name: "Remote Whitelist",
+            name: "whitelist",
             description: "Whitelist user remotely",
-            getRegexString: s => s.remoteOpWhitelistRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Whitelisting user ${match.groups.target}`);
-                    WhitelistModule.whitelistUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Whitelisting user ${target}`);
+                    WhitelistModule.whitelistUser(target, channelId);
                 }
             }
         },
         {
-            name: "Remote Unwhitelist",
+            name: "unwhitelist",
             description: "Unwhitelist user remotely",
-            getRegexString: s => s.remoteOpUnwhitelistRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Unwhitelisting user ${match.groups.target}`);
-                    WhitelistModule.unwhitelistUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Unwhitelisting user ${target}`);
+                    WhitelistModule.unwhitelistUser(target, channelId);
                 }
             }
         },
         {
-            name: "Remote Blacklist",
+            name: "blacklist",
             description: "Blacklist user remotely",
-            getRegexString: s => s.remoteOpBlacklistRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Blacklisting user ${match.groups.target}`);
-                    BlacklistModule.blacklistUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Blacklisting user ${target}`);
+                    BlacklistModule.blacklistUser(target, channelId);
                 }
             }
         },
         {
-            name: "Remote Unblacklist",
+            name: "unblacklist",
             description: "Unblacklist user remotely",
-            getRegexString: s => s.remoteOpUnblacklistRegex,
-            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(msg.author.id) : false),
-            execute: (match, msg, channelId) => {
-                if (match?.groups?.target) {
-                    logger.info(`RemoteOperator (${msg.author.username}): Unblacklisting user ${match.groups.target}`);
-                    BlacklistModule.unblacklistUser(match.groups.target, channelId);
+            checkPermission: (msg, s) => s.remoteOperatorsEnabled && (RemoteOperatorsModule.isOperator(msg.author.id)),
+            execute: (args, msg, channelId) => {
+                const target = extractId(args[0]);
+                if (target) {
+                    logger.info(`RemoteOperator (${msg.author.username}): Unblacklisting user ${target}`);
+                    BlacklistModule.unblacklistUser(target, channelId);
                 }
             }
         }

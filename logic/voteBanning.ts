@@ -3,6 +3,7 @@ import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { VoiceStateStore } from "@webpack/common";
 import { Message } from "@vencord/discord-types";
+import { extractId } from "../utils/parsing";
 import { stateManager } from "../utils/stateManager";
 import { sendDebugMessage } from "../utils/debug";
 import { BansModule } from "./bans";
@@ -27,18 +28,17 @@ export const VoteBanningModule: SocializeModule = {
 
     externalCommands: [
         {
-            name: "Vote Ban",
+            name: "vote ban",
             description: "Initiate a vote ban against a user",
-            getRegexString: s => s.voteBanRegex,
             checkPermission: (msg, s) => {
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
                 // Voter must be in a Voice Channel to initiate a vote ban
                 return !!(voterVoiceState && voterVoiceState.channelId);
             },
-            execute: (match, msg, channelId) => {
-                const targetUser = match.groups?.target;
-                const reason = match.groups?.reason || "";
+            execute: (args, msg, channelId) => {
+                const targetUser = extractId(args[0]);
+                const reason = args.slice(1).join(" ");
                 if (!targetUser) return;
 
                 const voterId = msg.author.id;
