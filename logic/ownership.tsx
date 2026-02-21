@@ -4,7 +4,7 @@ import { SocializeEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership, MemberChannelInfo } from "../types/state";
 import { stateManager } from "../utils/stateManager";
 import { logger } from "../utils/logger";
-import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
+import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
 import { actionQueue } from "../utils/actionQueue";
@@ -135,7 +135,7 @@ export const OwnershipActions = {
         }
 
         const guildChannels = GuildChannelStore.getChannels(settings.guildId);
-        let matchedChannel: ChannelWithComparator | undefined;
+        let matchedChannel: ChannelWithComparator | ThreadJoined | undefined;
 
         // 2. Search for any channel that matches the channel name in our cached memberchannelinfo object
         if (!targetChannelId && stateManager.hasMemberConfig(meId)) {
@@ -156,7 +156,7 @@ export const OwnershipActions = {
         if (!targetChannelId && guildChannels?.SELECTABLE && settings.channelNameRotationNames) {
             const nameList = getNewLineList(settings.channelNameRotationNames);
             if (nameList.length > 0) {
-                const matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
+                matchedChannel = guildChannels.SELECTABLE.find(({ channel }) =>
                     channel.parent_id === settings.categoryId &&
                     nameList.includes(channel.name)
                 );
@@ -166,10 +166,10 @@ export const OwnershipActions = {
                 }
             }
         }
-        const channelName = targetChannelId ? ChannelStore.getChannel(targetChannelId)?.name : undefined;
+        const channelName = matchedChannel ? matchedChannel.channel.name : targetChannelId;
 
         if (targetChannelId) {
-            showToast(`Joining found channel ${channelName || targetChannelId}`);
+            showToast(`Joining channel ${channelName}`);
             ChannelActions?.selectVoiceChannel(targetChannelId);
         } else if (create) {
             logger.info("findOrCreateChannel: No existing channel found, creating a new one.");
