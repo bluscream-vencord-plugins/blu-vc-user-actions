@@ -2,7 +2,7 @@ import { ActionQueueItem } from "../types/state";
 
 import { logger } from "./logger";
 import { sendDebugMessage } from "./debug";
-import { showExternalMessageToast } from "./messaging";
+import { sendExternalMessage } from "./messaging";
 
 // Simple Action Queue
 export class ActionQueue {
@@ -115,7 +115,7 @@ export class ActionQueue {
                 try {
                     sendDebugMessage(`Executing command: \`${item.command}\``, item.channelId);
 
-                    const timeoutPromise = new Promise<any>((_, reject) =>
+                    const timeoutPromise = new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error("Timeout after 10s waiting for sendCommandCallback")), 10000)
                     );
 

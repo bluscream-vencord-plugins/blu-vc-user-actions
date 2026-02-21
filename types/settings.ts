@@ -77,6 +77,9 @@ export const defaultSettings = definePluginSettings({
     externalCommandPrefix: { type: OptionType.STRING, description: "Global prefix for remote/external commands", default: "@", restartNeeded: false },
     remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
     friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
+    // ── Ephermal Author Settings ──────────────────────────────────────────────────
+    ephemeralAuthorName: { type: OptionType.STRING, description: "Author name for bot messages (displayed as the sender). Variables: {username}=username, {displayname}=display name, {userid}=user ID", default: "Socialize Voice [!]", placeholder: "Clyde or {username}", restartNeeded: false, },
+    ephemeralAuthorIconUrl: { type: OptionType.STRING, description: "Author icon URL for bot messages (leave empty for default). Variables: {username}=username, {displayname}=display name, {userid}=user ID, {avatar}=avatar URL", default: "https://cdn.discordapp.com/avatars/913852862990262282/6cef25d3cdfad395b26e32260da0b320.webp?size=1024", placeholder: "https://example.com/avatar.png or {avatar}", restartNeeded: false, },
 
     // ── Core ──────────────────────────────────────────────────────────────
     guildId: { type: OptionType.STRING, description: "Guild ID", default: "505974446914535426", restartNeeded: false },

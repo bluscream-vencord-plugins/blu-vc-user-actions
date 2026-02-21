@@ -1,6 +1,7 @@
 import { moduleRegistry } from "../logic/moduleRegistry";
 import { logger } from "./logger";
 import { SelectedChannelStore } from "@webpack/common";
+import { sendEphemeralMessage } from "./messaging";
 
 /**
  * Sends an ephemeral debug message.
@@ -18,13 +19,6 @@ export function sendDebugMessage(content: any, channelId?: string) {
         return;
     }
 
-    try {
-        const { sendBotMessage } = require("@api/Commands");
-        if (sendBotMessage) {
-            const text = typeof content === "object" ? JSON.stringify(content) : String(content);
-            sendBotMessage(targetChannelId, { content: text });
-        }
-    } catch (e) {
-        console.warn("[SocializeGuild] Failed to send debug message:", e);
-    }
+    const text = typeof content === "object" ? JSON.stringify(content) : String(content);
+    sendEphemeralMessage(targetChannelId, text);
 }

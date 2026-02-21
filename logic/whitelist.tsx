@@ -8,7 +8,7 @@ import { stateManager } from "../utils/stateManager";
 import { MemberLike, extractId } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
-import { sendExternalMessage } from "../utils/messaging";
+import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
 
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React, UserStore as Users } from "@webpack/common";
@@ -98,7 +98,7 @@ export const WhitelistModule: SocializeModule = {
                     userId: oldest,
                     newUserId: userId
                 });
-                actionQueue.enqueue(msg, channelId);
+                sendEphemeralMessage(channelId, msg);
             }
         }
 

@@ -33,3 +33,51 @@ export function sendExternalMessage(channelId: string, content: string) {
         return sendBotMessage(channelId, { content });
     }
 }
+/**
+ * Sends an ephemeral (local-only) bot message to a channel.
+ * @param channelId The target channel ID.
+ * @param content The message content.
+ */
+export function sendEphemeralMessage(channelId: string, content: string, authorName?: string, authorIconUrl?: string) {
+    try {
+        const { sendBotMessage } = require("@api/Commands");
+        const { UserStore: Users } = require("@webpack/common");
+        const { defaultSettings } = require("../types/settings");
+
+        const user = Users.getCurrentUser();
+        const settings = defaultSettings.store;
+
+        let finalAuthorName = authorName || settings.ephemeralAuthorName || "Socialize Voice [!]";
+        let finalAuthorIconUrl = authorIconUrl || settings.ephemeralAuthorIconUrl || "";
+
+        if (user) {
+            const replacements = {
+                "{username}": user.username,
+                "{displayname}": user.globalName || user.username,
+                "{userid}": user.id,
+                "{avatar}": user.getAvatarURL?.() || ""
+            };
+
+            for (const [key, val] of Object.entries(replacements)) {
+                finalAuthorName = finalAuthorName.replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), val);
+                finalAuthorIconUrl = finalAuthorIconUrl.replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), val);
+            }
+        }
+
+        const authorConfig: { username: string, avatar_url?: string } = {
+            username: finalAuthorName
+        };
+
+        if (finalAuthorIconUrl && finalAuthorIconUrl.trim()) {
+            authorConfig.avatar_url = finalAuthorIconUrl.trim();
+        }
+
+        return sendBotMessage(channelId, {
+            content,
+            author: authorConfig
+        });
+    } catch (e) {
+        // Fallback to toast if command API is not available
+        showToast(content, Toasts.Type.MESSAGE);
+    }
+}

@@ -11,7 +11,7 @@ import { isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channe
 import { formatCommand } from "../utils/formatting";
 import { extractId } from "../utils/parsing"; // Keeping this as it was in the original and instruction 1 mentioned it
 import { stateManager } from "../utils/stateManager";
-import { sendExternalMessage } from "../utils/messaging";
+import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
 
 const COMMAND_TIMEOUT = 10000;
 
@@ -260,13 +260,13 @@ export class ModuleRegistry {
         if (message.author.id !== meId) {
             const voiceChannelId = SelectedChannelStore.getVoiceChannelId();
             if (!voiceChannelId) {
-                sendDebugMessage("❌ Command rejected: I am not in a voice channel.", message.channel_id);
+                sendEphemeralMessage(message.channel_id, "❌ Command rejected: I am not in a voice channel.");
                 return;
             }
             const ownership = stateManager.getOwnership(voiceChannelId);
             const isOwner = ownership && (ownership.creatorId === meId || ownership.claimantId === meId);
             if (!isOwner) {
-                sendDebugMessage("❌ Command rejected: You can only control my voice channel when I am the owner of it.", message.channel_id);
+                sendEphemeralMessage(message.channel_id, "❌ Command rejected: You can only control my voice channel when I am the owner of it.");
                 return;
             }
         }
@@ -275,19 +275,17 @@ export class ModuleRegistry {
         if (isDM) {
             const voiceChannelId = SelectedChannelStore.getVoiceChannelId();
             if (!voiceChannelId) {
-                // Toast already shown via sendExternalMessage in security check if applicable,
-                // but this handles the case where it's the meId in a DM (though meId usually doesn't trigger this via message)
-                sendDebugMessage("❌ Command rejected: You are not in a voice channel.", message.channel_id);
+                sendEphemeralMessage(message.channel_id, "❌ Command rejected: You are not in a voice channel.");
                 return;
             }
             const vc = ChannelStore.getChannel(voiceChannelId);
             if (!vc || vc.guild_id !== this._settings.guildId || vc.parent_id !== this._settings.categoryId) {
-                sendDebugMessage("❌ Command rejected: You are not in a managed voice channel.", message.channel_id);
+                sendEphemeralMessage(message.channel_id, "❌ Command rejected: You are not in a managed voice channel.");
                 return;
             }
             const associatedText = findAssociatedTextChannel(voiceChannelId);
             if (!associatedText) {
-                sendDebugMessage("❌ Command rejected: Could not find associated text channel.", message.channel_id);
+                sendEphemeralMessage(message.channel_id, "❌ Command rejected: Could not find associated text channel.");
                 return;
             }
             targetChannelId = associatedText.id;

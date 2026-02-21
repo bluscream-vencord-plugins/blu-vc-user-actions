@@ -10,6 +10,7 @@ import { parseBotInfoMessage, extractId } from "../utils/parsing";
 import { ActionQueue, actionQueue } from "../utils/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
+import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
 import { isVoiceChannel, isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channels";
 import {
     GuildChannelStore, ChannelStore, GuildStore,
@@ -769,7 +770,7 @@ export const OwnershipModule: SocializeModule = {
         const settings = getSettings();
         if (!settings) return;
         const msg = formatCommand(settings.infoCommand, channelId);
-        actionQueue.enqueue(msg, channelId, false);
+        actionQueue.enqueue(msg, channelId, true);
     },
 
     // ── Discord Event Handlers ───────────────────────────────
@@ -946,7 +947,7 @@ export const OwnershipModule: SocializeModule = {
             reason: type === "creator" ? "Created" : "Claimed"
         });
 
-        actionQueue.enqueue(formatted, channelId);
+        sendEphemeralMessage(channelId, formatted);
     },
 
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {
