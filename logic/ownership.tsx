@@ -78,6 +78,22 @@ export const OwnershipActions = {
             () => isUserInVoiceChannel(userId, channelId)
         );
     },
+    kickBannedUsers(channelId: string): number {
+        const meId = Users.getCurrentUser()?.id || "";
+        const states = VoiceStateStore.getVoiceStatesForChannel(channelId);
+        if (!stateManager.hasMemberConfig(meId)) {
+            return -1;
+        }
+        const config = stateManager.getMemberConfig(meId);
+        let n = 0;
+        for (const uid in states) {
+            if (config.bannedUsers.includes(uid)) {
+                this.kickUser(channelId, uid);
+                n++;
+            }
+        }
+        return n;
+    },
     createChannel() {
         const settings = getSettings();
         if (settings?.creationChannelId) {
@@ -227,20 +243,12 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                 key="socialize-kick-banned"
                 color="danger"
                 action={() => {
-                    const states = VoiceStateStore.getVoiceStatesForChannel(channel.id);
-                    if (!stateManager.hasMemberConfig(meId)) {
+                    const n = OwnershipActions.kickBannedUsers(channel.id);
+                    if (n === -1) {
                         showToast("No banned users in VC (no personal ban list found).");
-                        return;
+                    } else {
+                        showToast(n > 0 ? `Kicked ${n} banned user(s).` : "No banned users in VC.");
                     }
-                    const config = stateManager.getMemberConfig(meId);
-                    let n = 0;
-                    for (const uid in states) {
-                        if (config.bannedUsers.includes(uid)) {
-                            OwnershipActions.kickUser(channel.id, uid);
-                            n++;
-                        }
-                    }
-                    showToast(n > 0 ? `Kicked ${n} banned user(s).` : "No banned users in VC.");
                 }}
             />
         );
