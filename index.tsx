@@ -18,6 +18,7 @@ import { RoleEnforcementModule } from "./logic/roleEnforcement";
 import { BansModule } from "./logic/bans";
 import { VoteBanningModule } from "./logic/voteBanning";
 import { CommandCleanupModule } from "./logic/commandCleanup";
+import { RemoteOperatorsModule } from "./logic/remoteOperators";
 import { contextMenuHandlers } from "./components/menus";
 
 export default definePlugin({
@@ -47,6 +48,7 @@ export default definePlugin({
         moduleRegistry.register(RoleEnforcementModule);
         moduleRegistry.register(VoteBanningModule);
         moduleRegistry.register(CommandCleanupModule);
+        moduleRegistry.register(RemoteOperatorsModule);
 
         // Initialize them with current settings
         moduleRegistry.init(this.settings.store as unknown as PluginSettings);

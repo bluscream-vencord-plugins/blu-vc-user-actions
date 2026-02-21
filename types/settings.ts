@@ -73,6 +73,14 @@ export const defaultSettings = definePluginSettings({
     unbanCommand: { type: OptionType.STRING, description: "Unban Command Template (use {user_id})", default: "!v unban {user_id}", restartNeeded: false },
     permitCommand: { type: OptionType.STRING, description: "Permit Command Template (use {user_id})", default: "!v permit {user_id}", restartNeeded: false },
     unpermitCommand: { type: OptionType.STRING, description: "Unpermit Command Template (use {user_id})", default: "!v unpermit {user_id}", restartNeeded: false },
+    // ── Remote Operators ──────────────────────────────────────────────────
+    remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
+    friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
+    remoteOpRenameRegex: { type: OptionType.STRING, description: "Regex to detect remote rename command (named group: name)", default: "^<@!?{me}>\\s+(?:channel\\s+)?name\\s+(?<name>.+)", restartNeeded: false },
+    remoteOpBanRegex: { type: OptionType.STRING, description: "Regex to detect remote ban command (named group: target)", default: "^<@!?{me}>\\s+ban\\s+<@!?(?<target>\\d+)>", restartNeeded: false },
+    remoteOpKickRegex: { type: OptionType.STRING, description: "Regex to detect remote kick command (named group: target)", default: "^<@!?{me}>\\s+kick\\s+<@!?(?<target>\\d+)>", restartNeeded: false },
+    remoteOpLockRegex: { type: OptionType.STRING, description: "Regex to detect remote lock command", default: "^<@!?{me}>\\s+lock(?!\\w)", restartNeeded: false },
+    remoteOpUnlockRegex: { type: OptionType.STRING, description: "Regex to detect remote unlock command", default: "^<@!?{me}>\\s+unlock(?!\\w)", restartNeeded: false },
 
     // ── Core ──────────────────────────────────────────────────────────────
     guildId: { type: OptionType.STRING, description: "Guild ID", default: "505974446914535426", restartNeeded: false },
