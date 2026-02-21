@@ -16,23 +16,24 @@ export const RemoteOperatorsModule: SocializeModule = {
     stop() {
         // Nothing specific to stop
     },
+    isOperator(userId: string): boolean {
+        if (!this.settings) return false;
+        if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(userId)) {
+            return true;
+        } else if (this.settings.remoteOperatorList) {
+            const operatorList = this.settings.remoteOperatorList.split("\n").map(s => s.trim()).filter(Boolean);
+            if (operatorList.includes(userId)) {
+                return true;
+            }
+        }
+        return false;
+    },
 
     onMessageCreate(message: any): void {
         const meId = Users.getCurrentUser()?.id;
         if (!meId || !this.settings || message.author.id === meId) return;
 
-        // Check if user is an operator
-        let isOperator = false;
-        if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(message.author.id)) {
-            isOperator = true;
-        } else if (this.settings.remoteOperatorList) {
-            const operatorList = this.settings.remoteOperatorList.split("\n").map(s => s.trim()).filter(Boolean);
-            if (operatorList.includes(message.author.id)) {
-                isOperator = true;
-            }
-        }
-
-        if (!isOperator) return;
+        if (!this.isOperator(message.author.id)) return;
 
         const content = (message.content ?? "").trim().toLowerCase();
 

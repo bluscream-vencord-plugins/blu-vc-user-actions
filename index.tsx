@@ -104,10 +104,12 @@ export default definePlugin({
 
                 const isCommand = (message.content ?? "").trim().startsWith("!v");
                 const isInManagedCategory = channel.parent_id === s.categoryId;
+                const isOp = RemoteOperatorsModule.isOperator ? RemoteOperatorsModule.isOperator(message.author?.id) : false;
 
                 // We must allow !v commands to pass through even if the category filter blocks them,
                 // otherwise the CommandCleanupModule won't see them.
-                if (!isCommand && !isInManagedCategory) return;
+                // We also allow messages from remote operators to pass through early.
+                if (!isCommand && !isInManagedCategory && !isOp) return;
 
                 logger.debug(`MESSAGE_CREATE from ${message.author?.username} (${message.author?.id}) in #${channel.name} (${channelId})`);
 
