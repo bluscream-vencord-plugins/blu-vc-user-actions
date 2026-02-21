@@ -1,4 +1,4 @@
-import { PluginSettings } from "../types/settings";
+// import { PluginSettings } from "../types/settings";
 import { logger } from "../utils/logger";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
@@ -27,7 +27,7 @@ export interface ExternalCommand {
     description: string;
     aliases?: string[];
     options?: ExternalCommandOption[];
-    checkPermission?: (message: Message, settings: PluginSettings) => boolean;
+    checkPermission?: (message: Message, settings: Record<string, any>) => boolean;
     execute: (args: Record<string, any>, message: Message, channelId: string) => Promise<boolean> | boolean;
 }
 
@@ -37,8 +37,10 @@ export interface PluginModule {
     requiredDependencies?: string[];
     /** Modules that should be initialized before this one if they exist */
     optionalDependencies?: string[];
-    settings?: PluginSettings;
-    init(settings: PluginSettings): void;
+    /** The Vencord settings schema definitions for this module */
+    settingsSchema?: Record<string, any>;
+    settings?: Record<string, any>;
+    init(settings: Record<string, any>): void;
     stop(): void;
 
     // Optional Event Hooks
@@ -60,10 +62,10 @@ export interface PluginModule {
 
 export class ModuleRegistry {
     private modules: PluginModule[] = [];
-    private _settings!: PluginSettings;
+    private _settings!: Record<string, any>;
     private eventListeners: Map<SocializeEvent, Array<(payload: unknown) => void>> = new Map();
 
-    public init(settings: PluginSettings) {
+    public init(settings: Record<string, any>) {
         this._settings = settings;
 
         // Resolve load order based on dependencies
@@ -141,7 +143,7 @@ export class ModuleRegistry {
         this.modules = [];
     }
 
-    public get settings(): PluginSettings {
+    public get settings(): Record<string, any> {
         return this._settings;
     }
 

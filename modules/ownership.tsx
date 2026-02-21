@@ -27,13 +27,36 @@ import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
 import { ApplicationCommandOptionType } from "@api/Commands";
 import { getNewLineList } from "../utils/settingsHelpers";
+import { OptionType } from "@utils/types";
+
+export const ownershipSettings = {
+    // ── Channel Claiming / Ownership ──────────────────────────────────────
+    ownershipChangeMessage: { type: OptionType.STRING, description: "Message sent when ownership changes (supports {reason}, {channel_id}, {channel_name}, {guild_id}, {guild_name}, {user_id}, {user_name})", default: "✨ <@{user_id}> is now the owner of <#{channel_id}> (Reason: {reason})", restartNeeded: false },
+
+    // ── Commands ──────────────────────────────────────────────────────────
+    claimCommand: { type: OptionType.STRING, description: "Claim Channel Command", default: "!v claim", restartNeeded: false },
+    lockCommand: { type: OptionType.STRING, description: "Lock Channel Command", default: "!v lock", restartNeeded: false },
+    unlockCommand: { type: OptionType.STRING, description: "Unlock Channel Command", default: "!v unlock", restartNeeded: false },
+    resetCommand: { type: OptionType.STRING, description: "Reset Channel Command", default: "!v name \"\" | !v limit 0 | !v unlock", restartNeeded: false },
+    infoCommand: { type: OptionType.STRING, description: "Get Channel Info Command", default: "!v info", restartNeeded: false },
+    kickCommand: { type: OptionType.STRING, description: "Kick Command Template (use {user_id})", default: "!v kick {user_id}", restartNeeded: false },
+    setSizeCommand: { type: OptionType.STRING, description: "Set Channel Size Command Template (use {size})", default: "!v limit {size}", restartNeeded: false },
+    setChannelNameCommand: { type: OptionType.STRING, description: "Set Channel Name Command Template (use {name})", default: "!v name {name}", restartNeeded: false },
+
+    // ── Ephermal Author Settings ──────────────────────────────────────────────────
+    ephemeralAuthorName: { type: OptionType.STRING, description: "Author name for bot messages (displayed as the sender). Variables: {username}=username, {displayname}=display name, {userid}=user ID", default: "Socialize Voice [!]", placeholder: "Clyde or {username}", restartNeeded: false, },
+    ephemeralAuthorIconUrl: { type: OptionType.STRING, description: "Author icon URL for bot messages (leave empty for default). Variables: {username}=username, {displayname}=display name, {userid}=user ID, {avatar}=avatar URL", default: "https://cdn.discordapp.com/avatars/913852862990262282/6cef25d3cdfad395b26e32260da0b320.webp?size=1024", placeholder: "https://example.com/avatar.png or {avatar}", restartNeeded: false, },
+};
+
+export type OwnershipSettingsType = typeof ownershipSettings;
+
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
 function getSettings() {
-    return moduleRegistry.settings;
+    return moduleRegistry.settings as any;
 }
 
 export const OwnershipActions = {
@@ -700,6 +723,8 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
 export const OwnershipModule: PluginModule = {
     name: "OwnershipModule",
     requiredDependencies: ["WhitelistModule", "BansModule", "BlacklistModule", "ChannelNameRotationModule"],
+    settingsSchema: ownershipSettings,
+    settings: undefined as unknown as Record<string, any>,
 
     // ── Menu Item Hooks ──────────────────────────────────────
 
@@ -728,7 +753,8 @@ export const OwnershipModule: PluginModule = {
 
     // ── Lifecycle ────────────────────────────────────────────
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
+        this.settings = settings;
         logger.info("OwnershipModule initializing");
 
         const currentUserId = Users.getCurrentUser()?.id;

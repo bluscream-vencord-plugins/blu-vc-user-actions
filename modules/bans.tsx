@@ -1,5 +1,5 @@
 import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginSettings, RequiredRoleMode } from "../types/settings";
+import { RequiredRoleMode } from "./roleEnforcement";
 import { SocializeEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { actionQueue } from "../utils/actionQueue";
@@ -16,11 +16,27 @@ import { BlacklistModule } from "./blacklist";
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
 import { sendBotMessage } from "@api/Commands";
+import { OptionType } from "@utils/types";
+import { defaultSettings } from "../settings";
+
+export const banSettings = {
+    // ── Banning ───────────────────────────────────────────────────────────
+    banLimit: { type: OptionType.SLIDER, description: "Max users in ban list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.banLimit = Math.round(v); } },
+    banRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest ban when limit is reached", default: true, restartNeeded: false },
+    banRotateCooldown: { type: OptionType.NUMBER, description: "Minimum seconds before re-kicking a user (0 = infinite)", default: 0, restartNeeded: false },
+    banRotationMessage: { type: OptionType.STRING, description: "Message sent on ban rotation (supports {user_id}, {user_id_new})", default: "♻️ Ban rotated: <@{user_id}> was unbanned to make room for <@{user_id_new}>", restartNeeded: false },
+    banInLocalBlacklist: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users in the local blacklist", default: true, restartNeeded: false },
+    banBlockedUsers: { type: OptionType.BOOLEAN, description: "Auto-kick/ban users you have blocked", default: true, restartNeeded: false },
+    localUserBlacklist: { type: OptionType.STRING, description: "Local ban list — user IDs to auto-kick (one per line)", default: "", multiline: true, restartNeeded: false },
+};
+
+export type BanSettingsType = typeof banSettings;
 
 export const BansModule: PluginModule = {
     name: "BansModule",
     requiredDependencies: ["BlacklistModule"],
-    settings: null as unknown as PluginSettings,
+    settingsSchema: banSettings,
+    settings: null as unknown as Record<string, any>,
     recentlyKickedWaitlist: new Map<string, number>(),
 
 

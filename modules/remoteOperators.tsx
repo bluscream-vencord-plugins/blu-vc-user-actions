@@ -8,16 +8,28 @@ import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
 import { getNewLineList } from "../utils/settingsHelpers";
+import { OptionType } from "@utils/types";
 
-const checkPermission = (msg: any, s: PluginSettings) =>
+export const remoteOperatorsSettings = {
+    // ── Remote Operators ──────────────────────────────────────────────────
+    remoteOperatorsEnabled: { type: OptionType.BOOLEAN, description: "Enable Remote Operator Commands", default: true, restartNeeded: false },
+    externalCommandPrefix: { type: OptionType.STRING, description: "Global prefix for remote/external commands", default: "@", restartNeeded: false },
+    remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
+    friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
+};
+
+export type RemoteOperatorsSettingsType = typeof remoteOperatorsSettings;
+
+const checkPermission = (msg: any, s: any) =>
     isUserOwner(msg.author.id, msg.channel_id) || (s.remoteOperatorsEnabled && RemoteOperatorsModule.isOperator(msg.author.id));
 
 export const RemoteOperatorsModule: PluginModule = {
     name: "RemoteOperatorsModule",
     requiredDependencies: ["OwnershipModule", "BansModule", "WhitelistModule", "BlacklistModule"],
-    settings: undefined as unknown as PluginSettings,
+    settingsSchema: remoteOperatorsSettings,
+    settings: undefined as unknown as Record<string, any>,
 
-    init(settings: PluginSettings) {
+    init(settings: Record<string, any>) {
         this.settings = settings;
     },
 

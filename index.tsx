@@ -1,7 +1,6 @@
 import definePlugin from "@utils/types";
 import { pluginInfo } from "./info";
-import { defaultSettings } from "./types/settings";
-import { PluginSettings } from "./types/settings";
+import { defaultSettings, LoosePluginSettings } from "./settings";
 import { moduleRegistry } from "./utils/moduleRegistry";
 import { stateManager } from "./utils/stateManager";
 import { logger } from "./utils/logger";
@@ -51,7 +50,7 @@ export default definePlugin({
         moduleRegistry.register(RemoteOperatorsModule);
 
         // Initialize them with current settings
-        moduleRegistry.init(this.settings.store as unknown as PluginSettings);
+        moduleRegistry.init(this.settings.store as unknown as LoosePluginSettings);
 
         if (this.settings.store.autoCreateOnStartup) {
             logger.info("autoCreateOnStartup is enabled. Waiting 10 seconds before finding/creating channel...");

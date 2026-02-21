@@ -13,10 +13,26 @@ import { sendExternalMessage, sendEphemeralMessage } from "../utils/messaging";
 import { User, Channel } from "@vencord/discord-types";
 import { Menu, React, UserStore as Users } from "@webpack/common";
 import { sendBotMessage } from "@api/Commands";
+import { OptionType } from "@utils/types";
+import { defaultSettings } from "../settings";
+
+export const whitelistSettings = {
+    // ── Whitelisting (exclude from auto-actions) ──────────────────────────
+    localUserWhitelist: { type: OptionType.STRING, description: "Local whitelist — user IDs to exclude from auto-actions (one per line)", default: "", multiline: true, restartNeeded: false },
+    whitelistSkipMessage: { type: OptionType.STRING, description: "Message sent when skipping an action for a whitelisted user (supports {action}, {user_id}, {user_name})", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
+
+    // ── Permitting ────────────────────────────────────────────────────────
+    permitLimit: { type: OptionType.SLIDER, description: "Max users in permit list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.permitLimit = Math.round(v); } },
+    permitRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest entry when permit limit is reached", default: false, restartNeeded: false },
+    permitRotationMessage: { type: OptionType.STRING, description: "Message sent on permit rotation (supports {user_id}, {user_id_new})", default: "♻️ Permit rotated: <@{user_id}> was unpermitted to make room for <@{user_id_new}>", restartNeeded: false },
+};
+
+export type WhitelistSettingsType = typeof whitelistSettings;
 
 export const WhitelistModule: PluginModule = {
     name: "WhitelistModule",
-    settings: undefined as PluginSettings | undefined,
+    settingsSchema: whitelistSettings,
+    settings: undefined as Record<string, any> | undefined,
 
 
     init(settings: PluginSettings) {

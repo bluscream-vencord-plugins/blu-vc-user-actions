@@ -6,9 +6,20 @@ import { User, Channel } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
 import { sendDebugMessage } from "../utils/debug";
 
+import { OptionType } from "@utils/types";
+
+export const blacklistSettings = {
+    // ── Blacklisting (auto-kick) ──────────────────────────
+    localUserBlacklist: { type: OptionType.STRING, description: "Local ban list — user IDs to auto-kick (one per line)", default: "", multiline: true, restartNeeded: false },
+    blacklistSkipMessage: { type: OptionType.STRING, description: "Message sent when auto-kicking a blacklisted user (supports {user_id}, {user_name})", default: "⚫ Blacklist: Removed <@{user_id}> ({user_name})", restartNeeded: false },
+};
+
+export type BlacklistSettingsType = typeof blacklistSettings;
+
 export const BlacklistModule: PluginModule = {
     name: "BlacklistModule",
-    settings: undefined as PluginSettings | undefined,
+    settingsSchema: blacklistSettings,
+    settings: undefined as Record<string, any> | undefined,
 
 
     init(settings: PluginSettings) {

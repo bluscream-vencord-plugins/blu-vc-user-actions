@@ -4,6 +4,16 @@ import { logger } from "../utils/logger";
 import { ActionQueueItem } from "../types/state";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message } from "@vencord/discord-types";
+import { OptionType } from "@utils/types";
+import { defaultSettings } from "../settings";
+
+export const commandCleanupSettings = {
+    // ── Command Cleanup ───────────────────────────────────────────────────
+    commandCleanup: { type: OptionType.BOOLEAN, description: "Delete command messages automatically after sending", default: true, restartNeeded: false },
+    commandCleanupDelay: { type: OptionType.SLIDER, description: "Delay before deleting command (ms)", default: 1000, markers: [0, 500, 1000, 2000, 5000], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.commandCleanupDelay = Math.round(v); } },
+};
+
+export type CommandCleanupSettingsType = typeof commandCleanupSettings;
 
 // Tracking for commands sent without immediate message ID
 const executedCommands = new Map<string, Set<string>>();
@@ -11,6 +21,8 @@ let messageActionsModule: any = null;
 
 export const CommandCleanupModule: PluginModule = {
     name: "CommandCleanupModule",
+    settingsSchema: commandCleanupSettings,
+    settings: null as unknown as Record<string, any>,
 
     init(settings: PluginSettings) {
         logger.info("CommandCleanupModule initializing");
@@ -18,7 +30,7 @@ export const CommandCleanupModule: PluginModule = {
         messageActionsModule = require("@webpack/common").MessageActions;
 
         moduleRegistry.on(SocializeEvent.ACTION_EXECUTED, (payload: EventPayloads[SocializeEvent.ACTION_EXECUTED]) => {
-            const s = moduleRegistry.settings;
+            const s = moduleRegistry.settings as any;
             if (!s?.commandCleanup) return;
             const item: ActionQueueItem = payload.item;
 
@@ -55,7 +67,7 @@ export const CommandCleanupModule: PluginModule = {
     },
 
     onMessageCreate(message: Message) {
-        const s = moduleRegistry.settings;
+        const s = moduleRegistry.settings as any;
         if (!s?.commandCleanup) return;
 
         // Use UserStore directly to avoid potential closure issues

@@ -3,6 +3,15 @@ import { ActionQueueItem } from "../types/state";
 import { logger } from "./logger";
 import { sendDebugMessage } from "./debug";
 import { sendExternalMessage } from "./messaging";
+import { OptionType } from "@utils/types";
+import { defaultSettings } from "../settings"; // Temporary cross import until fully decoupled
+
+export const actionQueueSettings = {
+    queueEnabled: { type: OptionType.BOOLEAN, description: "Enable Action Queue", default: true, restartNeeded: false },
+    queueInterval: { type: OptionType.SLIDER, description: "Action Queue Interval (seconds)", default: 2, markers: [1, 2, 5, 10], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.queueInterval = Math.round(v); } },
+};
+
+export type ActionQueueSettingsType = typeof actionQueueSettings;
 
 // Simple Action Queue
 export class ActionQueue {

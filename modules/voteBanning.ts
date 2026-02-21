@@ -6,11 +6,23 @@ import { ApplicationCommandOptionType } from "@api/Commands";
 import { stateManager } from "../utils/stateManager";
 import { sendDebugMessage } from "../utils/debug";
 import { BansModule } from "./bans";
+import { OptionType } from "@utils/types";
+import { defaultSettings } from "../settings";
+
+export const voteBanningSettings = {
+    // ── Vote Banning ──────────────────────────────────────────────────────
+    voteBanCommandString: { type: OptionType.STRING, description: "Command users type to vote-ban someone (e.g. !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
+    voteBanPercentage: { type: OptionType.SLIDER, description: "Percentage of channel occupants required to pass a vote ban", default: 50, markers: [10, 25, 50, 75, 100], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
+    voteBanWindowSecs: { type: OptionType.SLIDER, description: "Seconds a vote-ban stays open before expiring", default: 5 * 60, markers: [30, 60, 120, 300, 600, 1800], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowSecs = Math.round(v); } },
+};
+
+export type VoteBanningSettingsType = typeof voteBanningSettings;
 
 export const VoteBanningModule: PluginModule = {
     name: "VoteBanningModule",
     requiredDependencies: ["BansModule"],
-    settings: null as unknown as PluginSettings,
+    settingsSchema: voteBanningSettings,
+    settings: null as unknown as Record<string, any>,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
 
     init(settings: PluginSettings) {
@@ -79,7 +91,7 @@ export const VoteBanningModule: PluginModule = {
 
         const currentVoiceStates = Object.values(VoiceStateStore.getVoiceStatesForChannel(channelId) || {});
         const occupantCount = currentVoiceStates.length;
-        const requiredVotes = Math.ceil(occupantCount * (this.settings.voteBanPercentage / 100));
+        const requiredVotes = Math.ceil(occupantCount * ((this.settings as any).voteBanPercentage / 100));
 
         sendDebugMessage(`Vote registered against ${targetUser} by ${voterId}. (${voteData.voters.size}/${requiredVotes})`, channelId);
 
