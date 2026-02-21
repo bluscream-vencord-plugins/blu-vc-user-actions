@@ -8,6 +8,7 @@ import { logger } from "./utils/logger";
 import { socializeCommands } from "./commands";
 import { actionQueue } from "./utils/actionQueue";
 import { ChannelStore, GuildChannelStore } from "@webpack/common";
+import { sendExternalMessage } from "./utils/messaging";
 
 // Modules
 import { OwnershipModule, OwnershipActions } from "./logic/ownership";
@@ -34,9 +35,8 @@ export default definePlugin({
         // Use Vencord's sendMessage wrapper which properly fills in all required
         // Discord message fields (invalidEmojis, tts, validNonShortcutEmojis).
         // Raw MessageActions.sendMessage crashes with 'nonce' TypeError without them.
-        const { sendMessage } = require("@utils/discord");
         actionQueue.setCommandSender(async (command, channelId) => {
-            return sendMessage(channelId, { content: command }, true);
+            return sendExternalMessage(channelId, command);
         });
 
         // Register core logic modules

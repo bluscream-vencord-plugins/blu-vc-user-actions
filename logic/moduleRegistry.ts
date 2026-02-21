@@ -3,12 +3,15 @@ import { logger } from "../utils/logger";
 import { SocializeEvent, EventPayloads } from "../types/events";
 import { Message, VoiceState, Channel, User, Guild } from "@vencord/discord-types";
 import { ApplicationCommandOptionType } from "@api/Commands";
-import { React, UserStore as Users, RestAPI } from "@webpack/common";
+import { React, UserStore as Users, RestAPI, ChannelStore, SelectedChannelStore } from "@webpack/common";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { sendDebugMessage } from "../utils/debug";
-import { isUserInVoiceChannel } from "../utils/channels";
+import { ActionQueue, actionQueue } from "../utils/actionQueue";
+import { isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channels";
 import { formatCommand } from "../utils/formatting";
 import { extractId } from "../utils/parsing"; // Keeping this as it was in the original and instruction 1 mentioned it
+import { stateManager } from "../utils/stateManager";
+import { sendExternalMessage } from "../utils/messaging";
 
 const COMMAND_TIMEOUT = 10000;
 
@@ -22,6 +25,7 @@ export interface ExternalCommandOption {
 export interface ExternalCommand {
     name: string;
     description: string;
+    aliases?: string[];
     options?: ExternalCommandOption[];
     checkPermission?: (message: Message, settings: PluginSettings) => boolean;
     execute: (args: Record<string, any>, message: Message, channelId: string) => Promise<boolean> | boolean;
@@ -234,11 +238,12 @@ export class ModuleRegistry {
         const prefix = this._settings.externalCommandPrefix;
         const meMention = `<@${meId}>`;
         const meMentionNick = `<@!${meId}>`;
+        const isDM = !ChannelStore.getChannel(message.channel_id)?.guild_id;
 
         let effectiveContent = "";
         let triggered = false;
 
-        if (prefix && prefix.trim() !== "" && contentLower.startsWith(prefix.toLowerCase())) {
+        if (!isDM && prefix && prefix.trim() !== "" && contentLower.startsWith(prefix.toLowerCase())) {
             triggered = true;
             effectiveContent = contentTrim.slice(prefix.length).trim();
         } else if (contentLower.startsWith(meMention)) {
@@ -250,6 +255,43 @@ export class ModuleRegistry {
         }
 
         if (!triggered) return;
+
+        // Security check for remote operators
+        if (message.author.id !== meId) {
+            const voiceChannelId = SelectedChannelStore.getVoiceChannelId();
+            if (!voiceChannelId) {
+                sendDebugMessage("❌ Command rejected: I am not in a voice channel.", message.channel_id);
+                return;
+            }
+            const ownership = stateManager.getOwnership(voiceChannelId);
+            const isOwner = ownership && (ownership.creatorId === meId || ownership.claimantId === meId);
+            if (!isOwner) {
+                sendDebugMessage("❌ Command rejected: You can only control my voice channel when I am the owner of it.", message.channel_id);
+                return;
+            }
+        }
+
+        let targetChannelId = message.channel_id;
+        if (isDM) {
+            const voiceChannelId = SelectedChannelStore.getVoiceChannelId();
+            if (!voiceChannelId) {
+                // Toast already shown via sendExternalMessage in security check if applicable,
+                // but this handles the case where it's the meId in a DM (though meId usually doesn't trigger this via message)
+                sendDebugMessage("❌ Command rejected: You are not in a voice channel.", message.channel_id);
+                return;
+            }
+            const vc = ChannelStore.getChannel(voiceChannelId);
+            if (!vc || vc.guild_id !== this._settings.guildId || vc.parent_id !== this._settings.categoryId) {
+                sendDebugMessage("❌ Command rejected: You are not in a managed voice channel.", message.channel_id);
+                return;
+            }
+            const associatedText = findAssociatedTextChannel(voiceChannelId);
+            if (!associatedText) {
+                sendDebugMessage("❌ Command rejected: Could not find associated text channel.", message.channel_id);
+                return;
+            }
+            targetChannelId = associatedText.id;
+        }
 
         // Collect all external commands
         const allCmds: { mod: SocializeModule, cmd: ExternalCommand }[] = [];
@@ -268,15 +310,24 @@ export class ModuleRegistry {
         let matchedName = false;
 
         for (const { mod, cmd } of allCmds) {
-            const cmdNameLower = cmd.name.toLowerCase();
-            // Check if content starts with command name followed by space or end of string
-            if (effectiveContentLower === cmdNameLower || effectiveContentLower.startsWith(cmdNameLower + " ")) {
+            const namesToTry = [cmd.name, ...(cmd.aliases || [])];
+            let matchedTrigger: string | null = null;
+
+            for (const name of namesToTry) {
+                const nameLower = name.toLowerCase();
+                if (effectiveContentLower === nameLower || effectiveContentLower.startsWith(nameLower + " ")) {
+                    matchedTrigger = name;
+                    break;
+                }
+            }
+
+            if (matchedTrigger) {
                 matchedName = true;
                 if (cmd.checkPermission && !cmd.checkPermission(message, this._settings)) {
                     continue; // Check other implementations of this command if permission fails
                 }
 
-                const remainder = effectiveContent.slice(cmd.name.length).trim();
+                const remainder = effectiveContent.slice(matchedTrigger.length).trim();
                 const parsedArgs: Record<string, any> = {};
 
                 if (cmd.options && cmd.options.length > 0) {
@@ -324,14 +375,14 @@ export class ModuleRegistry {
                     }
                 }
 
-                sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, message.channel_id);
+                sendDebugMessage(`✅ Forwarding command \`${cmd.name}\` from <@${message.author.id}> to \`${mod.name}\``, targetChannelId);
                 try {
                     const timeoutPromise = new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error("TIMEOUT")), COMMAND_TIMEOUT)
                     );
 
                     await Promise.race([
-                        cmd.execute(parsedArgs, message, message.channel_id),
+                        cmd.execute(parsedArgs, message, targetChannelId),
                         timeoutPromise
                     ]);
                 } catch (err: any) {

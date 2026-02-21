@@ -7,10 +7,10 @@ import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../utils/BotResponse";
 import { parseBotInfoMessage, extractId } from "../utils/parsing";
-import { actionQueue } from "../utils/actionQueue";
+import { ActionQueue, actionQueue } from "../utils/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
-import { isVoiceChannel, isUserInVoiceChannel } from "../utils/channels";
+import { isVoiceChannel, isUserInVoiceChannel, findAssociatedTextChannel } from "../utils/channels";
 import {
     GuildChannelStore, ChannelStore, GuildStore,
     SelectedChannelStore, UserStore as Users,
@@ -24,7 +24,7 @@ import { BansModule } from "./bans";
 import { BlacklistModule } from "./blacklist";
 import { ChannelNameRotationModule } from "./channelNameRotation";
 import { plugins } from "@api/PluginManager";
-import { sendBotMessage, ApplicationCommandOptionType } from "@api/Commands";
+import { ApplicationCommandOptionType } from "@api/Commands";
 import { getNewLineList } from "../utils/settingsHelpers";
 
 // ─────────────────────────────────────────────────────────────
@@ -946,7 +946,7 @@ export const OwnershipModule: SocializeModule = {
             reason: type === "creator" ? "Created" : "Claimed"
         });
 
-        sendBotMessage(channelId, { content: formatted });
+        actionQueue.enqueue(formatted, channelId);
     },
 
     handleUserJoinedChannel(userId: string, channelId: string, currentUserId?: string) {

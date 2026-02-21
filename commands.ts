@@ -1,14 +1,12 @@
-import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
 
 import { moduleRegistry } from "./logic/moduleRegistry";
-import { actionQueue } from "./utils/actionQueue";
 import { WhitelistModule } from "./logic/whitelist";
 import { ChannelNameRotationModule } from "./logic/channelNameRotation";
-import { BlacklistModule } from "./logic/blacklist";
 import { BansModule } from "./logic/bans";
 import { stateManager } from "./utils/stateManager";
-import { UserStore as Users } from "@webpack/common";
 import { OwnershipActions } from "./logic/ownership";
+import { actionQueue } from "./utils/actionQueue";
 
 export const commandName = "socialize";
 
@@ -20,10 +18,11 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             const settings = moduleRegistry["settings"];
-            if (!settings) return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
-            sendBotMessage(ctx.channel.id, {
-                content: `**SocializeGuild Stats**\nAction Delay: ${settings.queueInterval}s\nBan Pool: ${settings.banLimit}\nVoteBan %: ${settings.voteBanPercentage}%`
-            });
+            if (!settings) {
+                return actionQueue.enqueue("Plugin not initialized.", ctx.channel.id, true);
+            }
+            const content = `**SocializeGuild Stats**\nAction Delay: ${settings.queueInterval}s\nBan Pool: ${settings.banLimit}\nVoteBan %: ${settings.voteBanPercentage}%`;
+            actionQueue.enqueue(content, ctx.channel.id, true);
         }
     },
     {
@@ -32,9 +31,11 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             const settings = moduleRegistry["settings"];
-            if (!settings || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
+            if (!settings || !ctx.channel) {
+                return actionQueue.enqueue("Plugin not initialized.", ctx.channel.id, true);
+            }
             OwnershipActions.syncInfo(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
+            actionQueue.enqueue("Information sync requested.", ctx.channel.id, true);
         }
     },
     {
@@ -42,9 +43,11 @@ export const socializeCommands = [
         description: "Claim the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             OwnershipActions.claimChannel(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Claim requested." });
+            actionQueue.enqueue("Claim requested.", ctx.channel.id, true);
         }
     },
     {
@@ -52,9 +55,11 @@ export const socializeCommands = [
         description: "Lock the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             OwnershipActions.lockChannel(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Lock requested." });
+            actionQueue.enqueue("Lock requested.", ctx.channel.id, true);
         }
     },
     {
@@ -62,9 +67,11 @@ export const socializeCommands = [
         description: "Unlock the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             OwnershipActions.unlockChannel(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Unlock requested." });
+            actionQueue.enqueue("Unlock requested.", ctx.channel.id, true);
         }
     },
     {
@@ -72,9 +79,11 @@ export const socializeCommands = [
         description: "Reset the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             OwnershipActions.resetChannel(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Reset requested." });
+            actionQueue.enqueue("Reset requested.", ctx.channel.id, true);
         }
     },
     {
@@ -90,12 +99,16 @@ export const socializeCommands = [
             }
         ],
         execute: (args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             const newName = args.find(a => a.name === "name")?.value;
-            if (!newName) return sendBotMessage(ctx.channel.id, { content: "Missing name parameter." });
+            if (!newName) {
+                return actionQueue.enqueue("Missing name parameter.", ctx.channel.id, true);
+            }
 
             OwnershipActions.renameChannel(ctx.channel.id, newName);
-            sendBotMessage(ctx.channel.id, { content: `Rename to "${newName}" requested.` });
+            actionQueue.enqueue(`Rename to "${newName}" requested.`, ctx.channel.id, true);
         }
     },
     {
@@ -113,12 +126,16 @@ export const socializeCommands = [
             }
         ],
         execute: (args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             const size = args.find(a => a.name === "size")?.value;
-            if (typeof size !== 'number') return sendBotMessage(ctx.channel.id, { content: "Missing or invalid size parameter." });
+            if (typeof size !== 'number') {
+                return actionQueue.enqueue("Missing or invalid size parameter.", ctx.channel.id, true);
+            }
 
             OwnershipActions.setChannelSize(ctx.channel.id, size);
-            sendBotMessage(ctx.channel.id, { content: `User limit change to ${size} requested.` });
+            actionQueue.enqueue(`User limit change to ${size} requested.`, ctx.channel.id, true);
         }
     },
     {
@@ -134,12 +151,16 @@ export const socializeCommands = [
             }
         ],
         execute: (args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user parameter." });
+            if (!userId) {
+                return actionQueue.enqueue("Missing user parameter.", ctx.channel.id, true);
+            }
 
             OwnershipActions.kickUser(ctx.channel.id, userId);
-            sendBotMessage(ctx.channel.id, { content: `Kick requested for <@${userId}>.` });
+            actionQueue.enqueue(`Kick requested for <@${userId}>.`, ctx.channel.id, true);
         }
     },
     {
@@ -147,14 +168,18 @@ export const socializeCommands = [
         description: "Kick all locally banned users from the current voice channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
 
             const n = OwnershipActions.kickBannedUsers(ctx.channel.id);
+            let content = "";
             if (n === -1) {
-                sendBotMessage(ctx.channel.id, { content: "No personal ban list found for this channel." });
+                content = "No personal ban list found for this channel.";
             } else {
-                sendBotMessage(ctx.channel.id, { content: n > 0 ? `Kicked ${n} banned user(s).` : "No banned users found in your channel." });
+                content = n > 0 ? `Kicked ${n} banned user(s).` : "No banned users found in your channel.";
             }
+            actionQueue.enqueue(content, ctx.channel.id, true);
         }
     },
     {
@@ -171,9 +196,11 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user or channel.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
             BansModule.enforceBanPolicy(userId, ctx.channel.id, true, "Manual Ban");
-            sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for <@${userId}>` });
+            actionQueue.enqueue(`Triggered ban sequence for <@${userId}>`, ctx.channel.id, true);
         }
     },
     {
@@ -190,9 +217,11 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user or channel.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
             BansModule.unbanUser(userId, ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for <@${userId}>` });
+            actionQueue.enqueue(`Triggered unban sequence for <@${userId}>`, ctx.channel.id, true);
         }
     },
     {
@@ -209,14 +238,16 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
 
             const whitelist = WhitelistModule.getWhitelist();
             if (!whitelist.includes(userId)) {
                 whitelist.push(userId);
                 WhitelistModule.setWhitelist(whitelist);
             }
-            sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
+            actionQueue.enqueue(`Whitelisted <@${userId}> locally.`, ctx.channel.id, true);
         }
     },
     {
@@ -233,10 +264,12 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
 
             WhitelistModule.unwhitelistUser(userId, ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: `Removed <@${userId}> from local whitelist.` });
+            actionQueue.enqueue(`Removed <@${userId}> from local whitelist.`, ctx.channel.id, true);
         }
     },
     {
@@ -253,10 +286,12 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
             WhitelistModule.whitelistUser(userId, ctx.channel.id);
             WhitelistModule.permitUser(userId, ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
+            actionQueue.enqueue(`Permitted <@${userId}>`, ctx.channel.id, true);
         }
     },
     {
@@ -273,9 +308,11 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
             WhitelistModule.unpermitUser(userId, ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: `Unpermitted <@${userId}>` });
+            actionQueue.enqueue(`Unpermitted <@${userId}>`, ctx.channel.id, true);
         }
     },
     {
@@ -283,9 +320,11 @@ export const socializeCommands = [
         description: "Manually start name rotation for current channel",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                return actionQueue.enqueue("Join a channel first.", ctx.channel.id, true);
+            }
             ChannelNameRotationModule.startRotation(ctx.channel.id);
-            sendBotMessage(ctx.channel.id, { content: "Started name rotation." });
+            actionQueue.enqueue("Started name rotation.", ctx.channel.id, true);
         }
     },
     {
@@ -294,7 +333,7 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             ChannelNameRotationModule.stopRotation();
-            sendBotMessage(ctx.channel.id, { content: "Stopped name rotation." });
+            actionQueue.enqueue("Stopped name rotation.", ctx.channel.id, true);
         }
     },
     {
@@ -311,10 +350,12 @@ export const socializeCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
+            if (!userId || !ctx.channel) {
+                return actionQueue.enqueue("Missing user.", ctx.channel ? ctx.channel.id : "unknown", true);
+            }
 
             if (!stateManager.hasMemberConfig(userId)) {
-                return sendBotMessage(ctx.channel.id, { content: `No cached configuration found for <@${userId}>.` });
+                return actionQueue.enqueue(`No cached configuration found for <@${userId}>.`, ctx.channel.id, true);
             }
 
             const config = stateManager.getMemberConfig(userId);
@@ -327,7 +368,7 @@ export const socializeCommands = [
                 `Permitted Users: ${config.permittedUsers.length > 0 ? config.permittedUsers.map(id => `<@${id}>`).join(", ") : "_None_"}`
             ].join("\n");
 
-            sendBotMessage(ctx.channel.id, { content });
+            actionQueue.enqueue(content, ctx.channel.id, true);
         }
     },
     {
@@ -336,7 +377,7 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.resetState();
-            sendBotMessage(ctx.channel.id, { content: "Plugin state reset requested." });
+            actionQueue.enqueue("Plugin state reset requested.", ctx.channel.id, true);
         }
     },
     {
@@ -345,7 +386,7 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.createChannel();
-            sendBotMessage(ctx.channel.id, { content: "Channel creation requested." });
+            actionQueue.enqueue("Channel creation requested.", ctx.channel.id, true);
         }
     },
     {
@@ -354,7 +395,6 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.findOrCreateChannel(false);
-            // findOrCreateChannel has its own toasts, so no need for bot message here unless generic.
         }
     },
     {
@@ -364,7 +404,7 @@ export const socializeCommands = [
         execute: (_args: any[], ctx: any) => {
             const { OwnershipModule } = require("./logic/ownership");
             OwnershipModule.fetchAllOwners();
-            sendBotMessage(ctx.channel.id, { content: "Started fetching all owners. This may take a moment." });
+            actionQueue.enqueue("Started fetching all owners. This may take a moment.", ctx.channel.id, true);
         }
     },
     {
@@ -373,7 +413,7 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.openSettings();
-            sendBotMessage(ctx.channel.id, { content: "Opened settings modal." });
+            actionQueue.enqueue("Opened settings modal.", ctx.channel.id, true);
         }
     }
 ];

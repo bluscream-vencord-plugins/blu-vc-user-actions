@@ -9,6 +9,7 @@ import { VoiceState } from "@vencord/discord-types";
 import { formatCommand } from "../utils/formatting";
 import { MemberLike, extractId } from "../utils/parsing";
 import { sendDebugMessage } from "../utils/debug";
+import { sendExternalMessage } from "../utils/messaging";
 import { getNewLineList } from "../utils/settingsHelpers";
 import { isUserInVoiceChannel } from "../utils/channels";
 import { BlacklistModule } from "./blacklist";
@@ -164,7 +165,7 @@ export const BansModule: SocializeModule = {
                         userId: oldestBannedUser,
                         newUserId: userId
                     });
-                    sendBotMessage(channelId, { content: rotationStr });
+                    actionQueue.enqueue(rotationStr, channelId);
                 }
             }
         }

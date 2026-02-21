@@ -2,6 +2,7 @@ import { ActionQueueItem } from "../types/state";
 
 import { logger } from "./logger";
 import { sendDebugMessage } from "./debug";
+import { showExternalMessageToast } from "./messaging";
 
 // Simple Action Queue
 export class ActionQueue {
