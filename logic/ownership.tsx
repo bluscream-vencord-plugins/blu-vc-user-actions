@@ -22,6 +22,7 @@ import { WhitelistModule } from "./whitelist";
 import { openPluginModal } from "@components/settings/tabs";
 import { plugins } from "@api/PluginManager";
 import { sendBotMessage } from "@api/Commands";
+import { SocializeActions } from "./actions";
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -71,31 +72,31 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
             id="socialize-claim-channel"
             label="Claim Channel"
             key="socialize-claim-channel"
-            action={() => enqueue(settings.claimCommand, true)}
+            action={() => SocializeActions.claimChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-lock-channel"
             label="Lock Channel"
             key="socialize-lock-channel"
-            action={() => enqueue(settings.lockCommand, true)}
+            action={() => SocializeActions.lockChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-unlock-channel"
             label="Unlock Channel"
             key="socialize-unlock-channel"
-            action={() => enqueue(settings.unlockCommand, true)}
+            action={() => SocializeActions.unlockChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-reset-channel"
             label="Reset Channel"
             key="socialize-reset-channel"
-            action={() => enqueue(settings.resetCommand)}
+            action={() => SocializeActions.resetChannel(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-info-channel"
             label="Channel Info"
             key="socialize-info-channel"
-            action={() => OwnershipModule.requestChannelInfo(channel.id)}
+            action={() => SocializeActions.syncInfo(channel.id)}
         />,
         <Menu.MenuItem
             id="socialize-set-size-submenu"
@@ -107,12 +108,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                     key={`size-${size}`}
                     id={`socialize-set-size-${size}`}
                     label={size === 0 ? "Unlimited" : `${size} Users`}
-                    action={() => {
-                        const sizeCmd = formatCommand(settings.setSizeCommand || "!v size {size}", channel.id)
-                            .replace("{size}", String(size))
-                            .replace("{channel_limit}", String(size));
-                        actionQueue.enqueue(sizeCmd, channel.id, false);
-                    }}
+                    action={() => SocializeActions.setChannelSize(channel.id, size)}
                 />
             ))}
         </Menu.MenuItem>,
@@ -151,11 +147,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                         cancelText: "Cancel",
                         onConfirm: () => {
                             if (newNameValue && newNameValue !== channel.name) {
-                                actionQueue.enqueue(
-                                    formatCommand(settings.setChannelNameCommand || "!v name {name}", channel.id, { name: newNameValue }),
-                                    channel.id,
-                                    true
-                                );
+                                SocializeActions.renameChannel(channel.id, newNameValue);
                             }
                         },
                         body: <RenameBody initialValue={channel.name} onUpdate={(v) => newNameValue = v} />
@@ -180,12 +172,7 @@ function makeChannelItems(channel: Channel): React.ReactElement[] {
                     let n = 0;
                     for (const uid in states) {
                         if (config.bannedUsers.includes(uid)) {
-                            actionQueue.enqueue(
-                                formatCommand(settings.kickCommand, channel.id, { userId: uid }),
-                                channel.id,
-                                false,
-                                () => isUserInVoiceChannel(uid, channel.id)
-                            );
+                            SocializeActions.kickUser(channel.id, uid);
                             n++;
                         }
                     }
@@ -257,14 +244,7 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 key="socialize-kick-user"
                 label="Kick from VC"
                 color="brand"
-                action={() => {
-                    actionQueue.enqueue(
-                        formatCommand(settings.kickCommand, myChannelId!, { userId: user.id }),
-                        myChannelId!,
-                        false,
-                        () => isUserInVoiceChannel(user.id, myChannelId!)
-                    );
-                }}
+                action={() => SocializeActions.kickUser(myChannelId!, user.id)}
             />
         );
     }
@@ -278,20 +258,11 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isBanned ? "Unban from VC" : "Ban from VC"}
                 color={isBanned ? "success" : "danger"}
                 action={() => {
-                    const { BansModule } = require("./bans");
-                    const { BlacklistModule } = require("./blacklist");
                     if (isBanned) {
-                        actionQueue.enqueue(formatCommand(settings.unbanCommand, myChannelId!, { userId: user.id }), myChannelId!);
-                        const ownerCfg = stateManager.getMemberConfig(meId);
-                        stateManager.updateMemberConfig(meId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== user.id) });
-                        BlacklistModule.unblacklistUser(user.id, myChannelId!);
+                        SocializeActions.unbanUser(myChannelId!, user.id);
                         showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
                     } else {
-                        const useKickFirst = !!settings.banInLocalBlacklist;
-                        if (useKickFirst) {
-                            BlacklistModule.blacklistUser(user.id, myChannelId!);
-                        }
-                        BansModule.enforceBanPolicy(user.id, myChannelId!, useKickFirst, "Manual Ban");
+                        SocializeActions.banUser(myChannelId!, user.id);
                         showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
                     }
                 }}
@@ -311,14 +282,11 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
                 label={isPermitted ? "Unpermit" : "Permit"}
                 color={isPermitted ? "default" : "success"}
                 action={() => {
-                    const { WhitelistModule } = require("./whitelist");
                     if (isPermitted) {
-                        WhitelistModule.unpermitUser(user.id, myChannelId!);
-                        WhitelistModule.unwhitelistUser(user.id, myChannelId!);
+                        SocializeActions.unpermitUser(myChannelId!, user.id);
                         showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
                     } else {
-                        WhitelistModule.whitelistUser(user.id, myChannelId!);
-                        WhitelistModule.permitUser(user.id, myChannelId!);
+                        SocializeActions.permitUser(myChannelId!, user.id);
                         showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
                     }
                 }}
@@ -437,7 +405,7 @@ function makeGuildItems(guild: Guild): React.ReactElement[] {
             id="socialize-guild-channel-info"
             label="Get Channel Info"
             key="socialize-guild-channel-info"
-            action={() => OwnershipModule.requestChannelInfo(voiceChannelId!)}
+            action={() => SocializeActions.syncInfo(voiceChannelId!)}
         />,
         <Menu.MenuItem
             id="socialize-guild-create-channel"
@@ -493,34 +461,25 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
                 id="socialize-toolbox-info"
                 label="Get Channel Info"
                 key="socialize-toolbox-info"
-                action={() => OwnershipModule.requestChannelInfo(voiceChannelId)}
+                action={() => SocializeActions.syncInfo(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-claim"
                 label="Claim Channel"
                 key="socialize-toolbox-claim"
-                action={() => {
-                    const s = getSettings();
-                    if (s) actionQueue.enqueue(formatCommand(s.claimCommand, voiceChannelId), voiceChannelId, true);
-                }}
+                action={() => SocializeActions.claimChannel(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-lock"
                 label="Lock Channel"
                 key="socialize-toolbox-lock"
-                action={() => {
-                    const s = getSettings();
-                    if (s) actionQueue.enqueue(formatCommand(s.lockCommand, voiceChannelId), voiceChannelId, true);
-                }}
+                action={() => SocializeActions.lockChannel(voiceChannelId)}
             />,
             <Menu.MenuItem
                 id="socialize-toolbox-unlock"
                 label="Unlock Channel"
                 key="socialize-toolbox-unlock"
-                action={() => {
-                    const s = getSettings();
-                    if (s) actionQueue.enqueue(formatCommand(s.unlockCommand, voiceChannelId), voiceChannelId, true);
-                }}
+                action={() => SocializeActions.unlockChannel(voiceChannelId)}
             />
         );
     }

@@ -1,5 +1,6 @@
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 
+import { SocializeActions } from "./logic/actions";
 import { moduleRegistry } from "./logic/moduleRegistry";
 import { actionQueue } from "./utils/actionQueue";
 import { WhitelistModule } from "./logic/whitelist";
@@ -30,7 +31,7 @@ export const socializeCommands = [
         execute: (_args: any[], ctx: any) => {
             const settings = moduleRegistry["settings"];
             if (!settings || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
-            actionQueue.enqueue(settings.infoCommand, ctx.channel.id, true);
+            SocializeActions.syncInfo(ctx.channel.id);
             sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
         }
     },
@@ -49,7 +50,7 @@ export const socializeCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
-            BansModule.enforceBanPolicy(userId, ctx.channel.id, false);
+            SocializeActions.banUser(ctx.channel.id, userId, true);
             sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for <@${userId}>` });
         }
     },
@@ -68,11 +69,7 @@ export const socializeCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
-            const whitelist = WhitelistModule.getWhitelist();
-            if (!whitelist.includes(userId)) {
-                whitelist.push(userId);
-                WhitelistModule.setWhitelist(whitelist);
-            }
+            SocializeActions.whitelistUserLocally(userId);
             sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
         }
     },
@@ -91,7 +88,7 @@ export const socializeCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Missing user." });
-            WhitelistModule.permitUser(userId, ctx.channel.id);
+            SocializeActions.permitUser(ctx.channel.id, userId);
             sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
         }
     },
@@ -101,7 +98,7 @@ export const socializeCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
-            ChannelNameRotationModule.startRotation(ctx.channel.id);
+            SocializeActions.startNameRotation(ctx.channel.id);
             sendBotMessage(ctx.channel.id, { content: "Started name rotation." });
         }
     },
@@ -110,7 +107,7 @@ export const socializeCommands = [
         description: "Manually stop name rotation",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            ChannelNameRotationModule.stopRotation();
+            SocializeActions.stopNameRotation();
             sendBotMessage(ctx.channel.id, { content: "Stopped name rotation." });
         }
     },
