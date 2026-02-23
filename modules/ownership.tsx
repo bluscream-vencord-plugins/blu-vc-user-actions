@@ -104,15 +104,17 @@ export const OwnershipActions = {
             true
         );
     },
-    kickUser(channelId: string, userId: string) {
+    kickUsers(channelId: string, userIds: string[]) {
         const s = getSettings();
         if (!s) return;
-        actionQueue.enqueue(
-            formatCommand(s.kickCommand, channelId, { userId }),
-            channelId,
-            false,
-            () => isUserInVoiceChannel(userId, channelId)
-        );
+        userIds.forEach(userId => {
+            actionQueue.enqueue(
+                formatCommand(s.kickCommand, channelId, { userId }),
+                channelId,
+                false,
+                () => isUserInVoiceChannel(userId, channelId)
+            );
+        });
     },
     kickBannedUsers(channelId: string): number {
         const meId = Users.getCurrentUser()?.id || "";
@@ -121,14 +123,11 @@ export const OwnershipActions = {
             return -1;
         }
         const config = stateManager.getMemberConfig(meId);
-        let n = 0;
-        for (const uid in states) {
-            if (config.bannedUsers.includes(uid)) {
-                this.kickUser(channelId, uid);
-                n++;
-            }
+        const bannedUsersInChannel = Object.keys(states).filter(uid => config.bannedUsers.includes(uid));
+        if (bannedUsersInChannel.length > 0) {
+            this.kickUsers(channelId, bannedUsersInChannel);
         }
-        return n;
+        return bannedUsersInChannel.length;
     },
     createChannel() {
         const settings = getSettings();
@@ -360,7 +359,7 @@ export const ownershipCommands = [
                 return sendBotMessage(ctx.channel.id, { content: "Missing user parameter." });
             }
 
-            OwnershipActions.kickUser(ctx.channel.id, userId);
+            OwnershipActions.kickUsers(ctx.channel.id, [userId]);
             return sendBotMessage(ctx.channel.id, { content: `Kick requested for <@${userId}>.` });
         }
     },
@@ -737,7 +736,7 @@ function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
     }
 
     if (amOwner && myChannelId) {
-        items.push(<Menu.MenuItem id="kick-user" label="Kick from VC" action={() => OwnershipActions.kickUser(myChannelId, user.id)} />);
+        items.push(<Menu.MenuItem id="kick-user" label="Kick from VC" action={() => OwnershipActions.kickUsers(myChannelId, [user.id])} />);
     }
 
     // Other items (whitelist, blacklist, ban) will be added by their respective modules

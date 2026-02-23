@@ -151,7 +151,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    OwnershipActions.kickUser(channelId, args.target);
+                    OwnershipActions.kickUsers(channelId, [args.target]);
                     return true;
                 }
                 return false;
@@ -177,7 +177,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BansModule.unbanUser(args.target, channelId);
+                    BansModule.unbanUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -190,7 +190,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.permitUser(args.target, channelId);
+                    WhitelistModule.permitUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -203,7 +203,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.unpermitUser(args.target, channelId);
+                    WhitelistModule.unpermitUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -216,7 +216,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.whitelistUser(args.target, channelId);
+                    WhitelistModule.whitelistUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -229,7 +229,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.unwhitelistUser(args.target, channelId);
+                    WhitelistModule.unwhitelistUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -242,7 +242,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BlacklistModule.blacklistUser(args.target, channelId);
+                    BlacklistModule.blacklistUsers([args.target], channelId);
                     return true;
                 }
                 return false;
@@ -255,7 +255,7 @@ export const RemoteOperatorsModule: PluginModule = {
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BlacklistModule.unblacklistUser(args.target, channelId);
+                    BlacklistModule.unblacklistUsers([args.target], channelId);
                     return true;
                 }
                 return false;

@@ -128,7 +128,7 @@ export const BansModule: PluginModule = {
     enforceBanPolicy(userId: string, channelId: string, kickFirst: boolean = false, reason?: string) {
         if (!this.settings) return;
 
-        BlacklistModule.blacklistUser(userId, channelId);
+        BlacklistModule.blacklistUsers([userId], channelId);
 
         const lastKickTime = this.recentlyKickedWaitlist.get(userId);
         const now = Date.now();
@@ -157,7 +157,7 @@ export const BansModule: PluginModule = {
         if (this.settings.banRotateEnabled && config.bannedUsers.length >= this.settings.banLimit) {
             const oldestBannedUser = config.bannedUsers.shift();
             if (oldestBannedUser) {
-                actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId: oldestBannedUser }), channelId, true);
+                this.unbanUsers([oldestBannedUser], channelId);
                 if (this.settings.banRotationMessage) {
                     sendEphemeralMessage(channelId, formatCommand(this.settings.banRotationMessage, channelId, { userId: oldestBannedUser, newUserId: userId }));
                 }
@@ -179,22 +179,23 @@ export const BansModule: PluginModule = {
         }
     },
 
-    banUser(member: MemberLike | string, channelId: string) {
-        this.banUsers([member], channelId);
-    },
 
-    unbanUser(userId: string, channelId: string) {
+    unbanUsers(userIds: string[], channelId: string) {
         if (!this.settings) return;
         const currentUserId = Users.getCurrentUser()?.id;
         if (!currentUserId) return;
 
-        actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId }), channelId);
+        userIds.forEach(userId => {
+            if (this.settings) {
+                actionQueue.enqueue(formatCommand(this.settings.unbanCommand, channelId, { userId }), channelId);
+            }
+        });
 
         if (stateManager.hasMemberConfig(currentUserId)) {
             const ownerCfg = stateManager.getMemberConfig(currentUserId);
-            stateManager.updateMemberConfig(currentUserId, { bannedUsers: ownerCfg.bannedUsers.filter(id => id !== userId) });
+            stateManager.updateMemberConfig(currentUserId, { bannedUsers: ownerCfg.bannedUsers.filter(id => !userIds.includes(id)) });
         }
-        BlacklistModule.unblacklistUser(userId, channelId);
+        BlacklistModule.unblacklistUsers(userIds, channelId);
     }
 };
 
@@ -233,7 +234,7 @@ export const bansCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            BansModule.unbanUser(userId, ctx.channel.id);
+            BansModule.unbanUsers([userId], ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for <@${userId}>` });
         }
     }

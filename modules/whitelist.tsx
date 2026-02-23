@@ -71,16 +71,24 @@ export const WhitelistModule: PluginModule = {
         return this.getWhitelist().includes(userId);
     },
 
-    whitelistUser(userId: string, channelId?: string) {
-        if (!this.settings || this.isWhitelisted(userId)) return;
-        this.setWhitelist([...this.getWhitelist(), userId]);
-        sendDebugMessage(`User <@${userId}> added to local whitelist.`, channelId);
+    whitelistUsers(userIds: string[], channelId?: string) {
+        if (!this.settings) return;
+        const currentList = this.getWhitelist();
+        const newList = [...new Set([...currentList, ...userIds])];
+        if (newList.length !== currentList.length) {
+            this.setWhitelist(newList);
+            sendDebugMessage(`Added ${userIds.length} user(s) to local whitelist.`, channelId);
+        }
     },
 
-    unwhitelistUser(userId: string, channelId?: string) {
-        if (!this.settings || !this.isWhitelisted(userId)) return;
-        this.setWhitelist(this.getWhitelist().filter(id => id !== userId));
-        sendDebugMessage(`User <@${userId}> removed from local whitelist.`, channelId);
+    unwhitelistUsers(userIds: string[], channelId?: string) {
+        if (!this.settings) return;
+        const currentList = this.getWhitelist();
+        const newList = currentList.filter(id => !userIds.includes(id));
+        if (newList.length !== currentList.length) {
+            this.setWhitelist(newList);
+            sendDebugMessage(`Removed ${userIds.length} user(s) from local whitelist.`, channelId);
+        }
     },
 
     applyPermitRotation(userId: string, channelId: string) {
@@ -135,9 +143,6 @@ export const WhitelistModule: PluginModule = {
         }
     },
 
-    permitUser(member: MemberLike | string, channelId: string) {
-        this.permitUsers([member], channelId);
-    },
 
     unpermitUsers(members: (MemberLike | string)[], channelId: string) {
         if (!this.settings) return;
@@ -158,9 +163,6 @@ export const WhitelistModule: PluginModule = {
         }
     },
 
-    unpermitUser(member: MemberLike | string, channelId: string) {
-        this.unpermitUsers([member], channelId);
-    }
 };
 
 export const whitelistCommands = [
@@ -179,7 +181,7 @@ export const whitelistCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.whitelistUser(userId, ctx.channel.id);
+            WhitelistModule.whitelistUsers([userId], ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
         }
     },
@@ -198,7 +200,7 @@ export const whitelistCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.unwhitelistUser(userId, ctx.channel.id);
+            WhitelistModule.unwhitelistUsers([userId], ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Removed <@${userId}> from local whitelist.` });
         }
     },
@@ -217,7 +219,7 @@ export const whitelistCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.permitUser(userId, ctx.channel.id);
+            WhitelistModule.permitUsers([userId], ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
         }
     },
@@ -236,7 +238,7 @@ export const whitelistCommands = [
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
             if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.unpermitUser(userId, ctx.channel.id);
+            WhitelistModule.unpermitUsers([userId], ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Unpermitted <@${userId}>` });
         }
     }

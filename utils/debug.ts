@@ -13,11 +13,8 @@ export function sendDebugMessage(content: any, channelId?: string) {
     const settings = moduleRegistry.settings as any;
     if (!settings || !settings.enableDebug) return;
 
-    const targetChannelId = channelId || SelectedChannelStore.getVoiceChannelId() || SelectedChannelStore.getChannelId();
-    if (!targetChannelId) {
-        logger.warn("sendDebugMessage: No target channel found and none provided.");
-        return;
-    }
+    const targetChannelId = channelId || SelectedChannelStore.getChannelId() || SelectedChannelStore.getVoiceChannelId();
+    if (!targetChannelId) return;
 
     const text = typeof content === "object" ? JSON.stringify(content) : String(content);
     sendEphemeralMessage(targetChannelId, text);

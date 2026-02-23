@@ -45,15 +45,23 @@ export const BlacklistModule: PluginModule = {
         return this.getBlacklist().includes(userId);
     },
 
-    blacklistUser(userId: string, channelId?: string) {
-        if (!this.settings || this.isBlacklisted(userId)) return;
-        this.setBlacklist([...this.getBlacklist(), userId]);
-        sendDebugMessage(`User <@${userId}> added to local blacklist.`, channelId);
+    blacklistUsers(userIds: string[], channelId?: string) {
+        if (!this.settings) return;
+        const currentList = this.getBlacklist();
+        const newList = [...new Set([...currentList, ...userIds])];
+        if (newList.length !== currentList.length) {
+            this.setBlacklist(newList);
+            sendDebugMessage(`Added ${userIds.length} user(s) to local blacklist: ${userIds.join(", ")}`, channelId);
+        }
     },
 
-    unblacklistUser(userId: string, channelId?: string) {
-        if (!this.settings || !this.isBlacklisted(userId)) return;
-        this.setBlacklist(this.getBlacklist().filter(id => id !== userId));
-        sendDebugMessage(`User <@${userId}> removed from local blacklist.`, channelId);
+    unblacklistUsers(userIds: string[], channelId?: string) {
+        if (!this.settings) return;
+        const currentList = this.getBlacklist();
+        const newList = currentList.filter(id => !userIds.includes(id));
+        if (newList.length !== currentList.length) {
+            this.setBlacklist(newList);
+            sendDebugMessage(`Removed ${userIds.length} user(s) from local blacklist: ${userIds.join(", ")}`, channelId);
+        }
     }
 };
