@@ -6,7 +6,7 @@ import { actionQueue } from "../core/actionQueue";
 import { stateManager } from "../utils/state";
 import { UserStore as Users, RelationshipStore, GuildMemberStore } from "@webpack/common";
 import { formatCommand } from "../utils/formatting";
-import { MemberLike, extractId } from "../utils/parsing";
+import { MemberLike, extractId, parseMultiUserIds } from "../utils/parsing";
 import { sendDebugMessage } from "../utils/debug";
 import { sendEphemeralMessage } from "../utils/messaging";
 import { getNewLineList } from "../utils/settings";
@@ -206,17 +206,18 @@ export const bansCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to ban",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to ban (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            BansModule.enforceBanPolicy(userId, ctx.channel.id, true, "Manual Ban");
-            return sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for <@${userId}>` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            userIds.forEach(uid => BansModule.enforceBanPolicy(uid, ctx.channel.id, true, "Manual Ban"));
+            return sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for ${userIds.length} user(s).` });
         }
     },
     {
@@ -225,17 +226,18 @@ export const bansCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to unban",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to unban (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            BansModule.unbanUsers([userId], ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for <@${userId}>` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            BansModule.unbanUsers(userIds, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for ${userIds.length} user(s).` });
         }
     }
 ];

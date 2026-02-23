@@ -5,7 +5,7 @@ import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
 import { actionQueue } from "../core/actionQueue";
 import { stateManager } from "../utils/state";
-import { MemberLike, extractId } from "../utils/parsing";
+import { MemberLike, extractId, parseMultiUserIds } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settings";
 import { sendDebugMessage } from "../utils/debug";
 import { sendEphemeralMessage } from "../utils/messaging";
@@ -172,17 +172,18 @@ export const whitelistCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to whitelist",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to whitelist (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.whitelistUsers([userId], ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            WhitelistModule.whitelistUsers(userIds, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Whitelisted ${userIds.length} user(s) locally.` });
         }
     },
     {
@@ -191,17 +192,18 @@ export const whitelistCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to unwhitelist",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to unwhitelist (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.unwhitelistUsers([userId], ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Removed <@${userId}> from local whitelist.` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            WhitelistModule.unwhitelistUsers(userIds, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Removed ${userIds.length} user(s) from local whitelist.` });
         }
     },
     {
@@ -210,17 +212,18 @@ export const whitelistCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to permit",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to permit (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.permitUsers([userId], ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            WhitelistModule.permitUsers(userIds, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Permitted ${userIds.length} user(s)` });
         }
     },
     {
@@ -229,17 +232,18 @@ export const whitelistCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to unpermit",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to unpermit (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
-            WhitelistModule.unpermitUsers([userId], ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Unpermitted <@${userId}>` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            WhitelistModule.unpermitUsers(userIds, ctx.channel.id);
+            return sendBotMessage(ctx.channel.id, { content: `Unpermitted ${userIds.length} user(s)` });
         }
     }
 ];

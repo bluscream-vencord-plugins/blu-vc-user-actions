@@ -6,7 +6,7 @@ import { stateManager } from "../utils/state";
 import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../types/BotResponse";
-import { parseBotInfoMessage } from "../utils/parsing";
+import { parseBotInfoMessage, parseMultiUserIds } from "../utils/parsing";
 import { actionQueue } from "../core/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
@@ -344,23 +344,18 @@ export const ownershipCommands = [
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
-                name: "user",
-                description: "The user to kick",
-                type: ApplicationCommandOptionType.USER,
+                name: "users",
+                description: "The user(s) to kick (comma-separated IDs or mentions)",
+                type: ApplicationCommandOptionType.STRING,
                 required: true
             }
         ],
         execute: (args: any[], ctx: any) => {
-            if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
-            }
-            const userId = args.find(a => a.name === "user")?.value;
-            if (!userId) {
-                return sendBotMessage(ctx.channel.id, { content: "Missing user parameter." });
-            }
-
-            OwnershipActions.kickUsers(ctx.channel.id, [userId]);
-            return sendBotMessage(ctx.channel.id, { content: `Kick requested for <@${userId}>.` });
+            const input = args.find(a => a.name === "users")?.value;
+            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            const userIds = parseMultiUserIds(input);
+            OwnershipActions.kickUsers(ctx.channel.id, userIds);
+            return sendBotMessage(ctx.channel.id, { content: `Kick requested for ${userIds.length} user(s).` });
         }
     },
     {

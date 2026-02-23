@@ -7,6 +7,7 @@ import { BansModule } from "./bans";
 import { WhitelistModule } from "./whitelist";
 import { BlacklistModule } from "./blacklist";
 import { getNewLineList } from "../utils/settings";
+import { parseMultiUserIds } from "../utils/parsing";
 import { OptionType } from "@utils/types";
 
 /**
@@ -146,12 +147,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "kick",
-            description: "Kick user remotely",
-            options: [{ name: "target", description: "User to kick", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Kick user(s) remotely",
+            options: [{ name: "target", description: "User(s) to kick (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    OwnershipActions.kickUsers(channelId, [args.target]);
+                    const userIds = parseMultiUserIds(args.target);
+                    OwnershipActions.kickUsers(channelId, userIds);
                     return true;
                 }
                 return false;
@@ -159,12 +161,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "ban",
-            description: "Ban user remotely",
-            options: [{ name: "target", description: "User to ban", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Ban user(s) remotely",
+            options: [{ name: "target", description: "User(s) to ban (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, msg, channelId) => {
                 if (args.target) {
-                    BansModule.enforceBanPolicy(args.target, channelId, true, `Remote action by ${msg.author.username}`);
+                    const userIds = parseMultiUserIds(args.target);
+                    userIds.forEach(uid => BansModule.enforceBanPolicy(uid, channelId, true, `Remote action by ${msg.author.username}`));
                     return true;
                 }
                 return false;
@@ -172,12 +175,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "unban",
-            description: "Unban user remotely",
-            options: [{ name: "target", description: "User to unban", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Unban user(s) remotely",
+            options: [{ name: "target", description: "User(s) to unban (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BansModule.unbanUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    BansModule.unbanUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -185,12 +189,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "permit",
-            description: "Permit user remotely",
-            options: [{ name: "target", description: "User to permit", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Permit user(s) remotely",
+            options: [{ name: "target", description: "User(s) to permit (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.permitUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    WhitelistModule.permitUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -198,12 +203,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "unpermit",
-            description: "Unpermit user remotely",
-            options: [{ name: "target", description: "User to unpermit", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Unpermit user(s) remotely",
+            options: [{ name: "target", description: "User(s) to unpermit (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.unpermitUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    WhitelistModule.unpermitUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -211,12 +217,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "whitelist",
-            description: "Whitelist user remotely",
-            options: [{ name: "target", description: "User to whitelist", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Whitelist user(s) remotely",
+            options: [{ name: "target", description: "User(s) to whitelist (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.whitelistUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    WhitelistModule.whitelistUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -224,12 +231,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "unwhitelist",
-            description: "Unwhitelist user remotely",
-            options: [{ name: "target", description: "User to unwhitelist", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Unwhitelist user(s) remotely",
+            options: [{ name: "target", description: "User(s) to unwhitelist (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    WhitelistModule.unwhitelistUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    WhitelistModule.unwhitelistUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -237,12 +245,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "blacklist",
-            description: "Blacklist user remotely",
-            options: [{ name: "target", description: "User to blacklist", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Blacklist user(s) remotely",
+            options: [{ name: "target", description: "User(s) to blacklist (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BlacklistModule.blacklistUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    BlacklistModule.blacklistUsers(userIds, channelId);
                     return true;
                 }
                 return false;
@@ -250,12 +259,13 @@ export const RemoteOperatorsModule: PluginModule = {
         },
         {
             name: "unblacklist",
-            description: "Unblacklist user remotely",
-            options: [{ name: "target", description: "User to unblacklist", type: ApplicationCommandOptionType.USER, required: true }],
+            description: "Unblacklist user(s) remotely",
+            options: [{ name: "target", description: "User(s) to unblacklist (comma-separated)", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, _msg, channelId) => {
                 if (args.target) {
-                    BlacklistModule.unblacklistUsers([args.target], channelId);
+                    const userIds = parseMultiUserIds(args.target);
+                    BlacklistModule.unblacklistUsers(userIds, channelId);
                     return true;
                 }
                 return false;

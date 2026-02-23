@@ -154,3 +154,30 @@ export function parseBotInfoMessage(response: BotResponse): { info: MemberChanne
         return null;
     }
 }
+
+/**
+ * Parses a comma-separated string of user IDs or mentions and returns an array of unique user IDs.
+ * @param input The input string (e.g. "<@123>,456, <@789>")
+ * @returns An array of extracted user IDs
+ */
+export function parseMultiUserIds(input: string): string[] {
+    if (!input) return [];
+    const parts = input.split(",");
+    const userIds: string[] = [];
+
+    for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+
+        // Extract ID from mention or use raw ID
+        const match = trimmed.match(/<@!?(\d+)>/);
+        const id = match ? match[1] : trimmed;
+
+        // Basic ID validation (17-20 digits)
+        if (/^\d{17,20}$/.test(id)) {
+            userIds.push(id);
+        }
+    }
+
+    return [...new Set(userIds)];
+}
