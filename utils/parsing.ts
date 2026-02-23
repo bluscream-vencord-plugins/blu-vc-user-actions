@@ -1,5 +1,7 @@
 import { UserStore, VoiceStateStore, GuildMemberStore } from "@webpack/common";
 import { User } from "@vencord/discord-types";
+import { MemberChannelInfo } from "../types/state";
+import { BotResponse } from "../types/BotResponse";
 
 /**
  * Represents a type that can be treated as a member, providing various ways to access a user ID.
@@ -70,8 +72,6 @@ export function parseVoiceUserFromInput(input: string, channelId: string): strin
 
     return undefined; // No matches found
 }
-import { MemberChannelInfo } from "../types/state";
-import { BotResponse } from "../types/BotResponse";
 
 const Patterns = {
     CHANNEL_ID: [

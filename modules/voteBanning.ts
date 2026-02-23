@@ -1,4 +1,4 @@
-import { PluginModule } from "../utils/moduleRegistry";
+import { PluginModule } from "../types/module";
 import { logger } from "../utils/logger";
 import { VoiceStateStore } from "@webpack/common";
 import { ApplicationCommandOptionType } from "@api/Commands";
@@ -6,7 +6,6 @@ import { stateManager } from "../utils/state";
 import { sendDebugMessage } from "../utils/debug";
 import { BansModule } from "./bans";
 import { OptionType } from "@utils/types";
-import { defaultSettings } from "../settings";
 
 /**
  * Settings definitions for the VoteBanningModule.
@@ -15,9 +14,9 @@ export const voteBanningSettings = {
     /** The command template for initiating a vote ban via text. */
     voteBanCommandString: { type: OptionType.STRING, description: "Command users type to vote-ban someone (e.g. !vote ban {user})", default: "!vote ban {user}", restartNeeded: false },
     /** The percentage of users in the voice channel required to approve a ban. */
-    voteBanPercentage: { type: OptionType.SLIDER, description: "Percentage of channel occupants required to pass a vote ban", default: 50, markers: [10, 25, 50, 75, 100], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanPercentage = Math.round(v); } },
+    voteBanPercentage: { type: OptionType.SLIDER, description: "Percentage of channel occupants required to pass a vote ban", default: 50, markers: [10, 25, 50, 75, 100], stickToMarkers: false, restartNeeded: false },
     /** The time window in seconds during which a vote-ban remains active. */
-    voteBanWindowSecs: { type: OptionType.SLIDER, description: "Seconds a vote-ban stays open before expiring", default: 5 * 60, markers: [30, 60, 120, 300, 600, 1800], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.voteBanWindowSecs = Math.round(v); } },
+    voteBanWindowSecs: { type: OptionType.SLIDER, description: "Seconds a vote-ban stays open before expiring", default: 300, markers: [30, 60, 120, 300, 600, 1800], stickToMarkers: false, restartNeeded: false },
 };
 
 export type VoteBanningSettingsType = typeof voteBanningSettings;
@@ -27,15 +26,12 @@ export const VoteBanningModule: PluginModule = {
     description: "Allows users in a voice channel to collectively vote to ban another user.",
     requiredDependencies: ["BansModule"],
     settingsSchema: voteBanningSettings,
-    settings: null as unknown as Record<string, any>,
-    /** Map of active votes, keyed by "channelId-targetUser". */
+    settings: null,
     activeVotes: new Map<string, { targetUser: string, voters: Set<string>, expiresAt: number }>(),
 
     init(settings: Record<string, any>) {
         this.settings = settings;
         logger.info("VoteBanningModule initializing");
-
-        // Cleanup expired votes every minute
         setInterval(() => this.cleanupExpiredVotes(), 60000);
     },
 
@@ -44,6 +40,9 @@ export const VoteBanningModule: PluginModule = {
         logger.info("VoteBanningModule stopping");
     },
 
+    /**
+     * Internal command definitions that ModuleRegistry can handle.
+     */
     externalCommands: [
         {
             name: "vote ban",
@@ -52,42 +51,31 @@ export const VoteBanningModule: PluginModule = {
                 { name: "target", description: "The user to vote ban", type: ApplicationCommandOptionType.USER, required: true },
                 { name: "reason", description: "The reason for the vote ban", type: ApplicationCommandOptionType.STRING, required: false }
             ],
-            checkPermission: (msg, s) => {
+            checkPermission: (msg) => {
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
-                // Voter must be in a Voice Channel to initiate a vote ban
                 return !!(voterVoiceState && voterVoiceState.channelId);
             },
-            execute: (args, msg, channelId) => {
+            execute: (args, msg) => {
                 const targetUser = args.target;
                 const reason = args.reason || "";
                 if (!targetUser) return false;
 
                 const voterId = msg.author.id;
                 const voterVoiceState = VoiceStateStore.getVoiceStateForUser(voterId);
-                // We know this exists because checkPermission passed
                 const vcId = voterVoiceState!.channelId!;
                 const guildId = voterVoiceState!.guildId!;
 
-                // Usually message is in text channel, but we bind vote to their current VC
                 VoteBanningModule.registerVote(targetUser, voterId, vcId, guildId, reason);
                 return true;
             }
         }
     ],
 
-    /**
-     * Registers a vote from a user against a target in a specific channel.
-     * @param targetUser The user ID being voted against
-     * @param voterId The user ID who is voting
-     * @param channelId The target voice channel ID
-     * @param guildId The target guild ID
-     * @param reason Optional reason for the vote
-     */
     registerVote(targetUser: string, voterId: string, channelId: string, guildId: string, reason?: string) {
         if (!this.settings) return;
         const ownership = stateManager.getOwnership(channelId);
-        if (!ownership) return; // Only allow in managed channels
+        if (!ownership) return;
 
         const voteKey = `${channelId}-${targetUser}`;
         const now = Date.now();
@@ -110,20 +98,15 @@ export const VoteBanningModule: PluginModule = {
         sendDebugMessage(`Vote registered against ${targetUser} by ${voterId}. (${voteData.voters.size}/${requiredVotes})`, channelId);
 
         if (voteData.voters.size >= requiredVotes) {
-            logger.info(`Vote threshold reached for ${targetUser}. Executing ban policy.`);
             BansModule.enforceBanPolicy(targetUser, channelId, false, reason || "Vote Ban");
             this.activeVotes.delete(voteKey);
         }
     },
 
-    /**
-     * Removes votes that have exceeded their configured lifetime.
-     */
     cleanupExpiredVotes() {
         const now = Date.now();
         for (const [key, data] of this.activeVotes.entries()) {
             if (data.expiresAt < now) {
-                logger.debug(`Expiring vote ban for ${key}`);
                 this.activeVotes.delete(key);
             }
         }

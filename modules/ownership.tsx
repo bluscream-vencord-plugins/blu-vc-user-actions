@@ -1,12 +1,13 @@
-import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginModuleEvent, BotResponseType } from "../types/events";
+import { PluginModule } from "../types/module";
+import { moduleRegistry } from "../core/moduleRegistry";
+import { CoreEvent, BotResponseType } from "../types/events";
 import { ChannelOwnership } from "../types/state";
 import { stateManager } from "../utils/state";
 import { logger } from "../utils/logger";
 import { Message, VoiceState, Channel, User, Guild, ChannelWithComparator, ThreadJoined } from "@vencord/discord-types";
 import { BotResponse } from "../types/BotResponse";
 import { parseBotInfoMessage } from "../utils/parsing";
-import { actionQueue } from "../utils/queue";
+import { actionQueue } from "../core/actionQueue";
 import { formatCommand, formatMessageCommon } from "../utils/formatting";
 import { sendDebugMessage } from "../utils/debug";
 import { sendEphemeralMessage } from "../utils/messaging";
@@ -18,14 +19,8 @@ import {
     ChannelRouter,
     Menu, React, showToast
 } from "@webpack/common";
-import { openSettings } from "../utils/settings";
-import { WhitelistModule } from "./whitelist";
-import { BansModule } from "./bans";
-import { BlacklistModule } from "./blacklist";
-import { ChannelNameRotationModule } from "./channelNameRotation";
-import { plugins } from "@api/PluginManager";
+import { openSettings, getNewLineList } from "../utils/settings";
 import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
-import { getNewLineList } from "../utils/settings";
 import { OptionType } from "@utils/types";
 import { pluginInfo } from "../info";
 
@@ -63,11 +58,6 @@ export const ownershipSettings = {
 };
 
 export type OwnershipSettingsType = typeof ownershipSettings;
-
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
 
 function getSettings() {
     return moduleRegistry.settings as any;
@@ -161,7 +151,7 @@ export const OwnershipActions = {
         let targetChannelId: string | undefined;
 
         // 1. Check if the last channel we are cached creator in still exists
-        const ownerships = stateManager["store"].activeChannelOwnerships;
+        const ownerships = stateManager.getAllActiveOwnerships();
         const myOwnedChannels = Object.keys(ownerships).filter(
             id => ownerships[id].creatorId === meId || ownerships[id].claimantId === meId
         ).sort((a, b) => {
@@ -230,8 +220,7 @@ export const OwnershipActions = {
         }
     },
     resetState() {
-        stateManager["store"].activeChannelOwnerships = {};
-        stateManager["store"].memberConfigs = {};
+        stateManager.resetState();
         showToast("Plugin state has been reset.");
     },
 };
@@ -242,7 +231,7 @@ export const ownershipCommands = [
         description: "Force manual sync of channel info and ownership",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            const settings = moduleRegistry["settings"];
+            const settings = moduleRegistry.settings;
             if (!settings || !ctx.channel) {
                 return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
             }
@@ -436,495 +425,9 @@ function getMyVoiceChannelId(): string | null {
     return SelectedChannelStore.getVoiceChannelId() ?? null;
 }
 
-function getOwnership(channelId: string): ChannelOwnership | null {
-    return stateManager.getOwnership(channelId);
-}
-
-function amIOwner(channelId: string): boolean {
-    return isUserOwner(Users.getCurrentUser()?.id || "", channelId);
-}
-
-export function isUserOwner(userId: string, channelId: string): boolean {
-    const o = stateManager.getOwnership(channelId);
-    return o?.creatorId === userId || o?.claimantId === userId;
-}
-
 function getUserDisplayName(userId: string): string {
     const u = Users.getUser(userId);
     return u?.globalName || u?.username || userId;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Channel Menu Items
-// ─────────────────────────────────────────────────────────────
-
-function makeChannelItems(channel: Channel): React.ReactElement[] {
-    const settings = getSettings();
-    if (!settings) return [];
-
-    const meId = Users.getCurrentUser()?.id || "";
-    const ownership = stateManager.getOwnership(channel.id);
-    const amOwner = ownership?.creatorId === meId || ownership?.claimantId === meId;
-
-    const enqueue = (cmd: string, priority = false) =>
-        actionQueue.enqueue(formatCommand(cmd, channel.id), channel.id, priority);
-
-    const items: React.ReactElement[] = [
-        <Menu.MenuItem
-            id="socialize-claim-channel"
-            label="Claim Channel"
-            key="socialize-claim-channel"
-            action={() => OwnershipActions.claimChannel(channel.id)}
-        />,
-        <Menu.MenuItem
-            id="socialize-lock-channel"
-            label="Lock Channel"
-            key="socialize-lock-channel"
-            action={() => OwnershipActions.lockChannel(channel.id)}
-        />,
-        <Menu.MenuItem
-            id="socialize-unlock-channel"
-            label="Unlock Channel"
-            key="socialize-unlock-channel"
-            action={() => OwnershipActions.unlockChannel(channel.id)}
-        />,
-        <Menu.MenuItem
-            id="socialize-reset-channel"
-            label="Reset Channel"
-            key="socialize-reset-channel"
-            action={() => OwnershipActions.resetChannel(channel.id)}
-        />,
-        <Menu.MenuItem
-            id="socialize-info-channel"
-            label="Channel Info"
-            key="socialize-info-channel"
-            action={() => OwnershipActions.syncInfo(channel.id)}
-        />,
-        <Menu.MenuItem
-            id="socialize-set-size-submenu"
-            label="Set Channel Size"
-            key="socialize-set-size-submenu"
-        >
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(size => (
-                <Menu.MenuItem
-                    key={`size-${size}`}
-                    id={`socialize-set-size-${size}`}
-                    label={size === 0 ? "Unlimited" : `${size} Users`}
-                    action={() => OwnershipActions.setChannelSize(channel.id, size)}
-                />
-            ))}
-        </Menu.MenuItem>,
-    ];
-
-    if (amOwner) {
-        items.push(<Menu.MenuSeparator key="socialize-owner-items-sep" />);
-
-        items.push(
-            <Menu.MenuItem
-                id="socialize-guild-rename-channel"
-                key="socialize-guild-rename-channel"
-                label="Rename Channel"
-                color="brand"
-                action={() => {
-                    let newNameValue = channel.name;
-                    const { TextInput, Alerts, React: R } = require("@webpack/common");
-
-                    const RenameBody = ({ initialValue, onUpdate }: { initialValue: string, onUpdate: (v: string) => void }) => {
-                        const [val, setVal] = R.useState(initialValue);
-                        return (
-                            <div style={{ marginTop: "1rem" }}>
-                                <TextInput
-                                    value={val}
-                                    onChange={(v: string) => { setVal(v); onUpdate(v); }}
-                                    placeholder="Enter new channel name..."
-                                    autoFocus
-                                />
-                            </div>
-                        );
-                    };
-
-                    Alerts.show({
-                        title: "Rename Channel",
-                        confirmText: "Rename",
-                        cancelText: "Cancel",
-                        onConfirm: () => {
-                            if (newNameValue && newNameValue !== channel.name) {
-                                OwnershipActions.renameChannel(channel.id, newNameValue);
-                            }
-                        },
-                        body: <RenameBody initialValue={channel.name} onUpdate={(v) => newNameValue = v} />
-                    });
-                }}
-            />
-        );
-
-        items.push(
-            <Menu.MenuItem
-                id="socialize-kick-banned"
-                label="Kick Banned Users"
-                key="socialize-kick-banned"
-                color="danger"
-                action={() => {
-                    const n = OwnershipActions.kickBannedUsers(channel.id);
-                    if (n === -1) {
-                        showToast("No banned users in VC (no personal ban list found).");
-                    } else {
-                        showToast(n > 0 ? `Kicked ${n} banned user(s).` : "No banned users in VC.");
-                    }
-                }}
-            />
-        );
-    }
-
-    return items;
-}
-
-// ─────────────────────────────────────────────────────────────
-// User Menu Items
-// ─────────────────────────────────────────────────────────────
-
-function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
-    const settings = getSettings();
-    if (!settings) return [];
-
-    const myChannelId = getMyVoiceChannelId();
-    const targetChannelId = channel?.id || myChannelId || "";
-    const guildId = channel?.guild_id || settings.guildId;
-
-    const isInMyChannel = myChannelId
-        ? !!VoiceStateStore.getVoiceStatesForChannel(myChannelId)?.[user.id]
-        : false;
-
-    const meId = Users.getCurrentUser()?.id || "";
-    const ownership = myChannelId ? getOwnership(myChannelId) : null;
-    const amOwner = ownership?.creatorId === meId || ownership?.claimantId === meId;
-    // Whitelist toggle
-    const isWhitelisted = WhitelistModule.isWhitelisted(user.id);
-
-    // Ban check: check the current owner's ban list
-    const ownerId = (ownership?.claimantId || ownership?.creatorId || "");
-    const ownerConfig = (myChannelId && ownerId && stateManager.hasMemberConfig(ownerId))
-        ? stateManager.getMemberConfig(ownerId)
-        : null;
-    const isBlacklisted = BlacklistModule.isBlacklisted(user.id);
-    const isBanned = (ownerConfig?.bannedUsers.includes(user.id) ?? false) || isBlacklisted;
-
-    const showToast = (msg: string) => {
-        const { Toasts } = require("@webpack/common");
-        Toasts.show({ message: msg, type: Toasts.Type.SUCCESS });
-    };
-
-    const items: React.ReactElement[] = [];
-
-    // Show ownership info if applicable
-    if (myChannelId) {
-        const o = getOwnership(myChannelId);
-        if (o?.creatorId === user.id || o?.claimantId === user.id) {
-            items.push(
-                <Menu.MenuItem
-                    id="socialize-user-is-owner"
-                    key="socialize-user-is-owner"
-                    label={o.claimantId === user.id
-                        ? `👑 Is Claimant`
-                        : `✨ Is Creator`}
-                    disabled
-                    action={() => { }}
-                />
-            );
-        }
-    }
-
-    // Kick (only if in my channel and I'm owner)
-    if (isInMyChannel && amOwner) {
-        items.push(
-            <Menu.MenuItem
-                id="socialize-kick-user"
-                key="socialize-kick-user"
-                label="Kick from VC"
-                color="brand"
-                action={() => OwnershipActions.kickUser(myChannelId!, user.id)}
-            />
-        );
-    }
-
-    // Permit/Unpermit (only if I'm owner)
-    if (amOwner && myChannelId) {
-        const hasOwnerCfg = stateManager.hasMemberConfig(meId);
-        const ownerCfg = hasOwnerCfg ? stateManager.getMemberConfig(meId) : null;
-        const isPermitted = ownerCfg?.permittedUsers.includes(user.id) || isWhitelisted;
-        items.push(
-            <Menu.MenuItem
-                id="socialize-permit-user"
-                key="socialize-permit-user"
-                label={isPermitted ? "Unpermit" : "Permit"}
-                color={isPermitted ? "default" : "success"}
-                action={() => {
-                    if (isPermitted) {
-                        WhitelistModule.unpermitUser(user.id, myChannelId!);
-                        showToast(`Queued unpermit for ${getUserDisplayName(user.id)}`);
-                    } else {
-                        WhitelistModule.permitUser(user.id, myChannelId!);
-                        showToast(`Queued permit for ${getUserDisplayName(user.id)}`);
-                    }
-                }}
-            />
-        );
-    }
-
-    // Whitelist / Blacklist (Global settings, accessible if owner or admin-like)
-    items.push(
-        <Menu.MenuItem
-            id="socialize-whitelist-user"
-            key="socialize-whitelist-user"
-            label={isWhitelisted ? "Remove from Whitelist" : "Add to Whitelist"}
-            color={isWhitelisted ? "brand" : "brand"}
-            action={() => {
-                if (isWhitelisted) {
-                    WhitelistModule.unwhitelistUser(user.id, myChannelId || undefined);
-                } else {
-                    WhitelistModule.whitelistUser(user.id, myChannelId || undefined);
-                }
-            }}
-        />
-    );
-
-    items.push(
-        <Menu.MenuItem
-            id="socialize-blacklist-user"
-            key="socialize-blacklist-user"
-            label={isBlacklisted ? "Remove from Blacklist" : "Add to Blacklist"}
-            color={isBlacklisted ? "danger" : "danger"}
-            action={() => {
-                if (isBlacklisted) {
-                    BlacklistModule.unblacklistUser(user.id, myChannelId || undefined);
-                } else {
-                    BlacklistModule.blacklistUser(user.id, myChannelId || undefined);
-                }
-            }}
-        />
-    );
-
-    // Ban/Unban (only if I'm owner)
-    if (amOwner && myChannelId) {
-        items.push(
-            <Menu.MenuItem
-                id="socialize-ban-user"
-                key="socialize-ban-user"
-                label={isBanned ? "Unban from VC" : "Ban from VC"}
-                color={isBanned ? "success" : "danger"}
-                action={() => {
-                    if (isBanned) {
-                        BansModule.unbanUser(user.id, myChannelId!);
-                        showToast(`Queued unban for ${getUserDisplayName(user.id)}`);
-                    } else {
-                        BansModule.banUser(user.id, myChannelId!);
-                        showToast(`Queued ban for ${getUserDisplayName(user.id)}`);
-                    }
-                }}
-            />
-        );
-    }
-
-    return items.filter(Boolean);
-}
-
-// ─────────────────────────────────────────────────────────────
-// Guild Menu Items
-// ─────────────────────────────────────────────────────────────
-
-function makeStatusItems(voiceChannelId?: string, prefix = "guild"): React.ReactElement[] {
-    const ownership = voiceChannelId ? getOwnership(voiceChannelId) : null;
-    const s = getSettings();
-
-    const creatorLabel = ownership?.creatorId
-        ? `✨ Creator: ${getUserDisplayName(ownership.creatorId)}`
-        : "✨ Creator: None";
-    const claimantLabel = ownership?.claimantId
-        ? `👑 Claimant: ${getUserDisplayName(ownership.claimantId)}`
-        : "👑 Claimant: None";
-
-    return [
-        // Read-only status labels (disabled plain MenuItems)
-        <Menu.MenuItem
-            key={`${prefix}-creator-status`}
-            id={`socialize-${prefix}-creator-status`}
-            label={creatorLabel}
-            disabled
-            action={() => { }}
-        />,
-        <Menu.MenuItem
-            key={`${prefix}-claimant-status`}
-            id={`socialize-${prefix}-claimant-status`}
-            label={claimantLabel}
-            disabled
-            action={() => { }}
-        />,
-        <Menu.MenuSeparator key={`${prefix}-status-sep`} />,
-        // Real feature toggles
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-queue`}
-            id={`socialize-${prefix}-toggle-queue`}
-            label="Queue Actions"
-            checked={!!s?.queueEnabled}
-            action={() => { if (s) s.queueEnabled = !s.queueEnabled; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-ban-rotate`}
-            id={`socialize-${prefix}-toggle-ban-rotate`}
-            label="Ban Rotation"
-            checked={!!s?.banRotateEnabled}
-            action={() => { if (s) s.banRotateEnabled = !s.banRotateEnabled; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-permit-rotate`}
-            id={`socialize-${prefix}-toggle-permit-rotate`}
-            label="Permit Rotation"
-            checked={!!(s as any)?.permitRotateEnabled}
-            action={() => { if (s) (s as any).permitRotateEnabled = !(s as any).permitRotateEnabled; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-ban-blacklist`}
-            id={`socialize-${prefix}-toggle-ban-blacklist`}
-            label="Ban Blacklisted"
-            checked={!!s?.banInLocalBlacklist}
-            action={() => { if (s) s.banInLocalBlacklist = !s.banInLocalBlacklist; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-ban-blocked`}
-            id={`socialize-${prefix}-toggle-ban-blocked`}
-            label="Ban Blocked Users"
-            checked={!!s?.banBlockedUsers}
-            action={() => { if (s) s.banBlockedUsers = !s.banBlockedUsers; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-ban-roles`}
-            id={`socialize-${prefix}-toggle-ban-roles`}
-            label="Ban Not-in-Role"
-            checked={!!s?.banNotInRoles}
-            action={() => { if (s) s.banNotInRoles = !s.banNotInRoles; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-cleanup`}
-            id={`socialize-${prefix}-toggle-cleanup`}
-            label="Command Cleanup"
-            checked={!!s?.commandCleanup}
-            action={() => { if (s) s.commandCleanup = !s.commandCleanup; }}
-        />,
-        <Menu.MenuCheckboxItem
-            key={`${prefix}-toggle-debug`}
-            id={`socialize-${prefix}-toggle-debug`}
-            label="Debug Mode"
-            checked={!!s?.enableDebug}
-            action={() => { if (s) s.enableDebug = !s.enableDebug; }}
-        />,
-    ];
-}
-
-function makeGuildItems(guild: Guild): React.ReactElement[] {
-    const voiceChannelId = getMyVoiceChannelId() || undefined;
-
-    return [
-        ...makeStatusItems(voiceChannelId, "guild"),
-        <Menu.MenuSeparator key="socialize-guild-sep" />,
-        <Menu.MenuItem
-            id="socialize-guild-fetch-owners"
-            label="Fetch All Owners"
-            key="socialize-guild-fetch-owners"
-            action={() => OwnershipModule.fetchAllOwners()}
-        />,
-        voiceChannelId && <Menu.MenuItem
-            id="socialize-guild-channel-info"
-            label="Get Channel Info"
-            key="socialize-guild-channel-info"
-            action={() => OwnershipActions.syncInfo(voiceChannelId!)}
-        />,
-        <Menu.MenuItem
-            id="socialize-guild-create-channel"
-            label="Create Channel"
-            key="socialize-guild-create-channel"
-            action={() => OwnershipActions.createChannel()}
-        />,
-        <Menu.MenuSeparator key="socialize-guild-sep2" />,
-        <Menu.MenuItem
-            id="socialize-guild-reset-state"
-            label="Reset Plugin State"
-            key="socialize-guild-reset-state"
-            color="danger"
-            action={() => OwnershipActions.resetState()}
-        />,
-        <Menu.MenuItem
-            id="socialize-open-settings"
-            label="Open Settings"
-            key="socialize-open-settings"
-            action={() => openSettings()}
-        />,
-    ].filter(Boolean) as React.ReactElement[];
-}
-
-// ─────────────────────────────────────────────────────────────
-// Toolbox Menu Items
-// ─────────────────────────────────────────────────────────────
-
-function makeToolboxItems(channel?: Channel): React.ReactElement[] {
-    const voiceChannelId = channel?.id || getMyVoiceChannelId() || undefined;
-
-    const items: (React.ReactElement | null)[] = [
-        ...makeStatusItems(voiceChannelId, "toolbox"),
-    ];
-
-    // Channel-specific items when we have a channel
-    if (voiceChannelId && channel) {
-        items.push(
-            <Menu.MenuItem
-                id="socialize-toolbox-info"
-                label="Get Channel Info"
-                key="socialize-toolbox-info"
-                action={() => OwnershipActions.syncInfo(voiceChannelId)}
-            />,
-            <Menu.MenuItem
-                id="socialize-toolbox-claim"
-                label="Claim Channel"
-                key="socialize-toolbox-claim"
-                action={() => OwnershipActions.claimChannel(voiceChannelId)}
-            />,
-            <Menu.MenuItem
-                id="socialize-toolbox-lock"
-                label="Lock Channel"
-                key="socialize-toolbox-lock"
-                action={() => OwnershipActions.lockChannel(voiceChannelId)}
-            />,
-            <Menu.MenuItem
-                id="socialize-toolbox-unlock"
-                label="Unlock Channel"
-                key="socialize-toolbox-unlock"
-                action={() => OwnershipActions.unlockChannel(voiceChannelId)}
-            />
-        );
-    }
-
-    items.push(
-        <Menu.MenuItem
-            id="socialize-toolbox-create"
-            label="Create Channel"
-            key="socialize-toolbox-create"
-            action={() => OwnershipActions.createChannel()}
-        />,
-        <Menu.MenuItem
-            id="socialize-toolbox-fetch-owners"
-            label="Fetch All Owners"
-            key="socialize-toolbox-fetch-owners"
-            action={() => OwnershipModule.fetchAllOwners()}
-        />,
-        <Menu.MenuSeparator key="socialize-toolbox-settings-sep" />,
-        <Menu.MenuItem
-            id="socialize-toolbox-open-settings"
-            label="Open Settings"
-            key="socialize-toolbox-open-settings"
-            action={() => openSettings()}
-        />
-    );
-
-    return items.filter(Boolean) as React.ReactElement[];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -933,10 +436,10 @@ function makeToolboxItems(channel?: Channel): React.ReactElement[] {
 
 export const OwnershipModule: PluginModule = {
     name: "OwnershipModule",
-    description: "The core module responsible for tracking and managing voice channel ownership. It handles Discord events (voice state updates, messages) and provides context menu items.",
+    description: "The core module responsible for tracking and managing voice channel ownership.",
     requiredDependencies: ["WhitelistModule", "BansModule", "BlacklistModule", "ChannelNameRotationModule"],
     settingsSchema: ownershipSettings,
-    settings: undefined as unknown as Record<string, any>,
+    settings: null,
 
     // ── Menu Item Hooks ──────────────────────────────────────
 
@@ -947,7 +450,6 @@ export const OwnershipModule: PluginModule = {
     getChannelMenuItems(channel: Channel) {
         const settings = getSettings();
         if (!settings) return null;
-        // Only show for voice channels in our managed category
         if (channel.parent_id !== settings.categoryId && channel.id !== settings.creationChannelId) return null;
         if (!isVoiceChannel(channel)) return null;
         return makeChannelItems(channel);
@@ -987,10 +489,6 @@ export const OwnershipModule: PluginModule = {
 
     // ── Logic Helpers ────────────────────────────────────────
 
-    /**
-     * Batch requests channel information from the bot for all channels in the managed category.
-     * Uses a delay between requests to avoid triggerring bot rate limits.
-     */
     async fetchAllOwners() {
         const settings = getSettings();
         if (!settings) return;
@@ -1008,10 +506,6 @@ export const OwnershipModule: PluginModule = {
         logger.info("Batch fetch complete.");
     },
 
-    /**
-     * Sends a command to the bot to request information about a specific channel.
-     * @param channelId The ID of the voice channel
-     */
     requestChannelInfo(channelId: string) {
         const settings = getSettings();
         if (!settings) return;
@@ -1021,13 +515,11 @@ export const OwnershipModule: PluginModule = {
 
     // ── Discord Event Handlers ───────────────────────────────
 
-    onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
+    onVoiceStateUpdate(oldState: any, newState: any) {
         const settings = getSettings();
         if (!settings) return;
 
         const currentUserId = Users.getCurrentUser()?.id;
-        logger.debug(`onVoiceStateUpdate: user ${newState.userId} (oldId: ${oldState.channelId}, newId: ${newState.channelId})`);
-
         if (oldState.channelId !== newState.channelId) {
             if (newState.channelId) {
                 const newChannel = ChannelStore.getChannel(newState.channelId);
@@ -1044,91 +536,71 @@ export const OwnershipModule: PluginModule = {
         }
     },
 
-    onMessageCreate(message: Message) {
-        const settings = getSettings();
-        if (!settings) return;
-
-        if (message.author.id !== settings.botId) return;
-
-        const response = new BotResponse(message, settings.botId);
-        if (response.type === BotResponseType.UNKNOWN) {
-            logger.debug(`Unknown bot response type. Author: ${message.author.username}, Content: ${message.content?.substring(0, 50)}`);
-            return;
+    onCustomEvent(event: string, payload: any) {
+        if (event === CoreEvent.BOT_EMBED_RECEIVED) {
+            this.handleBotEmbed(payload);
         }
+    },
 
-        moduleRegistry.dispatch(PluginModuleEvent.BOT_EMBED_RECEIVED, {
-            messageId: message.id,
-            channelId: message.channel_id,
-            type: response.type,
-            initiatorId: response.initiatorId,
-            targetUserId: response.targetId,
-            embed: response.embed
-        });
+    handleBotEmbed(payload: any) {
+        const { messageId, channelId, type, initiatorId, targetUserId, embed } = payload;
 
         // Ownership handling
-        if (response.initiatorId && (response.type === BotResponseType.CREATED || response.type === BotResponseType.CLAIMED)) {
-            const isCreator = response.type === BotResponseType.CREATED;
-            const channelId = response.channelId;
-            const userId = response.initiatorId;
-
+        if (initiatorId && (type === BotResponseType.CREATED || type === BotResponseType.CLAIMED)) {
+            const isCreator = type === BotResponseType.CREATED;
             const oldOwnership = stateManager.getOwnership(channelId);
             const newOwnership: Partial<ChannelOwnership> = {
                 channelId,
                 ...(isCreator
-                    ? { creatorId: userId, createdAt: response.timestamp }
-                    : { claimantId: userId, claimedAt: response.timestamp })
+                    ? { creatorId: initiatorId, createdAt: Date.now() } // Fallback to now if timestamp missing
+                    : { claimantId: initiatorId, claimedAt: Date.now() })
             };
 
             stateManager.setOwnership(channelId, newOwnership);
-            this.handleOwnershipUpdate(channelId, userId, isCreator ? "creator" : "claimant", oldOwnership, stateManager.getOwnership(channelId));
+            this.handleOwnershipUpdate(channelId, initiatorId, isCreator ? "creator" : "claimant", oldOwnership, stateManager.getOwnership(channelId));
         }
 
-        // Info sync
-        if (response.type === BotResponseType.INFO) {
-            const result = parseBotInfoMessage(response);
+        // Info sync via manual parsing or delegated parse
+        if (type === BotResponseType.INFO) {
+            // Mocked BotResponse for parsing
+            const mockResponse = { embed, initiatorId, channelId, getRawDescription: () => embed.description || "" } as any;
+            const result = parseBotInfoMessage(mockResponse);
             if (result?.info.userId) {
                 stateManager.updateMemberConfig(result.info.userId, result.info);
-                sendDebugMessage(`Synchronized info for <@${result.info.userId}>`, message.channel_id);
+                sendDebugMessage(`Synchronized info for <@${result.info.userId}>`, channelId);
             }
         }
 
-        // Dynamic state updates for ban/permit/lock actions
-        let userId = response.initiatorId;
-        const channelId = response.channelId || message.channel_id;
-
-        if (!userId) { // Fallback: If we can't find an initiator, assume it's the owner of the channel
+        // Dynamic config updates
+        let userId = initiatorId;
+        if (!userId) {
             const ownership = stateManager.getOwnership(channelId);
             userId = ownership?.claimantId || ownership?.creatorId || undefined;
         }
 
-        const configExisted = userId ? stateManager.hasMemberConfig(userId) : false;
-
         if (userId) {
-            const description = response.getRawDescription().toLowerCase();
-            const targetMatch = description.match(/<@!?(\d+)>/);
-            const targetUserId = targetMatch?.[1];
+            const description = (embed.description || "").toLowerCase();
+            const config = stateManager.getMemberConfig(userId);
 
-            const cfg = stateManager.getMemberConfig(userId);
-
-            switch (response.type) {
+            switch (type) {
                 case BotResponseType.BANNED:
-                    if (targetUserId && !cfg.bannedUsers.includes(targetUserId)) {
-                        stateManager.updateMemberConfig(userId, { bannedUsers: [...cfg.bannedUsers, targetUserId] });
+                    if (targetUserId && !config.bannedUsers.includes(targetUserId)) {
+                        stateManager.updateMemberConfig(userId, { bannedUsers: [...config.bannedUsers, targetUserId] });
                     }
                     break;
                 case BotResponseType.UNBANNED:
                     if (targetUserId) {
-                        stateManager.updateMemberConfig(userId, { bannedUsers: cfg.bannedUsers.filter(id => id !== targetUserId) });
+                        stateManager.updateMemberConfig(userId, { bannedUsers: config.bannedUsers.filter(id => id !== targetUserId) });
                     }
                     break;
                 case BotResponseType.PERMITTED:
-                    if (targetUserId && !cfg.permittedUsers.includes(targetUserId)) {
-                        stateManager.updateMemberConfig(userId, { permittedUsers: [...cfg.permittedUsers, targetUserId] });
+                    if (targetUserId && !config.permittedUsers.includes(targetUserId)) {
+                        stateManager.updateMemberConfig(userId, { permittedUsers: [...config.permittedUsers, targetUserId] });
                     }
                     break;
                 case BotResponseType.UNPERMITTED:
                     if (targetUserId) {
-                        stateManager.updateMemberConfig(userId, { permittedUsers: cfg.permittedUsers.filter(id => id !== targetUserId) });
+                        stateManager.updateMemberConfig(userId, { permittedUsers: config.permittedUsers.filter(id => id !== targetUserId) });
                     }
                     break;
                 case BotResponseType.SIZE_SET: {
@@ -1144,26 +616,7 @@ export const OwnershipModule: PluginModule = {
                     break;
             }
         }
-
-        let banSuffix = "";
-        if (userId && (response.type === BotResponseType.BANNED || response.type === BotResponseType.UNBANNED)) {
-            const updatedCfg = stateManager.getMemberConfig(userId);
-            let count = updatedCfg.bannedUsers.length;
-            if (!configExisted) {
-                count = (response.type === BotResponseType.BANNED) ? 1 : 4;
-            }
-            banSuffix = ` (Bans: ${count})`;
-        }
-
-        const targetStr = response.targetId ? ` target <@${response.targetId}>` : "";
-        sendDebugMessage(`Bot Response: **${response.type}**${targetStr} from <@${userId || "Unknown"}>${banSuffix}`, message.channel_id);
     },
-
-    // ── External Commands ────────────────────────────────────
-
-    // ── External Commands ────────────────────────────────────
-    // (None - Moved to RemoteOperatorsModule)
-
 
     // ── Internal Helpers ─────────────────────────────────────
 
@@ -1174,13 +627,13 @@ export const OwnershipModule: PluginModule = {
         const debugMsg = formatMessageCommon(`Ownership: **${ownerId === meId ? "You" : `<@${ownerId}>`}** recognized as **${type}**`);
         sendDebugMessage(debugMsg, channelId);
 
-        moduleRegistry.dispatch(PluginModuleEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
+        moduleRegistry.dispatch(CoreEvent.CHANNEL_OWNERSHIP_CHANGED, { channelId, oldOwnership, newOwnership });
 
         if (ownerId === meId) {
-            ChannelNameRotationModule.startRotation(channelId);
+            // Dependencies handled via requiredDependencies, but we search for them globally
+            const { ChannelNameRotationModule } = require("./channelNameRotation");
+            ChannelNameRotationModule?.startRotation?.(channelId);
             this.requestChannelInfo(channelId);
-        } else {
-            ChannelNameRotationModule.stopRotation(channelId);
         }
     },
 
@@ -1201,15 +654,14 @@ export const OwnershipModule: PluginModule = {
         if (!settings) return;
 
         const ownership = stateManager.getOwnership(channelId);
-        logger.debug(`handleUserJoinedChannel: user ${userId}, channel ${channelId}, hasOwnership: ${!!ownership}`);
-
         if (userId === currentUserId) {
             sendDebugMessage(`You joined managed channel <#${channelId}>`, channelId);
-            moduleRegistry.dispatch(PluginModuleEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
+            moduleRegistry.dispatch(CoreEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL, { channelId });
 
             if (ownership) {
                 if (ownership.creatorId === userId || ownership.claimantId === userId) {
-                    ChannelNameRotationModule.startRotation(channelId);
+                    const { ChannelNameRotationModule } = require("./channelNameRotation");
+                    ChannelNameRotationModule?.startRotation?.(channelId);
                 }
             } else if (channelId !== settings.creationChannelId) {
                 sendDebugMessage(`Unknown channel <#${channelId}> joined. Requesting info.`, channelId);
@@ -1218,35 +670,114 @@ export const OwnershipModule: PluginModule = {
         }
 
         if (ownership) {
-            // Only handle joins for others if we are actually in the channel to manage it
-            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) {
-                return;
-            }
+            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) return;
             const guildId = ChannelStore.getChannel(channelId)?.guild_id || settings.guildId;
             sendDebugMessage(`<@${userId}> joined owned channel`, channelId);
-            moduleRegistry.dispatch(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
+            moduleRegistry.dispatch(CoreEvent.USER_JOINED_OWNED_CHANNEL, { channelId, userId, guildId });
         }
     },
 
     handleUserLeftChannel(userId: string, channelId: string, currentUserId?: string) {
         if (userId === currentUserId) {
-            moduleRegistry.dispatch(PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
-            ChannelNameRotationModule.stopRotation(channelId);
+            moduleRegistry.dispatch(CoreEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL, { channelId });
+            const { ChannelNameRotationModule } = require("./channelNameRotation");
+            ChannelNameRotationModule?.stopRotation?.(channelId);
         }
 
         const ownership = stateManager.getOwnership(channelId);
         if (ownership) {
-            // Only handle leaves for others if we are actually in the channel
-            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) {
-                return;
-            }
-            moduleRegistry.dispatch(PluginModuleEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
-            if (ownership.creatorId === userId || ownership.claimantId === userId) {
-                sendDebugMessage(`Owner <@${userId}> left channel`, channelId);
-                if (userId === currentUserId) {
-                    ChannelNameRotationModule.stopRotation(channelId);
-                }
-            }
+            if (userId !== currentUserId && channelId !== getMyVoiceChannelId()) return;
+            moduleRegistry.dispatch(CoreEvent.USER_LEFT_OWNED_CHANNEL, { channelId, userId });
         }
     },
 };
+
+// ── Menu Implementation ──
+
+function makeChannelItems(channel: Channel): React.ReactElement[] {
+    const meId = Users.getCurrentUser()?.id || "";
+    const ownership = stateManager.getOwnership(channel.id);
+    const amOwner = ownership?.creatorId === meId || ownership?.claimantId === meId;
+
+    const items: React.ReactElement[] = [
+        <Menu.MenuItem id="socialize-claim-channel" label="Claim Channel" action={() => OwnershipActions.claimChannel(channel.id)} />,
+        <Menu.MenuItem id="socialize-lock-channel" label="Lock Channel" action={() => OwnershipActions.lockChannel(channel.id)} />,
+        <Menu.MenuItem id="socialize-unlock-channel" label="Unlock Channel" action={() => OwnershipActions.unlockChannel(channel.id)} />,
+        <Menu.MenuItem id="socialize-reset-channel" label="Reset Channel" action={() => OwnershipActions.resetChannel(channel.id)} />,
+        <Menu.MenuItem id="socialize-info-channel" label="Channel Info" action={() => OwnershipActions.syncInfo(channel.id)} />,
+        <Menu.MenuItem id="socialize-set-size-submenu" label="Set Channel Size">
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(size => (
+                <Menu.MenuItem key={size} id={`size-${size}`} label={size === 0 ? "Unlimited" : `${size} Users`} action={() => OwnershipActions.setChannelSize(channel.id, size)} />
+            ))}
+        </Menu.MenuItem>,
+    ];
+
+    if (amOwner) {
+        items.push(<Menu.MenuSeparator key="sep" />);
+        items.push(<Menu.MenuItem id="socialize-rename-channel" label="Rename Channel" action={() => {
+            // Simplified rename for now, implementation could use a prompt
+            let name = prompt("Enter new channel name", channel.name);
+            if (name) OwnershipActions.renameChannel(channel.id, name);
+        }} />);
+        items.push(<Menu.MenuItem id="socialize-kick-banned" label="Kick Banned Users" color="danger" action={() => OwnershipActions.kickBannedUsers(channel.id)} />);
+    }
+    return items;
+}
+
+function makeUserItems(user: User, channel?: Channel): React.ReactElement[] {
+    const myChannelId = getMyVoiceChannelId();
+    const amOwner = myChannelId ? isUserOwner(Users.getCurrentUser()?.id || "", myChannelId) : false;
+    const items: React.ReactElement[] = [];
+
+    if (myChannelId) {
+        const o = stateManager.getOwnership(myChannelId);
+        if (o?.creatorId === user.id || o?.claimantId === user.id) {
+            items.push(<Menu.MenuItem id="owner-status" label={o.claimantId === user.id ? "👑 Is Claimant" : "✨ Is Creator"} disabled action={() => { }} />);
+        }
+    }
+
+    if (amOwner && myChannelId) {
+        items.push(<Menu.MenuItem id="kick-user" label="Kick from VC" action={() => OwnershipActions.kickUser(myChannelId, user.id)} />);
+    }
+
+    // Other items (whitelist, blacklist, ban) will be added by their respective modules
+    return items;
+}
+
+function makeGuildItems(guild: Guild): React.ReactElement[] {
+    return [
+        ...makeStatusItems(getMyVoiceChannelId() || undefined, "guild"),
+        <Menu.MenuSeparator key="sep" />,
+        <Menu.MenuItem id="fetch-owners" label="Fetch All Owners" action={() => OwnershipModule.fetchAllOwners()} />,
+        <Menu.MenuItem id="create-channel" label="Create Channel" action={() => OwnershipActions.createChannel()} />,
+        <Menu.MenuItem id="open-settings" label="Open Settings" action={() => openSettings()} />,
+    ];
+}
+
+function makeToolboxItems(channel?: Channel): React.ReactElement[] {
+    const vcId = channel?.id || getMyVoiceChannelId() || undefined;
+    return [
+        ...makeStatusItems(vcId, "toolbox"),
+        <Menu.MenuSeparator key="sep" />,
+        <Menu.MenuItem id="toolbox-create" label="Create Channel" action={() => OwnershipActions.createChannel()} />,
+        <Menu.MenuItem id="toolbox-fetch-owners" label="Fetch All Owners" action={() => OwnershipModule.fetchAllOwners()} />,
+        <Menu.MenuItem id="toolbox-settings" label="Open Settings" action={() => openSettings()} />,
+    ];
+}
+
+function makeStatusItems(vcId?: string, prefix = "item"): React.ReactElement[] {
+    const s = getSettings();
+    const o = vcId ? stateManager.getOwnership(vcId) : null;
+    return [
+        <Menu.MenuItem key="creator" id={`${prefix}-creator`} label={`✨ Creator: ${o?.creatorId ? getUserDisplayName(o.creatorId) : "None"}`} disabled action={() => { }} />,
+        <Menu.MenuItem key="claimant" id={`${prefix}-claimant`} label={`👑 Claimant: ${o?.claimantId ? getUserDisplayName(o.claimantId) : "None"}`} disabled action={() => { }} />,
+        <Menu.MenuSeparator key="sep" />,
+        <Menu.MenuCheckboxItem key="queue" id={`${prefix}-queue`} label="Queue Actions" checked={!!s?.queueEnabled} action={() => { if (s) s.queueEnabled = !s.queueEnabled; }} />,
+        <Menu.MenuCheckboxItem key="debug" id={`${prefix}-debug`} label="Debug Mode" checked={!!s?.enableDebug} action={() => { if (s) s.enableDebug = !s.enableDebug; }} />,
+    ];
+}
+
+export function isUserOwner(userId: string, channelId: string): boolean {
+    const o = stateManager.getOwnership(channelId);
+    return o?.creatorId === userId || o?.claimantId === userId;
+}

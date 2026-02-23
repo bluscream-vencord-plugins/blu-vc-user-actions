@@ -33,23 +33,22 @@ export interface MemberChannelInfo {
 }
 
 /**
- * Represents a single task in the ActionQueue.
+ * Represents an item in the execution queue.
  */
 export interface ActionQueueItem {
-    /** Internal unique identifier for the queue item */
     id: string;
-    /** The command string to be executed */
+    /** The actual command string to send */
     command: string;
-    /** The ID of the target channel */
+    /** The target channel ID */
     channelId: string;
     /** Whether this action should be processed with high priority */
     priority: boolean;
-    /** Timestamp when the item was enqueued */
+    /** Timestamp when it was enqueued */
     timestamp: number;
+    /** Optional check performed immediately before execution */
+    executeCondition?: () => boolean;
     /** The ID of the resulting message once sent */
     messageId?: string;
-    /** Callback to verify if the action is still valid immediately before execution */
-    executeCondition?: () => boolean;
 }
 
 /**

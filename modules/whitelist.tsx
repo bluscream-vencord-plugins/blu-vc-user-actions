@@ -1,8 +1,9 @@
-import { PluginModule, moduleRegistry } from "../utils/moduleRegistry";
-import { PluginModuleEvent } from "../types/events";
+import { PluginModule } from "../types/module";
+import { moduleRegistry } from "../core/moduleRegistry";
+import { CoreEvent } from "../types/events";
 import { logger } from "../utils/logger";
 import { formatCommand } from "../utils/formatting";
-import { actionQueue } from "../utils/queue";
+import { actionQueue } from "../core/actionQueue";
 import { stateManager } from "../utils/state";
 import { MemberLike, extractId } from "../utils/parsing";
 import { getUserIdList, setNewLineList } from "../utils/settings";
@@ -12,7 +13,6 @@ import { sendEphemeralMessage } from "../utils/messaging";
 import { UserStore as Users } from "@webpack/common";
 import { OptionType } from "@utils/types";
 import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
-import { defaultSettings } from "../settings";
 
 /**
  * Settings definitions for the WhitelistModule.
@@ -23,7 +23,7 @@ export const whitelistSettings = {
     /** Template for the message sent when an enforcement action is skipped due to whitelist. */
     whitelistSkipMessage: { type: OptionType.STRING, description: "Message sent when skipping an action for a whitelisted user (supports {action}, {user_id}, {user_name})", default: "⚪ Whitelist: Skipping {action} for <@{user_id}> ({user_name})", restartNeeded: false },
     /** Maximum number of users that can be in the temporary permit list before rotation occurs. */
-    permitLimit: { type: OptionType.SLIDER, description: "Max users in permit list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false, onChange: (v: number) => { defaultSettings.store.permitLimit = Math.round(v); } },
+    permitLimit: { type: OptionType.SLIDER, description: "Max users in permit list before rotation", default: 5, markers: [1, 2, 3, 4, 5, 10, 15, 20, 50], stickToMarkers: false, restartNeeded: false },
     /** Whether to automatically remove the oldest entry from the permit list when the limit is reached. */
     permitRotateEnabled: { type: OptionType.BOOLEAN, description: "Automatically unpermit oldest entry when permit limit is reached", default: false, restartNeeded: false },
     /** Template for the notification message sent when permit rotation occurs. */
@@ -34,16 +34,16 @@ export type WhitelistSettingsType = typeof whitelistSettings;
 
 export const WhitelistModule: PluginModule = {
     name: "WhitelistModule",
-    description: "Manages whitelisted and temporarily permitted users. Whitelisting bypasses enforcement globally, while permitting allows access to specific channels.",
+    description: "Manages whitelisted and temporarily permitted users.",
     settingsSchema: whitelistSettings,
-    settings: undefined as Record<string, any> | undefined,
+    settings: null,
 
 
     init(settings: Record<string, any>) {
         this.settings = settings;
         logger.info("WhitelistModule initializing");
 
-        moduleRegistry.on<PluginModuleEvent.USER_JOINED_OWNED_CHANNEL>(PluginModuleEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
+        moduleRegistry.on(CoreEvent.USER_JOINED_OWNED_CHANNEL, (payload) => {
             if (this.isWhitelisted(payload.userId)) {
                 payload.isAllowed = true;
                 payload.reason = "Whitelisted";
@@ -83,15 +83,9 @@ export const WhitelistModule: PluginModule = {
         sendDebugMessage(`User <@${userId}> removed from local whitelist.`, channelId);
     },
 
-    /**
-     * Handles permit list rotation logic for a user in a specific channel.
-     * If the permit limit is reached and rotation is enabled, the oldest entry is removed.
-     * @param userId The ID of the user to permit
-     * @param channelId The target voice channel ID
-     */
     applyPermitRotation(userId: string, channelId: string) {
         if (!this.settings) return;
-        const s = this.settings as any; // permitLimit / permitRotateEnabled are new fields
+        const s = this.settings;
 
         const meId = Users.getCurrentUser()?.id;
         if (!meId) return;
@@ -102,7 +96,7 @@ export const WhitelistModule: PluginModule = {
 
         if (config.permittedUsers.includes(userId)) {
             sendDebugMessage(`<@${userId}> is already permitted, skipping duplicate.`, channelId);
-            return; // Already in list
+            return;
         }
 
         if (rotateEnabled && config.permittedUsers.length >= permitLimit) {
@@ -129,19 +123,12 @@ export const WhitelistModule: PluginModule = {
 
     // ── Permit / Unpermit ─────────────────────────────────────────────────
 
-    /**
-     * Permits multiple users into a voice channel, applying rotation logic if necessary.
-     * @param members Array of user IDs or member-like objects to permit
-     * @param channelId The target voice channel ID
-     */
     permitUsers(members: (MemberLike | string)[], channelId: string) {
         if (!this.settings) return;
         for (const member of members) {
             const userId = extractId(member);
             if (!userId) continue;
-            // Apply rotation logic (adds to tracked list + handles overflow)
             this.applyPermitRotation(userId, channelId);
-            // Queue the actual bot command
             const cmd = formatCommand(this.settings.permitCommand, channelId, { userId });
             sendDebugMessage(`Permitting user <@${userId}>`, channelId);
             actionQueue.enqueue(cmd, channelId);
@@ -161,7 +148,6 @@ export const WhitelistModule: PluginModule = {
             const cmd = formatCommand(this.settings.unpermitCommand, channelId, { userId });
             sendDebugMessage(`Unpermitting user <@${userId}>`, channelId);
             actionQueue.enqueue(cmd, channelId);
-            // Remove from tracked list
             if (meId && stateManager.hasMemberConfig(meId)) {
                 const config = stateManager.getMemberConfig(meId);
                 const filtered = config.permittedUsers.filter(id => id !== userId);
@@ -192,15 +178,8 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) {
-                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
-            }
-
-            const whitelist = WhitelistModule.getWhitelist();
-            if (!whitelist.includes(userId)) {
-                whitelist.push(userId);
-                WhitelistModule.setWhitelist(whitelist);
-            }
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            WhitelistModule.whitelistUser(userId, ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Whitelisted <@${userId}> locally.` });
         }
     },
@@ -218,10 +197,7 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) {
-                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
-            }
-
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
             WhitelistModule.unwhitelistUser(userId, ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Removed <@${userId}> from local whitelist.` });
         }
@@ -240,10 +216,7 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) {
-                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
-            }
-            WhitelistModule.whitelistUser(userId, ctx.channel.id);
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
             WhitelistModule.permitUser(userId, ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Permitted <@${userId}>` });
         }
@@ -262,9 +235,7 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const userId = args.find(a => a.name === "user")?.value;
-            if (!userId || !ctx.channel) {
-                return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing user." });
-            }
+            if (!userId || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
             WhitelistModule.unpermitUser(userId, ctx.channel.id);
             return sendBotMessage(ctx.channel.id, { content: `Unpermitted <@${userId}>` });
         }

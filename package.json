@@ -1,7 +1,7 @@
 {
-    "name": "socializeGuild",
+    "name": "pluginTemplate",
     "version": "1.0.0",
-    "description": "Automatically takes actions against users joining your voice channel",
+    "description": "Boilerplate for modular plugins",
     "main": "index.tsx",
     "author": {
         "name": "Bluscream",
@@ -10,7 +10,7 @@
     "license": "GPL-3.0-or-later",
     "repository": {
         "type": "git",
-        "url": "https://github.com/bluscream-vencord-plugins/socializeGuild.git"
+        "url": "https://github.com/bluscream-vencord-plugins/pluginTemplate.git"
     },
     "vencord": {
         "plugin": true,

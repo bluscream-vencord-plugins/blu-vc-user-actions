@@ -1,4 +1,4 @@
-import { moduleRegistry } from "../utils/moduleRegistry";
+import { moduleRegistry } from "../core/moduleRegistry";
 import { logger } from "./logger";
 import { SelectedChannelStore } from "@webpack/common";
 import { sendEphemeralMessage } from "./messaging";
@@ -10,7 +10,7 @@ import { sendEphemeralMessage } from "./messaging";
  */
 export function sendDebugMessage(content: any, channelId?: string) {
     logger.debug(content);
-    const settings = moduleRegistry["settings"];
+    const settings = moduleRegistry.settings as any;
     if (!settings || !settings.enableDebug) return;
 
     const targetChannelId = channelId || SelectedChannelStore.getVoiceChannelId() || SelectedChannelStore.getChannelId();

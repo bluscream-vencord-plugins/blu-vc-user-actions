@@ -1,5 +1,4 @@
 import { ChannelOwnership, MemberChannelInfo, PluginState } from "../types/state";
-import { PluginSettings } from "../types/settings";
 import { logger } from "./logger";
 import * as DataStore from "@api/DataStore";
 
@@ -9,7 +8,7 @@ const STORAGE_KEY_MEMBERS = "SocializeGuild_Members_v3";
 /**
  * Internal store structure combining plugin settings with runtime state.
  */
-type StoreWithState = PluginSettings & {
+type StoreWithState = any & { // Loose type for the Vencord store
     /** Map of channel IDs to their ownership metadata */
     activeChannelOwnerships: Record<string, ChannelOwnership>;
     /** Map of user IDs to their personal channel configurations */
@@ -28,7 +27,7 @@ export class StateManager {
      * Initializes the state manager and loads stored data from the Vencord DataStore.
      * @param vencordStore The core Vencord settings store proxy
      */
-    public async init(vencordStore: PluginSettings) {
+    public async init(vencordStore: any) {
         this.store = vencordStore as StoreWithState;
         this.store.activeChannelOwnerships = {};
         this.store.memberConfigs = {};
@@ -61,10 +60,6 @@ export class StateManager {
     private async flushSave() {
         this.saveTimer = null;
         try {
-            // Deep-clone via JSON round-trip to produce a plain object.
-            // this.store is a Vencord Proxy — the structured clone algorithm
-            // used by IndexedDB cannot serialize Proxy objects directly, causing
-            // DataCloneError. The JSON round-trip strips the Proxy wrapper.
             const ownerships = JSON.parse(JSON.stringify(this.store.activeChannelOwnerships ?? {}));
             const members = JSON.parse(JSON.stringify(this.store.memberConfigs ?? {}));
             await DataStore.setMany([
@@ -162,7 +157,17 @@ export class StateManager {
         }
         return ownerships;
     }
+    /**
+     * Resets the plugin's internal state to empty.
+     */
+    public resetState() {
+        if (!this.store) return;
+        this.store.activeChannelOwnerships = {};
+        this.store.memberConfigs = {};
+        this.scheduleSave();
+    }
 }
+
 
 /**
  * The singleton instance of the StateManager.

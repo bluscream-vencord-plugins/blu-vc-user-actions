@@ -35,6 +35,7 @@ export function sendExternalMessage(channelId: string, content: string) {
         return sendBotMessage(channelId, { content });
     }
 }
+
 /**
  * Sends an ephemeral (local-only) bot message to a channel.
  * @param channelId The target channel ID.
@@ -44,13 +45,13 @@ export function sendEphemeralMessage(channelId: string, content: string, authorN
     try {
         const { sendBotMessage } = require("@api/Commands");
         const { UserStore: Users } = require("@webpack/common");
-        const { moduleRegistry } = require("../utils/moduleRegistry");
+        const { moduleRegistry } = require("../core/moduleRegistry");
 
         const user = Users.getCurrentUser();
         const settings = moduleRegistry.settings as any;
 
-        let finalAuthorName = authorName || settings.ephemeralAuthorName || "Socialize Voice [!]";
-        let finalAuthorIconUrl = authorIconUrl || settings.ephemeralAuthorIconUrl || "";
+        let finalAuthorName = authorName || settings?.ephemeralAuthorName || "Socialize Voice [!]";
+        let finalAuthorIconUrl = authorIconUrl || settings?.ephemeralAuthorIconUrl || "";
 
         if (user) {
             const replacements = {

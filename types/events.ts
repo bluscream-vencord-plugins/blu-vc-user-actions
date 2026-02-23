@@ -31,18 +31,23 @@ export enum BotResponseType {
 /**
  * List of custom internal events used for communication between modules.
  */
-export enum PluginModuleEvent {
+export enum CoreEvent {
+    /** Dispatched when a module is fully initialized */
+    MODULE_INIT = "MODULE_INIT",
+    /** Dispatched when a message is created in a relevant channel */
+    MESSAGE_CREATE = "MESSAGE_CREATE",
+    /** Dispatched when a voice state change is detected */
+    VOICE_STATE_UPDATE = "VOICE_STATE_UPDATE",
+    /** Dispatched when an action is added to the ActionQueue */
+    ACTION_QUEUED = "ACTION_QUEUED",
+    /** Dispatched when an action is successfully executed from the ActionQueue */
+    ACTION_EXECUTED = "ACTION_EXECUTED",
+
     /** Fired when the internal state of a channel changes */
     CHANNEL_OWNERSHIP_CHANGED = "SOCIALIZE_CHANNEL_OWNERSHIP_CHANGED",
 
     /** Fired when the target bot confirms a change via embed */
     BOT_EMBED_RECEIVED = "SOCIALIZE_BOT_EMBED_RECEIVED",
-
-    /** Fired before a command is sent by the action queue */
-    ACTION_EXECUTED = "SOCIALIZE_ACTION_EXECUTED",
-
-    /** Fired when a command is added to the action queue */
-    ACTION_QUEUED = "SOCIALIZE_ACTION_QUEUED",
 
     /** Fired when our local user joins a managed channel */
     LOCAL_USER_JOINED_MANAGED_CHANNEL = "SOCIALIZE_LOCAL_USER_JOINED_MANAGED_CHANNEL",
@@ -59,7 +64,13 @@ export enum PluginModuleEvent {
  * Map of event types to their corresponding data payload shapes.
  */
 export interface EventPayloads {
-    [PluginModuleEvent.CHANNEL_OWNERSHIP_CHANGED]: {
+    [CoreEvent.MODULE_INIT]: { moduleName: string };
+    [CoreEvent.MESSAGE_CREATE]: { message: any };
+    [CoreEvent.VOICE_STATE_UPDATE]: { oldState: any; newState: any };
+    [CoreEvent.ACTION_QUEUED]: { item: any };
+    [CoreEvent.ACTION_EXECUTED]: { item: any };
+
+    [CoreEvent.CHANNEL_OWNERSHIP_CHANGED]: {
         /** The ID of the channel */
         channelId: string;
         /** Previous ownership data */
@@ -67,7 +78,7 @@ export interface EventPayloads {
         /** New ownership data */
         newOwnership: ChannelOwnership | null;
     };
-    [PluginModuleEvent.BOT_EMBED_RECEIVED]: {
+    [CoreEvent.BOT_EMBED_RECEIVED]: {
         /** ID of the message containing the embed */
         messageId: string;
         /** ID of the channel where the message appeared */
@@ -81,23 +92,15 @@ export interface EventPayloads {
         /** The raw Discord embed object */
         embed: unknown;
     };
-    [PluginModuleEvent.ACTION_EXECUTED]: {
-        /** The queue item that was processed */
-        item: ActionQueueItem;
-    };
-    [PluginModuleEvent.ACTION_QUEUED]: {
-        /** The queue item that was created */
-        item: ActionQueueItem;
-    };
-    [PluginModuleEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL]: {
+    [CoreEvent.LOCAL_USER_JOINED_MANAGED_CHANNEL]: {
         /** The ID of the managed channel */
         channelId: string;
     };
-    [PluginModuleEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL]: {
+    [CoreEvent.LOCAL_USER_LEFT_MANAGED_CHANNEL]: {
         /** The ID of the managed channel */
         channelId: string;
     };
-    [PluginModuleEvent.USER_JOINED_OWNED_CHANNEL]: {
+    [CoreEvent.USER_JOINED_OWNED_CHANNEL]: {
         /** The ID of the voice channel */
         channelId: string;
         /** The ID of the user who joined */
@@ -110,11 +113,15 @@ export interface EventPayloads {
         isHandled?: boolean;
         /** Narrative reason for the allow/handle decision */
         reason?: string;
+        /** Whether the user is currently being moderated (kicking/banning) */
+        isModerated?: boolean;
     };
-    [PluginModuleEvent.USER_LEFT_OWNED_CHANNEL]: {
+    [CoreEvent.USER_LEFT_OWNED_CHANNEL]: {
         /** The ID of the voice channel */
         channelId: string;
         /** The ID of the user who left */
         userId: string;
     };
+    // Fallback for custom string events
+    [key: string]: any;
 }

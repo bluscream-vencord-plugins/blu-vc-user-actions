@@ -1,7 +1,6 @@
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
-
 import { pluginInfo } from "./info";
-import { moduleRegistry } from "./utils/moduleRegistry";
+import { moduleRegistry } from "./core/moduleRegistry";
 import { stateManager } from "./utils/state";
 import { openSettings } from "./utils/settings";
 
@@ -9,8 +8,6 @@ import { ownershipCommands } from "./modules/ownership";
 import { bansCommands } from "./modules/bans";
 import { whitelistCommands } from "./modules/whitelist";
 import { channelNameRotationCommands } from "./modules/channelNameRotation";
-import { OwnershipActions } from "./modules/ownership";
-
 
 const coreCommands = [
     {
@@ -18,7 +15,7 @@ const coreCommands = [
         description: "View SocializeGuild memory statistics",
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            const settings = moduleRegistry["settings"];
+            const settings = moduleRegistry.settings;
             if (!settings) {
                 return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
             }

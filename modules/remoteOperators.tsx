@@ -1,5 +1,5 @@
 import { ApplicationCommandOptionType } from "@api/Commands";
-import { PluginModule } from "../utils/moduleRegistry";
+import { PluginModule } from "../types/module";
 import { logger } from "../utils/logger";
 import { RelationshipStore, React, Menu } from "@webpack/common";
 import { OwnershipActions, isUserOwner } from "./ownership";
@@ -13,15 +13,10 @@ import { OptionType } from "@utils/types";
  * Settings definitions for the RemoteOperatorsModule.
  */
 export const remoteOperatorsSettings = {
-    // ── Remote Operators ──────────────────────────────────────────────────
-    /** Whether to allow certain authorized users to control your channel via text commands. */
     remoteOperatorsEnabled: { type: OptionType.BOOLEAN, description: "Enable Remote Operator Commands", default: true, restartNeeded: false },
-    /** The character used to prefix remote commands (e.g., @lock). */
     externalCommandPrefix: { type: OptionType.STRING, description: "Global prefix for remote/external commands", default: "@", restartNeeded: false },
-    /** A newline-separated list of user IDs who are granted remote operator permissions. */
-    remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators — user IDs allowed to control your channel remotely (one per line)", default: "", multiline: true, restartNeeded: false },
-    /** If enabled, all users on your Discord friends list are automatically treated as remote operators. */
-    friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow all your Discord friends to act as Remote Operators", default: false, restartNeeded: false },
+    remoteOperatorList: { type: OptionType.STRING, description: "Remote Operators", default: "", multiline: true, restartNeeded: false },
+    friendsCountAsOperator: { type: OptionType.BOOLEAN, description: "Allow Discord friends to act as Remote Operators", default: false, restartNeeded: false },
 };
 
 export type RemoteOperatorsSettingsType = typeof remoteOperatorsSettings;
@@ -31,10 +26,10 @@ const checkPermission = (msg: any, s: any) =>
 
 export const RemoteOperatorsModule: PluginModule = {
     name: "RemoteOperatorsModule",
-    description: "Allows authorized users to control the local user's voice channel remotely.",
+    description: "Allows authorized users to control the voice channel remotely.",
     requiredDependencies: ["OwnershipModule", "BansModule", "WhitelistModule", "BlacklistModule"],
     settingsSchema: remoteOperatorsSettings,
-    settings: undefined as unknown as Record<string, any>,
+    settings: null,
 
     init(settings: Record<string, any>) {
         this.settings = settings;
@@ -43,22 +38,17 @@ export const RemoteOperatorsModule: PluginModule = {
     stop() {
         // Nothing specific to stop
     },
-    /**
-     * Checks if a user has remote operator privileges based on friends list or explicit ID list.
-     * @param userId The ID of the user to check
-     */
+
     isOperator(userId: string): boolean {
         if (!this.settings) return false;
-        if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(userId)) {
-            return true;
-        } else if (this.settings.remoteOperatorList) {
+        if (this.settings.friendsCountAsOperator && RelationshipStore.isFriend(userId)) return true;
+        if (this.settings.remoteOperatorList) {
             const operatorList = getNewLineList(this.settings.remoteOperatorList);
-            if (operatorList.includes(userId)) {
-                return true;
-            }
+            if (operatorList.includes(userId)) return true;
         }
         return false;
     },
+
     getToolboxMenuItems(): React.ReactElement[] {
         if (!this.settings) return [];
         return [
@@ -75,15 +65,11 @@ export const RemoteOperatorsModule: PluginModule = {
         ];
     },
 
-    /**
-     * List of remotely executable commands and their handler logic.
-     */
     externalCommands: [
         {
             name: "info",
             description: "Request channel info remotely",
-            execute: (args, msg, channelId) => {
-                logger.info(`RemoteAction (${msg.author.username}): Requesting channel info`);
+            execute: (_args, _msg, channelId) => {
                 OwnershipActions.syncInfo(channelId);
                 return true;
             }
@@ -91,7 +77,7 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "claim",
             description: "Claim the current channel",
-            execute: (args, msg, channelId) => {
+            execute: (_args, _msg, channelId) => {
                 OwnershipActions.claimChannel(channelId);
                 return true;
             }
@@ -100,8 +86,7 @@ export const RemoteOperatorsModule: PluginModule = {
             name: "lock",
             description: "Lock channel remotely",
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                logger.info(`RemoteAction (${msg.author.username}): Locking channel`);
+            execute: (_args, _msg, channelId) => {
                 OwnershipActions.lockChannel(channelId);
                 return true;
             }
@@ -110,8 +95,7 @@ export const RemoteOperatorsModule: PluginModule = {
             name: "unlock",
             description: "Unlock channel remotely",
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                logger.info(`RemoteAction (${msg.author.username}): Unlocking channel`);
+            execute: (_args, _msg, channelId) => {
                 OwnershipActions.unlockChannel(channelId);
                 return true;
             }
@@ -120,8 +104,7 @@ export const RemoteOperatorsModule: PluginModule = {
             name: "reset",
             description: "Reset channel remotely",
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                logger.info(`RemoteAction (${msg.author.username}): Resetting channel`);
+            execute: (_args, _msg, channelId) => {
                 OwnershipActions.resetChannel(channelId);
                 return true;
             }
@@ -129,15 +112,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "name",
             description: "Rename channel remotely",
-            options: [
-                { name: "target", description: "The new name for the channel", type: ApplicationCommandOptionType.STRING, required: true }
-            ],
+            options: [{ name: "target", description: "New name", type: ApplicationCommandOptionType.STRING, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const newName = args.target;
-                if (newName) {
-                    logger.info(`RemoteAction (${msg.author.username}): Renaming channel to ${newName}`);
-                    OwnershipActions.renameChannel(channelId, newName);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    OwnershipActions.renameChannel(channelId, args.target);
                     return true;
                 }
                 return false;
@@ -146,15 +125,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "size",
             description: "Set channel size remotely",
-            options: [
-                { name: "target", description: "The user limit (0 for unlimited)", type: ApplicationCommandOptionType.INTEGER, required: true }
-            ],
+            options: [{ name: "target", description: "Limit", type: ApplicationCommandOptionType.INTEGER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const size = args.target;
-                if (size !== undefined) {
-                    logger.info(`RemoteAction (${msg.author.username}): Setting size to ${size}`);
-                    OwnershipActions.setChannelSize(channelId, size);
+            execute: (args, _msg, channelId) => {
+                if (args.target !== undefined) {
+                    OwnershipActions.setChannelSize(channelId, args.target);
                     return true;
                 }
                 return false;
@@ -164,24 +139,19 @@ export const RemoteOperatorsModule: PluginModule = {
             name: "kick banned",
             description: "Kick all banned users remotely",
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                logger.info(`RemoteAction (${msg.author.username}): Kicking all banned users`);
-                const n = OwnershipActions.kickBannedUsers(channelId);
-                return n >= 0;
+            execute: (_args, _msg, channelId) => {
+                OwnershipActions.kickBannedUsers(channelId);
+                return true;
             }
         },
         {
             name: "kick",
             description: "Kick user remotely",
-            options: [
-                { name: "target", description: "The user to kick", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to kick", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Kicking user ${target}`);
-                    OwnershipActions.kickUser(channelId, target);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    OwnershipActions.kickUser(channelId, args.target);
                     return true;
                 }
                 return false;
@@ -190,15 +160,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "ban",
             description: "Ban user remotely",
-            options: [
-                { name: "target", description: "The user to ban", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to ban", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
             execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Banning user ${target}`);
-                    BansModule.enforceBanPolicy(target, channelId, true, `Remote action by ${msg.author.username}`);
+                if (args.target) {
+                    BansModule.enforceBanPolicy(args.target, channelId, true, `Remote action by ${msg.author.username}`);
                     return true;
                 }
                 return false;
@@ -207,15 +173,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "unban",
             description: "Unban user remotely",
-            options: [
-                { name: "target", description: "The user to unban", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to unban", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Unbanning user ${target}`);
-                    BansModule.unbanUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    BansModule.unbanUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -224,15 +186,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "permit",
             description: "Permit user remotely",
-            options: [
-                { name: "target", description: "The user to permit", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to permit", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Permitting user ${target}`);
-                    WhitelistModule.permitUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    WhitelistModule.permitUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -241,15 +199,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "unpermit",
             description: "Unpermit user remotely",
-            options: [
-                { name: "target", description: "The user to unpermit", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to unpermit", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Unpermitting user ${target}`);
-                    WhitelistModule.unpermitUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    WhitelistModule.unpermitUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -258,15 +212,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "whitelist",
             description: "Whitelist user remotely",
-            options: [
-                { name: "target", description: "The user to whitelist", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to whitelist", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Whitelisting user ${target}`);
-                    WhitelistModule.whitelistUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    WhitelistModule.whitelistUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -275,15 +225,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "unwhitelist",
             description: "Unwhitelist user remotely",
-            options: [
-                { name: "target", description: "The user to unwhitelist", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to unwhitelist", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Unwhitelisting user ${target}`);
-                    WhitelistModule.unwhitelistUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    WhitelistModule.unwhitelistUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -292,15 +238,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "blacklist",
             description: "Blacklist user remotely",
-            options: [
-                { name: "target", description: "The user to blacklist", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to blacklist", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Blacklisting user ${target}`);
-                    BlacklistModule.blacklistUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    BlacklistModule.blacklistUser(args.target, channelId);
                     return true;
                 }
                 return false;
@@ -309,15 +251,11 @@ export const RemoteOperatorsModule: PluginModule = {
         {
             name: "unblacklist",
             description: "Unblacklist user remotely",
-            options: [
-                { name: "target", description: "The user to unblacklist", type: ApplicationCommandOptionType.USER, required: true }
-            ],
+            options: [{ name: "target", description: "User to unblacklist", type: ApplicationCommandOptionType.USER, required: true }],
             checkPermission: (msg, s) => checkPermission(msg, s),
-            execute: (args, msg, channelId) => {
-                const target = args.target;
-                if (target) {
-                    logger.info(`RemoteAction (${msg.author.username}): Unblacklisting user ${target}`);
-                    BlacklistModule.unblacklistUser(target, channelId);
+            execute: (args, _msg, channelId) => {
+                if (args.target) {
+                    BlacklistModule.unblacklistUser(args.target, channelId);
                     return true;
                 }
                 return false;

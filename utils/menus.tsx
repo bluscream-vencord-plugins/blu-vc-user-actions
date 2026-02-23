@@ -1,7 +1,6 @@
 import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChannelStore } from "@webpack/common";
 
-// Vencord types
-import { moduleRegistry } from "./moduleRegistry";
+import { moduleRegistry } from "../core/moduleRegistry";
 import { logger } from "./logger";
 
 /**
