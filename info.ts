@@ -1,6 +1,6 @@
 export const pluginInfo = {
     id: "socializeGuild",
-    name: "socializeGuild",
+    name: "SocializeGuild",
     commandName: "socialize",
     description: "Automatically takes actions against users joining your voice channel",
     color: "#7289da",

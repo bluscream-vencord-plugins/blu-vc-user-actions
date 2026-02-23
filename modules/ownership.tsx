@@ -20,7 +20,7 @@ import {
     Menu, React, showToast
 } from "@webpack/common";
 import { openSettings, getNewLineList } from "../utils/settings";
-import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandOptionType, ApplicationCommandInputType, ApplicationCommandType, sendBotMessage } from "@api/Commands";
 import { OptionType } from "@utils/types";
 import { pluginInfo } from "../info";
 
@@ -40,7 +40,7 @@ export const ownershipSettings = {
     /** Command template to unlock a channel. */
     unlockCommand: { type: OptionType.STRING, description: "Unlock Channel Command", default: "!v unlock", restartNeeded: false },
     /** Command template to reset a channel's settings. */
-    resetCommand: { type: OptionType.STRING, description: "Reset Channel Command", default: "!v name \"\" | !v limit 0 | !v unlock", restartNeeded: false },
+    resetCommand: { type: OptionType.STRING, description: "Reset Channel Command", default: "!v reset", restartNeeded: false },
     /** Command template to request channel info from the bot. */
     infoCommand: { type: OptionType.STRING, description: "Get Channel Info Command", default: "!v info", restartNeeded: false },
     /** Command template to kick a user. */
@@ -228,67 +228,78 @@ export const ownershipCommands = [
     {
         name: `${pluginInfo.commandName} sync`,
         description: "Force manual sync of channel info and ownership",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             const settings = moduleRegistry.settings;
             if (!settings || !ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Plugin not initialized." });
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Plugin not initialized." });
+                return;
             }
             OwnershipActions.syncInfo(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
+            sendBotMessage(ctx.channel.id, { content: "Information sync requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} claim`,
         description: "Claim the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             OwnershipActions.claimChannel(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Claim requested." });
+            sendBotMessage(ctx.channel.id, { content: "Claim requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} lock`,
         description: "Lock the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             OwnershipActions.lockChannel(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Lock requested." });
+            sendBotMessage(ctx.channel.id, { content: "Lock requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} unlock`,
         description: "Unlock the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             OwnershipActions.unlockChannel(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Unlock requested." });
+            sendBotMessage(ctx.channel.id, { content: "Unlock requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} reset`,
         description: "Reset the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             OwnershipActions.resetChannel(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Reset requested." });
+            sendBotMessage(ctx.channel.id, { content: "Reset requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} rename`,
         description: "Rename the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -300,20 +311,23 @@ export const ownershipCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             const newName = args.find(a => a.name === "name")?.value;
             if (!newName) {
-                return sendBotMessage(ctx.channel.id, { content: "Missing name parameter." });
+                sendBotMessage(ctx.channel.id, { content: "Missing name parameter." });
+                return;
             }
 
             OwnershipActions.renameChannel(ctx.channel.id, newName);
-            return sendBotMessage(ctx.channel.id, { content: `Rename to "${newName}" requested.` });
+            sendBotMessage(ctx.channel.id, { content: `Rename to "${newName}" requested.` });
         }
     },
     {
         name: `${pluginInfo.commandName} limit`,
         description: "Set the user limit for the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -327,20 +341,23 @@ export const ownershipCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
             const size = args.find(a => a.name === "size")?.value;
             if (typeof size !== 'number') {
-                return sendBotMessage(ctx.channel.id, { content: "Missing or invalid size parameter." });
+                sendBotMessage(ctx.channel.id, { content: "Missing or invalid size parameter." });
+                return;
             }
 
             OwnershipActions.setChannelSize(ctx.channel.id, size);
-            return sendBotMessage(ctx.channel.id, { content: `User limit change to ${size} requested.` });
+            sendBotMessage(ctx.channel.id, { content: `User limit change to ${size} requested.` });
         }
     },
     {
         name: `${pluginInfo.commandName} kick`,
         description: "Kick a user from the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -352,19 +369,24 @@ export const ownershipCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             OwnershipActions.kickUsers(ctx.channel.id, userIds);
-            return sendBotMessage(ctx.channel.id, { content: `Kick requested for ${userIds.length} user(s).` });
+            sendBotMessage(ctx.channel.id, { content: `Kick requested for ${userIds.length} user(s).` });
         }
     },
     {
         name: `${pluginInfo.commandName} kick-banned`,
         description: "Kick all locally banned users from the current voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             if (!ctx.channel) {
-                return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
             }
 
             const n = OwnershipActions.kickBannedUsers(ctx.channel.id);
@@ -374,43 +396,47 @@ export const ownershipCommands = [
             } else {
                 content = n > 0 ? `Kicked ${n} banned user(s).` : "No banned users found in your channel.";
             }
-            return sendBotMessage(ctx.channel.id, { content });
+            sendBotMessage(ctx.channel.id, { content });
         }
     },
     {
         name: `${pluginInfo.commandName} reset-state`,
         description: "Emergency reset of SocializeGuild internal state",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.resetState();
-            return sendBotMessage(ctx.channel.id, { content: "Plugin state reset requested." });
+            sendBotMessage(ctx.channel.id, { content: "Plugin state reset requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} create`,
         description: "Join the creation channel to create a new managed voice channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.createChannel();
-            return sendBotMessage(ctx.channel.id, { content: "Channel creation requested." });
+            sendBotMessage(ctx.channel.id, { content: "Channel creation requested." });
         }
     },
     {
         name: `${pluginInfo.commandName} find`,
         description: "Find an existing owned channel or create a new one",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipActions.findOrCreateChannel(false);
-            return sendBotMessage(ctx.channel.id, { content: "Searching for or creating your channel..." });
+            sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Searching for or creating your channel..." });
         }
     },
     {
         name: `${pluginInfo.commandName} fetch-owners`,
         description: "Fetch all channel owners in the managed category",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             OwnershipModule.fetchAllOwners();
-            return sendBotMessage(ctx.channel.id, { content: "Started fetching all owners. This may take a moment." });
+            sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Started fetching all owners. This may take a moment." });
         }
     }
 ];

@@ -7,7 +7,7 @@ import { getNewLineList } from "../utils/settings";
 import { ChannelStore } from "@webpack/common";
 
 import { OptionType } from "@utils/types";
-import { ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandType, sendBotMessage } from "@api/Commands";
 import { pluginInfo } from "../info";
 
 /**
@@ -90,20 +90,25 @@ export const channelNameRotationCommands = [
     {
         name: `${pluginInfo.commandName} name start`,
         description: "Manually start name rotation for current channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
-            if (!ctx.channel) return sendBotMessage(ctx.channel.id, { content: "Join a channel first." });
+            if (!ctx.channel) {
+                sendBotMessage("unknown", { content: "Join a channel first." });
+                return;
+            }
             ChannelNameRotationModule.startRotation(ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: "Started name rotation." });
+            sendBotMessage(ctx.channel.id, { content: "Started name rotation." });
         }
     },
     {
         name: `${pluginInfo.commandName} name stop`,
         description: "Manually stop name rotation",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         execute: (_args: any[], ctx: any) => {
             ChannelNameRotationModule.stopRotation();
-            return sendBotMessage(ctx.channel.id, { content: "Stopped name rotation." });
+            sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Stopped name rotation." });
         }
     }
 ];

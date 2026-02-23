@@ -13,7 +13,7 @@ import { getNewLineList } from "../utils/settings";
 import { isUserInVoiceChannel } from "../utils/channels";
 import { BlacklistModule } from "./blacklist";
 import { OptionType } from "@utils/types";
-import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandOptionType, ApplicationCommandType, sendBotMessage } from "@api/Commands";
 import { pluginInfo } from "../info";
 import { RequiredRoleMode } from "./roleEnforcement";
 
@@ -203,6 +203,7 @@ export const bansCommands = [
     {
         name: `${pluginInfo.commandName} ban`,
         description: "Add a user to the local ban list",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -214,15 +215,19 @@ export const bansCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             userIds.forEach(uid => BansModule.enforceBanPolicy(uid, ctx.channel.id, true, "Manual Ban"));
-            return sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for ${userIds.length} user(s).` });
+            sendBotMessage(ctx.channel.id, { content: `Triggered ban sequence for ${userIds.length} user(s).` });
         }
     },
     {
         name: `${pluginInfo.commandName} unban`,
         description: "Remove a user from the local ban list",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -234,10 +239,13 @@ export const bansCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             BansModule.unbanUsers(userIds, ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for ${userIds.length} user(s).` });
+            sendBotMessage(ctx.channel.id, { content: `Triggered unban sequence for ${userIds.length} user(s).` });
         }
     }
 ];

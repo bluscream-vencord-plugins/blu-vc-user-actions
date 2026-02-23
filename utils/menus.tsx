@@ -2,6 +2,7 @@ import { UserStore as Users, ChannelStore as Channels, React, Menu, SelectedChan
 
 import { moduleRegistry } from "../core/moduleRegistry";
 import { logger } from "./logger";
+import { pluginInfo } from "../info";
 
 /**
  * Injects a new menu item into a specific submenu or group within a native Discord context menu.
@@ -46,7 +47,7 @@ export const contextMenuHandlers = {
 
         const items = moduleRegistry.collectUserItems(user, channel);
         if (items.length > 0) {
-            addToSubmenu(children, "socialize-user-menu", "SocializeGuild", items);
+            addToSubmenu(children, "socialize-user-menu", pluginInfo.name, items);
         }
     },
     "channel-context": (children: any[], props: any) => {
@@ -55,7 +56,7 @@ export const contextMenuHandlers = {
 
         const items = moduleRegistry.collectChannelItems(channel);
         if (items.length > 0) {
-            addToSubmenu(children, "socialize-channel-menu", "SocializeGuild", items);
+            addToSubmenu(children, "socialize-channel-menu", pluginInfo.name, items);
         }
     },
     "guild-context": (children: any[], props: any) => {
@@ -64,7 +65,7 @@ export const contextMenuHandlers = {
 
         const items = moduleRegistry.collectGuildItems(guild);
         if (items.length > 0) {
-            addToSubmenu(children, "socialize-guild-menu", "SocializeGuild", items);
+            addToSubmenu(children, "socialize-guild-menu", pluginInfo.name, items);
         }
     }
 };

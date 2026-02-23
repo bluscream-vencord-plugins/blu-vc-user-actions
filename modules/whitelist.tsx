@@ -10,9 +10,10 @@ import { getUserIdList, setNewLineList } from "../utils/settings";
 import { sendDebugMessage } from "../utils/debug";
 import { sendEphemeralMessage } from "../utils/messaging";
 
+import { pluginInfo } from "../info";
 import { UserStore as Users } from "@webpack/common";
 import { OptionType } from "@utils/types";
-import { ApplicationCommandOptionType, ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandOptionType, ApplicationCommandInputType, ApplicationCommandType, sendBotMessage } from "@api/Commands";
 
 /**
  * Settings definitions for the WhitelistModule.
@@ -167,8 +168,9 @@ export const WhitelistModule: PluginModule = {
 
 export const whitelistCommands = [
     {
-        name: `socialize whitelist`,
+        name: `${pluginInfo.commandName} whitelist`,
         description: "Add a user to the local whitelist",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -180,15 +182,19 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             WhitelistModule.whitelistUsers(userIds, ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Whitelisted ${userIds.length} user(s) locally.` });
+            sendBotMessage(ctx.channel.id, { content: `Whitelisted ${userIds.length} user(s) locally.` });
         }
     },
     {
-        name: `socialize unwhitelist`,
+        name: `${pluginInfo.commandName} unwhitelist`,
         description: "Remove a user from the local whitelist",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -200,15 +206,19 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             WhitelistModule.unwhitelistUsers(userIds, ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Removed ${userIds.length} user(s) from local whitelist.` });
+            sendBotMessage(ctx.channel.id, { content: `Removed ${userIds.length} user(s) from local whitelist.` });
         }
     },
     {
-        name: `socialize permit`,
+        name: `${pluginInfo.commandName} permit`,
         description: "Permit a user into managed channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -220,15 +230,19 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             WhitelistModule.permitUsers(userIds, ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Permitted ${userIds.length} user(s)` });
+            sendBotMessage(ctx.channel.id, { content: `Permitted ${userIds.length} user(s)` });
         }
     },
     {
-        name: `socialize unpermit`,
+        name: `${pluginInfo.commandName} unpermit`,
         description: "Unpermit a user from managed channel",
+        type: ApplicationCommandType.CHAT_INPUT,
         inputType: ApplicationCommandInputType.BUILT_IN,
         options: [
             {
@@ -240,10 +254,13 @@ export const whitelistCommands = [
         ],
         execute: (args: any[], ctx: any) => {
             const input = args.find(a => a.name === "users")?.value;
-            if (!input || !ctx.channel) return sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+            if (!input || !ctx.channel) {
+                sendBotMessage(ctx.channel ? ctx.channel.id : "unknown", { content: "Missing context." });
+                return;
+            }
             const userIds = parseMultiUserIds(input);
             WhitelistModule.unpermitUsers(userIds, ctx.channel.id);
-            return sendBotMessage(ctx.channel.id, { content: `Unpermitted ${userIds.length} user(s)` });
+            sendBotMessage(ctx.channel.id, { content: `Removed ${userIds.length} user(s) from permission list.` });
         }
     }
 ];
