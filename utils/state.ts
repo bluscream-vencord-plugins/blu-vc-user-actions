@@ -104,7 +104,20 @@ export class StateManager {
      * @returns The member configuration object
      */
     public getMemberConfig(userId: string): MemberChannelInfo {
-        if (!this.store?.memberConfigs[userId]) {
+        if (!this.store) {
+            return {
+                userId,
+                customName: null,
+                userLimit: null,
+                isLocked: false,
+                bannedUsers: [],
+                permittedUsers: []
+            };
+        }
+        if (!this.store.memberConfigs) {
+            this.store.memberConfigs = {};
+        }
+        if (!this.store.memberConfigs[userId]) {
             this.store.memberConfigs[userId] = {
                 userId,
                 customName: null,
